@@ -198,24 +198,49 @@ export default function Tavoli() {
 
       {senzaTavolo.length > 0 && (
         <div className="card mb-5 border-yellow-200 bg-yellow-50/40">
-          <div className="flex items-center gap-2 mb-3">
-            <UserX size={16} className="text-yellow-500" />
-            <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <UserX size={16} className="text-yellow-500" />
+              <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {senzaTavolo.map(o => (
-              <div key={o.id} className="flex items-center gap-1 bg-white border border-yellow-200 rounded-lg px-2 py-1">
-                <span className="text-sm text-gray-700">{guestLabel(o)}</span>
-                <select
-                  className="text-xs border-0 bg-transparent text-rose-500 font-semibold"
-                  value=""
-                  onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
-                >
-                  <option value="">Assegna…</option>
-                  {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                </select>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {[...senzaTavolo].sort((a, b) => {
+              const aKey = a.parent_id || a.id;
+              const bKey = b.parent_id || b.id;
+              if (aKey !== bKey) return aKey - bKey;
+              if (!a.parent_id) return -1;
+              if (!b.parent_id) return 1;
+              return a.tipo === 'adulto' ? -1 : 1;
+            }).map(o => {
+              const isChild = o.tipo === 'bambino';
+              const isPartner = !!o.parent_id && !isChild;
+              const pn = o.parent_id ? parentName(o.parent_id) : null;
+              const displayName = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+              return (
+                <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${
+                  isChild ? 'border-purple-100' : isPartner ? 'border-rose-100' : 'border-gray-100 shadow-sm'
+                }`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-800 truncate">{displayName}</div>
+                    {pn && (
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Bambino' : '♥ Partner'}</span>
+                        {' '}di {pn}
+                      </div>
+                    )}
+                  </div>
+                  <select
+                    className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
+                    value=""
+                    onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
+                  >
+                    <option value="">Assegna…</option>
+                    {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                  </select>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
