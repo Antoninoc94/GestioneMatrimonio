@@ -17,7 +17,7 @@ function Section({ title, icon: Icon, children }) {
 }
 
 export default function Impostazioni() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const { updateAppConfig } = useAppConfig();
 
   // Config matrimonio + aspetto
@@ -80,12 +80,14 @@ export default function Impostazioni() {
     if (pwd.nuova !== pwd.conferma) { setPwdMsg('Le password non coincidono'); return; }
     try {
       await api.post('/auth/change-password', { vecchia_password: pwd.vecchia, nuova_password: pwd.nuova });
-      setPwdMsg('✓ Password aggiornata!');
+      setPwdMsg('✓ Password aggiornata! Reindirizzamento al login...');
       setPwd({ vecchia: '', nuova: '', conferma: '' });
-    } catch {
-      setPwdMsg('✗ Vecchia password errata');
+      setTimeout(() => logout(), 2000);
+    } catch (err) {
+      const status = err.response?.status;
+      setPwdMsg(status === 400 ? '✗ Password attuale non corretta' : '✗ Errore, riprova');
+      setTimeout(() => setPwdMsg(''), 3500);
     }
-    setTimeout(() => setPwdMsg(''), 3000);
   };
 
   const saveEmail = async e => {
@@ -131,8 +133,8 @@ export default function Impostazioni() {
             </div>
             <div>
               <label className="form-label">Username (per il login) *</label>
-              <input className="form-input" value={profilo.username} onChange={e => setProfilo({ ...profilo, username: e.target.value })} placeholder="es. antonino" required />
-              <p className="text-xs text-gray-400 mt-1">Solo lettere minuscole, numeri e underscore</p>
+              <input className="form-input" value={profilo.username} onChange={e => setProfilo({ ...profilo, username: e.target.value.toLowerCase() })} placeholder="es. antonino" required />
+              <p className="text-xs text-gray-400 mt-1">Salvato in minuscolo — usa questo esatto username per accedere</p>
             </div>
             <div>
               <label className="form-label">Email (per le notifiche)</label>

@@ -24,8 +24,19 @@ app.use('/api/email-config', require('./routes/email-config'));
 // Serve React build in production
 const clientDist = path.join(__dirname, '../client/dist');
 if (require('fs').existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get('/{*splat}', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    }
+  }));
+  app.get('/{*splat}', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
 }
 
 const PORT = process.env.PORT || 3001;
