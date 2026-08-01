@@ -131,7 +131,7 @@ export default function Landing() {
         {/* Label "Vi invitiamo" nell'hero, solo quando c'è la foto */}
         {config.landing_foto && (
           <div style={{ position: 'absolute', top: '1.5rem', left: 0, right: 0, textAlign: 'center', zIndex: 2 }}>
-            <span style={{ color: 'rgba(255,255,255,0.85)', letterSpacing: '0.25em', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 300 }}>
+            <span style={{ color: 'rgba(255,255,255,0.92)', letterSpacing: '0.2em', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: 500 }}>
               ✦ vi invitiamo al nostro matrimonio ✦
             </span>
           </div>
