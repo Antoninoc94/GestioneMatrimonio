@@ -187,11 +187,11 @@ export default function Inviti() {
 
       {/* Nomi sposi */}
       <div style={{ color: t.title, fontSize: '28px', fontWeight: 'bold', lineHeight: 1.2, marginBottom: '3mm' }}>
-        {campi.sposo1 || 'Nome 1'}
+        {campi.sposo1 || 'Sposo'}
       </div>
       <div style={{ color: t.accent, fontSize: '16px', marginBottom: '3mm' }}>&</div>
       <div style={{ color: t.title, fontSize: '28px', fontWeight: 'bold', lineHeight: 1.2, marginBottom: '7mm' }}>
-        {campi.sposo2 || 'Nome 2'}
+        {campi.sposo2 || 'Sposa'}
       </div>
 
       {/* Divisore */}
@@ -309,11 +309,11 @@ export default function Inviti() {
           <div className="card space-y-3">
             <h3 className="text-sm font-bold text-gray-700">Sposi & Data</h3>
             <div>
-              <label className="form-label">Nome Sposo/a 1</label>
+              <label className="form-label">Nome Sposo</label>
               <input className="form-input" value={campi.sposo1} onChange={e => campo('sposo1', e.target.value)} placeholder="Antonino" />
             </div>
             <div>
-              <label className="form-label">Nome Sposo/a 2</label>
+              <label className="form-label">Nome Sposa</label>
               <input className="form-input" value={campi.sposo2} onChange={e => campo('sposo2', e.target.value)} placeholder="Valentina" />
             </div>
             <div>

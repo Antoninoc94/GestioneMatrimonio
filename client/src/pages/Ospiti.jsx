@@ -1,15 +1,15 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 
 const LATO = ['sposo1', 'sposo2', 'comune'];
 const RSVP = ['attesa', 'confermato', 'declinato'];
 const rsvpColor = { confermato: 'bg-green-100 text-green-700', declinato: 'bg-red-100 text-red-600', attesa: 'bg-yellow-100 text-yellow-700' };
 const rsvpLabel = { confermato: 'Confermato', declinato: 'Declinato', attesa: 'In attesa' };
 const rsvpIcon = { confermato: Check, declinato: X, attesa: Clock };
-const latoLabel = { sposo1: 'Sposo 1', sposo2: 'Sposo 2', comune: 'Comune' };
+const latoLabel = { sposo1: 'Sposo', sposo2: 'Sposa', comune: 'Comune' };
 
 const empty = { nome: '', cognome: '', lato: 'comune', tipo: 'adulto', rsvp: 'attesa', tavolo_id: '', email: '', telefono: '', intolleranze: '', note: '' };
 
@@ -22,7 +22,6 @@ export default function Ospiti() {
   const [filtroRsvp, setFiltroRsvp] = useState('');
   const [filtroLato, setFiltroLato] = useState('');
   const [exporting, setExporting] = useState(false);
-  const printRef = useRef();
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
@@ -59,21 +58,92 @@ export default function Ospiti() {
   const adulti = items.filter(i => i.tipo === 'adulto' && i.rsvp === 'confermato').length;
   const bambini = items.filter(i => i.tipo === 'bambino' && i.rsvp === 'confermato').length;
 
-  const exportPDF = async () => {
+  const exportPDF = () => {
     setExporting(true);
-    await new Promise(r => setTimeout(r, 100));
-    const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true });
-    const img = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const w = 210, h = (canvas.height * w) / canvas.width;
-    let y = 0;
-    while (y < h) {
-      if (y > 0) pdf.addPage();
-      pdf.addImage(img, 'PNG', 0, -y, w, h);
-      y += 297;
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+      const gray = [107, 114, 128];
+
+      // Header
+      doc.setFillColor(...rose);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Lista Ospiti', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const subtitle = `${totale} invitati · ${confermati} confermati · ${declinati} declinati · ${items.filter(i => i.rsvp === 'attesa').length} in attesa`;
+      doc.text(subtitle, 14, 20);
+
+      // Stats box
+      const statsY = 34;
+      [[`${adulti}`, 'Adulti conf.'], [`${bambini}`, 'Bambini conf.'], [`${items.filter(i => i.lato === 'sposo1').length}`, 'Lato Sposo'], [`${items.filter(i => i.lato === 'sposo2').length}`, 'Lato Sposa']].forEach(([val, lbl], i) => {
+        const x = 14 + i * 47;
+        doc.setFillColor(255, 245, 247);
+        doc.roundedRect(x, statsY, 43, 14, 2, 2, 'F');
+        doc.setTextColor(...rose);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(val, x + 21.5, statsY + 7, { align: 'center' });
+        doc.setTextColor(...gray);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.text(lbl, x + 21.5, statsY + 12, { align: 'center' });
+      });
+
+      // Table
+      const rsvpText = { confermato: '✓ Confermato', declinato: '✗ Declinato', attesa: '⏳ In attesa' };
+      const rows = (filtered.length > 0 ? filtered : items).map(o => [
+        o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
+        latoLabel[o.lato] || o.lato,
+        o.tipo === 'bambino' ? 'Bambino' : 'Adulto',
+        rsvpText[o.rsvp] || o.rsvp,
+        o.tavolo_nome || '—',
+        o.intolleranze || '—',
+      ]);
+
+      autoTable(doc, {
+        startY: statsY + 20,
+        head: [['Nome', 'Lato', 'Tipo', 'RSVP', 'Tavolo', 'Intolleranze']],
+        body: rows,
+        headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: [55, 65, 81] },
+        alternateRowStyles: { fillColor: [255, 251, 252] },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 22 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 32 },
+          4: { cellWidth: 28 },
+          5: { cellWidth: 'auto' },
+        },
+        didParseCell: data => {
+          if (data.section === 'body' && data.column.index === 3) {
+            const v = data.cell.raw;
+            if (v?.includes('✓')) data.cell.styles.textColor = [22, 163, 74];
+            else if (v?.includes('✗')) data.cell.styles.textColor = [220, 38, 38];
+            else data.cell.styles.textColor = [161, 98, 7];
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text(`Pagina ${i} di ${pageCount}`, 196, 290, { align: 'right' });
+        doc.text(`Lista Ospiti — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+      }
+
+      doc.save('lista-ospiti.pdf');
+    } finally {
+      setExporting(false);
     }
-    pdf.save('lista-ospiti.pdf');
-    setExporting(false);
   };
 
   return (
@@ -123,7 +193,7 @@ export default function Ospiti() {
       </div>
 
       {/* Tabella */}
-      <div ref={printRef} className="card">
+      <div className="card">
         {confermati > 0 && (
           <div className="text-xs text-gray-400 mb-3">
             Confermati: {adulti} adulti + {bambini} bambini

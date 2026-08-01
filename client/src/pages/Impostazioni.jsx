@@ -201,11 +201,11 @@ export default function Impostazioni() {
           <form onSubmit={saveConfig} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="form-label">Nome Sposo/a 1</label>
+                <label className="form-label">Nome Sposo</label>
                 <input className="form-input" value={config.nome_sposo1} onChange={e => setConfig({ ...config, nome_sposo1: e.target.value })} />
               </div>
               <div>
-                <label className="form-label">Nome Sposo/a 2</label>
+                <label className="form-label">Nome Sposa</label>
                 <input className="form-input" value={config.nome_sposo2} onChange={e => setConfig({ ...config, nome_sposo2: e.target.value })} />
               </div>
             </div>
