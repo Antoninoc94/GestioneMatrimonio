@@ -131,13 +131,13 @@ export default function Conferma() {
         <div className="w-full max-w-md space-y-3">
 
           {/* ── Pagina disabilitata ── */}
-          {disabilitata && (
+          {disabilitata ? (
             <div className="text-center py-12">
               <div className="text-5xl mb-4">🔒</div>
               <h2 className="text-xl font-bold text-gray-700 mb-2">Pagina non disponibile</h2>
               <p className="text-gray-400 text-sm">La conferma presenze è momentaneamente chiusa. Contatta gli sposi per maggiori informazioni.</p>
             </div>
-          )}
+          ) : <>
 
           {/* ── Step 3: Inviato ── */}
           {inviato && (
@@ -330,6 +330,8 @@ export default function Conferma() {
               </form>
             </div>
           )}
+
+          </> /* fine blocco !disabilitata */}
 
         </div>
       </main>
