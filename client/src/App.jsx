@@ -19,6 +19,8 @@ import Regali from './pages/Regali';
 import Viaggio from './pages/Viaggio';
 import Inviti from './pages/Inviti';
 import Conferma from './pages/Conferma';
+import Landing from './pages/Landing';
+import LandingEditor from './pages/LandingEditor';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -30,6 +32,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/conferma" element={<Conferma />} />
+      <Route path="/wedding" element={<Landing />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />
@@ -47,6 +50,7 @@ function AppRoutes() {
         <Route path="regali" element={<Regali />} />
         <Route path="viaggio" element={<Viaggio />} />
         <Route path="inviti" element={<Inviti />} />
+        <Route path="landing" element={<LandingEditor />} />
       </Route>
     </Routes>
   );

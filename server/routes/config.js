@@ -13,11 +13,21 @@ router.get('/', auth, (req, res) => {
 });
 
 router.put('/', auth, (req, res) => {
-  const { data_matrimonio, budget_totale, nome_sposo1, nome_sposo2, app_name, app_emoji, login_subtitle, conferma_abilitata } = req.body;
-  db.prepare(`UPDATE config SET data_matrimonio=?, budget_totale=?, nome_sposo1=?, nome_sposo2=?, app_name=?, app_emoji=?, login_subtitle=?, conferma_abilitata=?, updated_at=datetime('now')`)
-    .run(data_matrimonio, budget_totale, nome_sposo1, nome_sposo2,
+  const {
+    data_matrimonio, budget_totale, nome_sposo1, nome_sposo2,
+    app_name, app_emoji, login_subtitle, conferma_abilitata,
+    landing_abilitata, landing_messaggio, landing_dress_code,
+    landing_info_pratiche, landing_tema
+  } = req.body;
+  db.prepare(`UPDATE config SET data_matrimonio=?, budget_totale=?, nome_sposo1=?, nome_sposo2=?, app_name=?, app_emoji=?, login_subtitle=?, conferma_abilitata=?, landing_abilitata=?, landing_messaggio=?, landing_dress_code=?, landing_info_pratiche=?, landing_tema=?, updated_at=datetime('now')`)
+    .run(
+      data_matrimonio, budget_totale, nome_sposo1, nome_sposo2,
       app_name || 'Il Nostro Matrimonio', app_emoji || '💍', login_subtitle || '',
-      conferma_abilitata === false || conferma_abilitata === 0 ? 0 : 1);
+      conferma_abilitata === false || conferma_abilitata === 0 ? 0 : 1,
+      landing_abilitata === false || landing_abilitata === 0 ? 0 : 1,
+      landing_messaggio || '', landing_dress_code || '', landing_info_pratiche || '',
+      landing_tema || 'rose'
+    );
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette, Eye, EyeOff, Globe } from 'lucide-react';
+import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette, Eye, EyeOff, Globe, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../AuthContext';
 import { useAppConfig } from '../AppConfigContext';
@@ -255,6 +256,24 @@ export default function Impostazioni() {
               <Save size={15} /> {aspettoSaved ? 'Salvato!' : 'Salva Aspetto'}
             </button>
           </form>
+        </Section>
+
+        {/* Pagina Wedding */}
+        <Section title="Pagina Wedding Pubblica" icon={Globe}>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Crea e personalizza la pagina pubblica del matrimonio con foto, programma, location e dress code.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/landing" className="btn-primary text-sm">
+                <Globe size={14} /> Personalizza pagina
+              </Link>
+              <a href="/wedding" target="_blank" rel="noopener noreferrer" className="btn-secondary text-sm">
+                <ExternalLink size={14} /> Anteprima
+              </a>
+            </div>
+            <p className="text-xs text-gray-400">La pagina è accessibile su <code className="bg-gray-100 px-1 rounded">/wedding</code></p>
+          </div>
         </Section>
 
         {/* Pagina RSVP pubblica */}

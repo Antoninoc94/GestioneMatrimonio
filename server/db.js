@@ -212,6 +212,24 @@ if (!configCols.find(c => c.name === 'login_subtitle')) {
 if (!configCols.find(c => c.name === 'conferma_abilitata')) {
   db.prepare('ALTER TABLE config ADD COLUMN conferma_abilitata INTEGER DEFAULT 1').run();
 }
+if (!configCols.find(c => c.name === 'landing_abilitata')) {
+  db.prepare('ALTER TABLE config ADD COLUMN landing_abilitata INTEGER DEFAULT 1').run();
+}
+if (!configCols.find(c => c.name === 'landing_messaggio')) {
+  db.prepare("ALTER TABLE config ADD COLUMN landing_messaggio TEXT DEFAULT ''").run();
+}
+if (!configCols.find(c => c.name === 'landing_dress_code')) {
+  db.prepare("ALTER TABLE config ADD COLUMN landing_dress_code TEXT DEFAULT ''").run();
+}
+if (!configCols.find(c => c.name === 'landing_info_pratiche')) {
+  db.prepare("ALTER TABLE config ADD COLUMN landing_info_pratiche TEXT DEFAULT ''").run();
+}
+if (!configCols.find(c => c.name === 'landing_tema')) {
+  db.prepare("ALTER TABLE config ADD COLUMN landing_tema TEXT DEFAULT 'rose'").run();
+}
+if (!configCols.find(c => c.name === 'landing_foto')) {
+  db.prepare('ALTER TABLE config ADD COLUMN landing_foto TEXT').run();
+}
 
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();

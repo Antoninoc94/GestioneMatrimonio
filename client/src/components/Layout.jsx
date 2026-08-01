@@ -4,7 +4,7 @@ import { useAppConfig } from '../AppConfigContext';
 import {
   LayoutDashboard, Users, FileText, DollarSign, CalendarCheck,
   MapPin, FolderOpen, Lightbulb, Settings, LogOut, Menu,
-  UserCheck, Clock, Gift, Plane, Mail
+  UserCheck, Clock, Gift, Plane, Mail, Globe
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -27,6 +27,7 @@ const navItems = [
   { to: '/inviti', icon: Mail, label: 'Inviti' },
   { to: '/documenti', icon: FolderOpen, label: 'Documenti' },
   { to: '/idee', icon: Lightbulb, label: 'Idee' },
+  { to: '/landing', icon: Globe, label: 'Pagina Wedding' },
   { to: '/impostazioni', icon: Settings, label: 'Impostazioni' },
 ];
 

@@ -38,7 +38,10 @@ setTimeout(checkAutoReminder, 60 * 1000);
 app.use(cors());
 app.use(express.json());
 
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 app.use('/api/conferma', require('./routes/conferma'));
+app.use('/api/landing', require('./routes/landing'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/dashboard', require('./routes/dashboard'));
