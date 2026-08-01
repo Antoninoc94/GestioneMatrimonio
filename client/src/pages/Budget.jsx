@@ -225,14 +225,14 @@ export default function Budget() {
       {chartData.length > 0 && (
         <div className="card mb-6">
           <h2 className="text-sm font-bold text-gray-700 mb-4">Preventivato vs Effettivo per Categoria</h2>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 40 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
-              <YAxis tick={{ fontSize: 11 }} />
+          <ResponsiveContainer width="100%" height={Math.max(160, chartData.length * 34)}>
+            <BarChart layout="vertical" data={chartData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => formatEuro(v)} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={112} />
               <Tooltip formatter={v => formatEuro(v)} />
               <Legend />
-              <Bar dataKey="Preventivato" fill="#93c5fd" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Effettivo" fill="#e11d48" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Preventivato" fill="#93c5fd" radius={[0, 3, 3, 0]} maxBarSize={14} />
+              <Bar dataKey="Effettivo" fill="#e11d48" radius={[0, 3, 3, 0]} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
         </div>
