@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, CalendarDays, Euro, AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { Heart, Euro, AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import api from '../api';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { statoPreventivo, prioritaLabel, label } from '../labels';
 
 const COLORS = ['#e11d48', '#f43f5e', '#fb7185', '#fda4af', '#fecdd3', '#f97316', '#fbbf24', '#34d399'];
 
 const prioritaColor = { alta: 'text-red-600 bg-red-50', media: 'text-yellow-600 bg-yellow-50', bassa: 'text-green-600 bg-green-50' };
+const prioritaBadge = p => ({ className: prioritaColor[p] || 'text-gray-600 bg-gray-50', text: prioritaLabel[p] || p });
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -27,6 +29,9 @@ export default function Dashboard() {
   );
 
   const { config, giorniAlMatrimonio, budget, scadenzeImminenti, scadenzeScadute, costiPerCategoria, preventiviPerStato } = data;
+
+  // Converte stati DB → label italiane per i grafici
+  const preventiviChart = preventiviPerStato?.map(r => ({ ...r, stato: label(statoPreventivo, r.stato) }));
 
   const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
   const budgetUsato = budget.totale > 0 ? Math.round((budget.effettivo / budget.totale) * 100) : 0;
@@ -114,14 +119,14 @@ export default function Dashboard() {
         )}
 
         {/* Preventivi per stato */}
-        {preventiviPerStato?.length > 0 && (
+        {preventiviChart?.length > 0 && (
           <div className="card">
             <h2 className="text-sm font-bold text-gray-700 mb-4">Stato Preventivi</h2>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={preventiviPerStato} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <XAxis dataKey="stato" tick={{ fontSize: 11 }} />
+              <BarChart data={preventiviChart} margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
+                <XAxis dataKey="stato" tick={{ fontSize: 11 }} interval={0} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={v => formatEuro(v)} />
+                <Tooltip formatter={(v, name) => [formatEuro(v), 'Totale']} />
                 <Bar dataKey="tot" fill="#e11d48" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -163,7 +168,7 @@ export default function Dashboard() {
                 <div key={s.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{s.titolo}</p>
-                    <span className={`badge text-xs mt-0.5 ${prioritaColor[s.priorita]}`}>{s.priorita}</span>
+                    <span className={`badge text-xs mt-0.5 ${prioritaBadge(s.priorita).className}`}>{prioritaBadge(s.priorita).text}</span>
                   </div>
                   <span className="text-xs text-gray-500 font-semibold">{format(parseISO(s.data_scadenza), 'd MMM', { locale: it })}</span>
                 </div>

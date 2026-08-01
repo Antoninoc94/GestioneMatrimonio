@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, CheckCircle, Circle, AlertCircle } from 'lucide-r
 import api from '../api';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { prioritaLabel } from '../labels';
 
 const CATEGORIE = ['Documenti', 'Fornitori', 'Pagamenti', 'Abbigliamento', 'Location', 'Viaggio', 'Inviti', 'Altro'];
 const PRIORITA = ['alta', 'media', 'bassa'];
@@ -59,7 +60,7 @@ export default function Scadenze() {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-0.5">
             <span className={`font-semibold text-sm ${s.completata ? 'line-through text-gray-400' : 'text-gray-900'}`}>{s.titolo}</span>
-            <span className={`badge ${prioritaColor[s.priorita]}`}>{s.priorita}</span>
+            <span className={`badge ${prioritaColor[s.priorita]}`}>{prioritaLabel[s.priorita] || s.priorita}</span>
             <span className="badge bg-gray-100 text-gray-500">{s.categoria}</span>
             {isScaduta && <span className="badge bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={11} /> Scaduta</span>}
             {isOggi && <span className="badge bg-yellow-100 text-yellow-700">Oggi!</span>}
@@ -143,7 +144,7 @@ export default function Scadenze() {
                 <div>
                   <label className="form-label">Priorità</label>
                   <select className="form-input" value={form.priorita} onChange={e => setForm({ ...form, priorita: e.target.value })}>
-                    {PRIORITA.map(p => <option key={p}>{p}</option>)}
+                    {PRIORITA.map(p => <option key={p} value={p}>{prioritaLabel[p]}</option>)}
                   </select>
                 </div>
               </div>
