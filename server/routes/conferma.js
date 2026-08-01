@@ -28,7 +28,7 @@ router.get('/trova', (req, res) => {
   }
 });
 
-function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta }) {
+function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, parent_id }) {
   const existing = db.prepare(`
     SELECT id FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
@@ -37,13 +37,13 @@ function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tip
   `).get(nome, cognome || '', cognome || '', nome);
 
   if (existing) {
-    db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=? WHERE id=?')
-      .run(rsvp, intolleranze || null, messaggio_ospite || null, existing.id);
+    db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=?, parent_id=? WHERE id=?')
+      .run(rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null, existing.id);
   } else {
-    db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, fonte)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'sito')`)
+    db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, fonte, parent_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'sito', ?)`)
       .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null,
-        tipo || 'adulto', eta || null);
+        tipo || 'adulto', eta || null, parent_id || null);
   }
 }
 
@@ -72,7 +72,7 @@ router.post('/rispondi', (req, res) => {
   if (partner?.nome?.trim() && partner?.rsvp) {
     if (!['confermato', 'declinato'].includes(partner.rsvp))
       return res.status(400).json({ error: 'Stato partner non valido' });
-    upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp });
+    upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, parent_id: mainId });
   }
 
   // Figli (opzionale) — collegati al genitore tramite parent_id

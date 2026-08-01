@@ -1,5 +1,5 @@
 import { useEffect, useState, Fragment } from 'react';
-import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -221,7 +221,6 @@ export default function Ospiti() {
         )}
         {filtered.map(o => {
           const Icon = rsvpIcon[o.rsvp];
-          const figli = childrenOf(o.id);
           return (
             <Fragment key={o.id}>
               <div className="card p-3">
@@ -247,25 +246,30 @@ export default function Ospiti() {
                   <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
                 </div>
               </div>
-              {figli.map(c => (
-                <div key={c.id} className="ml-4 border-l-2 border-purple-200 pl-3">
-                  <div className="card p-2.5 border-purple-100">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-700 truncate">{c.nome}</div>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>
-                          {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
+              {childrenOf(o.id).map(c => {
+                const isPartner = c.tipo !== 'bambino';
+                return (
+                  <div key={c.id} className={`ml-4 border-l-2 pl-3 ${isPartner ? 'border-rose-200' : 'border-purple-200'}`}>
+                    <div className={`card p-2.5 ${isPartner ? 'border-rose-100' : 'border-purple-100'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-700 truncate">{c.cognome ? `${c.cognome} ${c.nome}` : c.nome}</div>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {isPartner
+                              ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1"><Heart size={9} />Partner</span>
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                            {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={12} /></button>
-                        <button className="p-1 rounded hover:bg-red-50 text-red-300" onClick={() => del(c.id)}><Trash2 size={12} /></button>
+                        <div className="flex gap-1">
+                          <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={12} /></button>
+                          <button className="p-1 rounded hover:bg-red-50 text-red-300" onClick={() => del(c.id)}><Trash2 size={12} /></button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </Fragment>
           );
         })}
@@ -297,7 +301,6 @@ export default function Ospiti() {
               )}
               {filtered.map(o => {
                 const Icon = rsvpIcon[o.rsvp];
-                const figli = childrenOf(o.id);
                 return (
                   <Fragment key={o.id}>
                     <tr>
@@ -328,28 +331,38 @@ export default function Ospiti() {
                         </div>
                       </td>
                     </tr>
-                    {figli.map(c => (
-                      <tr key={c.id} className="bg-purple-50/40">
-                        <td className="text-gray-600 text-sm">
-                          <span className="inline-block w-4 text-purple-300 mr-1">↳</span>{c.nome}
-                        </td>
-                        <td className="text-gray-400 text-xs">—</td>
-                        <td>
-                          <span className="badge bg-purple-100 text-purple-600 text-xs">
-                            Bambino{c.eta ? ` (${c.eta}a)` : ''}
-                          </span>
-                        </td>
-                        <td><span className="badge bg-green-100 text-green-700 text-xs flex items-center gap-1 w-fit"><Check size={10} />Confermato</span></td>
-                        <td className="text-gray-400 text-xs">—</td>
-                        <td className="text-gray-400 text-xs">{c.intolleranze || '—'}</td>
-                        <td>
-                          <div className="flex gap-1">
-                            <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={13} /></button>
-                            <button className="p-1.5 rounded hover:bg-red-50 text-gray-300 hover:text-red-400" onClick={() => del(c.id)}><Trash2 size={13} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {childrenOf(o.id).map(c => {
+                      const isPartner = c.tipo !== 'bambino';
+                      return (
+                        <tr key={c.id} className={isPartner ? 'bg-rose-50/40' : 'bg-purple-50/40'}>
+                          <td className="text-gray-600 text-sm">
+                            {isPartner
+                              ? <Heart size={12} className="inline mr-1 text-rose-300" />
+                              : <span className="inline-block w-4 text-purple-300 mr-1">↳</span>}
+                            {c.cognome ? `${c.cognome} ${c.nome}` : c.nome}
+                          </td>
+                          <td className="text-gray-400 text-xs">—</td>
+                          <td>
+                            {isPartner
+                              ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1 w-fit"><Heart size={9} />Partner</span>
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                          </td>
+                          <td>
+                            <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-green-100 text-green-700'}`}>
+                              <Check size={10} />{rsvpLabel[c.rsvp] || 'Confermato'}
+                            </span>
+                          </td>
+                          <td className="text-gray-400 text-xs">—</td>
+                          <td className="text-gray-400 text-xs">{c.intolleranze || '—'}</td>
+                          <td>
+                            <div className="flex gap-1">
+                              <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={13} /></button>
+                              <button className="p-1.5 rounded hover:bg-red-50 text-gray-300 hover:text-red-400" onClick={() => del(c.id)}><Trash2 size={13} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </Fragment>
                 );
               })}
