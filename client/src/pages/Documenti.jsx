@@ -4,6 +4,8 @@ import api from '../api';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 
+const toUtc = s => s && !s.endsWith('Z') ? s.replace(' ', 'T') + 'Z' : s;
+
 const CATEGORIE = ['Contratto', 'Preventivo', 'Ricevuta', 'Certificato', 'Permesso', 'Foto ispirazione', 'Altro'];
 
 const empty = { titolo: '', categoria: 'Contratto', fornitore_id: '', note: '' };
@@ -115,7 +117,7 @@ export default function Documenti() {
                     <p className="text-xs text-gray-400 truncate">{d.nome_file}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-300 mt-0.5">
                       {d.dimensione && <span>{formatSize(d.dimensione)}</span>}
-                      <span>{format(parseISO(d.created_at), 'd MMM yyyy', { locale: it })}</span>
+                      <span>{format(parseISO(toUtc(d.created_at)), 'd MMM yyyy', { locale: it })}</span>
                     </div>
                     {d.note && <p className="text-xs text-gray-400 mt-0.5 italic truncate">{d.note}</p>}
                   </div>

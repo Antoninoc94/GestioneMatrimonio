@@ -13,8 +13,9 @@ import { statoPreventivo, statoFornitore, label } from '../labels';
 
 const COLORS = ['#e11d48','#f43f5e','#fb7185','#fda4af','#f97316','#fbbf24','#34d399','#60a5fa'];
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
-const fmtDate = d => { try { return format(parseISO(d), 'd MMM', { locale: it }); } catch { return d; } };
-const fmtDateTime = s => { try { return format(parseISO(s), "d MMM, HH:mm", { locale: it }); } catch { return s; } };
+const toUtc = s => s && !s.endsWith('Z') ? s.replace(' ', 'T') + 'Z' : s;
+const fmtDate = d => { try { return format(parseISO(toUtc(d)), 'd MMM', { locale: it }); } catch { return d; } };
+const fmtDateTime = s => { try { return format(parseISO(toUtc(s)), "d MMM, HH:mm", { locale: it }); } catch { return s; } };
 
 const getMilestone = giorni => {
   if (giorni > 365) return { emoji: '🏛️', title: 'Scegli la location', desc: 'Hai tempo — inizia dai luoghi prima che si prenotino' };
