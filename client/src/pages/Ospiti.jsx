@@ -94,7 +94,7 @@ export default function Ospiti() {
       });
 
       // Table
-      const rsvpText = { confermato: '✓ Confermato', declinato: '✗ Declinato', attesa: '⏳ In attesa' };
+      const rsvpText = { confermato: 'Confermato', declinato: 'Declinato', attesa: 'In attesa' };
       const rows = (filtered.length > 0 ? filtered : items).map(o => [
         o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
         latoLabel[o.lato] || o.lato,
@@ -122,8 +122,8 @@ export default function Ospiti() {
         didParseCell: data => {
           if (data.section === 'body' && data.column.index === 3) {
             const v = data.cell.raw;
-            if (v?.includes('✓')) data.cell.styles.textColor = [22, 163, 74];
-            else if (v?.includes('✗')) data.cell.styles.textColor = [220, 38, 38];
+            if (v === 'Confermato') data.cell.styles.textColor = [22, 163, 74];
+            else if (v === 'Declinato') data.cell.styles.textColor = [220, 38, 38];
             else data.cell.styles.textColor = [161, 98, 7];
           }
         },
