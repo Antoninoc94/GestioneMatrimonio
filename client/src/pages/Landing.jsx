@@ -105,7 +105,7 @@ export default function Landing() {
             <img
               src={`/uploads/landing/${config.landing_foto}`}
               alt="Foto matrimonio"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: config.landing_foto_posizione || 'center top' }}
             />
             {/* vignette top */}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.55) 100%)' }} />

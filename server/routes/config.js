@@ -33,6 +33,7 @@ router.put('/', auth, (req, res) => {
     landing_dress_code=COALESCE(?,landing_dress_code),
     landing_info_pratiche=COALESCE(?,landing_info_pratiche),
     landing_tema=COALESCE(?,landing_tema),
+    landing_foto_posizione=COALESCE(?,landing_foto_posizione),
     updated_at=datetime('now')`)
     .run(
       p('data_matrimonio', v => v || null),
@@ -47,7 +48,8 @@ router.put('/', auth, (req, res) => {
       p('landing_messaggio', v => v ?? ''),
       p('landing_dress_code', v => v ?? ''),
       p('landing_info_pratiche', v => v ?? ''),
-      p('landing_tema', v => v || 'rose')
+      p('landing_tema', v => v || 'rose'),
+      p('landing_foto_posizione', v => v || 'center top')
     );
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });

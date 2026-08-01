@@ -24,7 +24,7 @@ router.get('/info', (req, res) => {
   const config = db.prepare(`
     SELECT data_matrimonio, nome_sposo1, nome_sposo2,
            landing_abilitata, landing_messaggio, landing_dress_code,
-           landing_info_pratiche, landing_tema, landing_foto,
+           landing_info_pratiche, landing_tema, landing_foto, landing_foto_posizione,
            conferma_abilitata
     FROM config LIMIT 1
   `).get();

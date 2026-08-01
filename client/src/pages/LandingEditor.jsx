@@ -10,12 +10,20 @@ const TEMI = [
   { key: 'oro',     label: 'Champagne', primary: '#b45309', light: '#fffbeb', border: '#fde68a' },
 ];
 
+// Griglia 3×3 delle posizioni CSS object-position
+const POSIZIONI = [
+  { label: '↖', value: 'left top' },    { label: '↑', value: 'center top' },    { label: '↗', value: 'right top' },
+  { label: '←', value: 'left center' }, { label: '·', value: 'center center' }, { label: '→', value: 'right center' },
+  { label: '↙', value: 'left bottom' }, { label: '↓', value: 'center bottom' }, { label: '↘', value: 'right bottom' },
+];
+
 const empty = {
   landing_abilitata: true,
   landing_messaggio: '',
   landing_dress_code: '',
   landing_info_pratiche: '',
   landing_tema: 'rose',
+  landing_foto_posizione: 'center top',
 };
 
 export default function LandingEditor() {
@@ -35,6 +43,7 @@ export default function LandingEditor() {
         landing_dress_code: d.landing_dress_code || '',
         landing_info_pratiche: d.landing_info_pratiche || '',
         landing_tema: d.landing_tema || 'rose',
+        landing_foto_posizione: d.landing_foto_posizione || 'center top',
       });
       setFoto(d.landing_foto || null);
     });
@@ -169,7 +178,47 @@ export default function LandingEditor() {
                     src={`/uploads/landing/${foto}`}
                     alt="Foto copertina"
                     className="w-full h-full object-cover"
+                    style={{ objectPosition: form.landing_foto_posizione }}
                   />
+                  {/* Overlay con indicatore posizione attiva */}
+                  <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gridTemplateRows: 'repeat(3,1fr)' }}>
+                    {POSIZIONI.map(p => (
+                      <div
+                        key={p.value}
+                        className="pointer-events-auto flex items-center justify-center cursor-pointer transition-all"
+                        style={{ background: form.landing_foto_posizione === p.value ? 'rgba(255,255,255,0.35)' : 'transparent' }}
+                        title={p.value}
+                        onClick={() => setForm(f => ({ ...f, landing_foto_posizione: p.value }))}
+                      >
+                        {form.landing_foto_posizione === p.value && (
+                          <div className="w-3 h-3 rounded-full bg-white shadow-md border-2 border-rose-400" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Picker posizione testuale sotto l'anteprima */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">Posizione della foto — clicca sull'anteprima o scegli qui:</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px', maxWidth: '160px' }}>
+                    {POSIZIONI.map(p => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        title={p.value}
+                        onClick={() => setForm(f => ({ ...f, landing_foto_posizione: p.value }))}
+                        style={{
+                          height: '32px', borderRadius: '6px', fontSize: '0.9rem',
+                          border: form.landing_foto_posizione === p.value ? '2px solid #e11d48' : '1px solid #e5e7eb',
+                          background: form.landing_foto_posizione === p.value ? '#fff1f2' : '#fff',
+                          cursor: 'pointer', transition: 'all 0.12s',
+                          color: form.landing_foto_posizione === p.value ? '#e11d48' : '#6b7280',
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" className="btn-secondary flex-1" onClick={() => fileRef.current?.click()} disabled={uploading}>

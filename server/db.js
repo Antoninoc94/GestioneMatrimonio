@@ -230,6 +230,9 @@ if (!configCols.find(c => c.name === 'landing_tema')) {
 if (!configCols.find(c => c.name === 'landing_foto')) {
   db.prepare('ALTER TABLE config ADD COLUMN landing_foto TEXT').run();
 }
+if (!configCols.find(c => c.name === 'landing_foto_posizione')) {
+  db.prepare("ALTER TABLE config ADD COLUMN landing_foto_posizione TEXT DEFAULT 'center top'").run();
+}
 
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();
