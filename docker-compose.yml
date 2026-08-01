@@ -1,0 +1,28 @@
+services:
+  app:
+    build: .
+    image: matrimonio-app
+    container_name: matrimonio
+    restart: unless-stopped
+    ports:
+      - "80:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_PATH: /app/data/matrimonio.db
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - matrimonio_db:/app/data
+      - matrimonio_uploads:/app/server/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/dashboard"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  matrimonio_db:
+    driver: local
+  matrimonio_uploads:
+    driver: local
