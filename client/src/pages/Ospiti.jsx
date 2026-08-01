@@ -23,6 +23,10 @@ export default function Ospiti() {
   const [filtroLato, setFiltroLato] = useState('');
   const [filtroSito, setFiltroSito] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [conPartner, setConPartner] = useState(false);
+  const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato' });
+  const [conFigli, setConFigli] = useState(false);
+  const [figli, setFigli] = useState([{ nome: '', eta: '', intolleranze: '' }]);
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
@@ -30,14 +34,49 @@ export default function Ospiti() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
-  const openEdit = o => { setForm({ ...o, tavolo_id: o.tavolo_id || '' }); setEditId(o.id); setModal(true); };
+  const resetExtra = () => {
+    setConPartner(false);
+    setPartnerForm({ nome: '', cognome: '', rsvp: 'confermato' });
+    setConFigli(false);
+    setFigli([{ nome: '', eta: '', intolleranze: '' }]);
+  };
+
+  const openNew = () => { setForm(empty); setEditId(null); resetExtra(); setModal(true); };
+  const openEdit = o => { setForm({ ...o, tavolo_id: o.tavolo_id || '' }); setEditId(o.id); resetExtra(); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
     const payload = { ...form, tavolo_id: form.tavolo_id || null };
-    if (editId) await api.put(`/ospiti/${editId}`, payload);
-    else await api.post('/ospiti', payload);
+    if (editId) {
+      await api.put(`/ospiti/${editId}`, payload);
+    } else {
+      const r = await api.post('/ospiti', payload);
+      const mainId = r.data.id;
+      if (conPartner && partnerForm.nome.trim()) {
+        await api.post('/ospiti', {
+          nome: partnerForm.nome.trim(),
+          cognome: partnerForm.cognome.trim() || null,
+          rsvp: partnerForm.rsvp,
+          lato: form.lato,
+          tipo: 'adulto',
+          parent_id: mainId,
+        });
+      }
+      if (conFigli) {
+        for (const f of figli) {
+          if (!f.nome.trim()) continue;
+          await api.post('/ospiti', {
+            nome: f.nome.trim(),
+            tipo: 'bambino',
+            rsvp: 'confermato',
+            eta: parseInt(f.eta) || null,
+            intolleranze: f.intolleranze.trim() || null,
+            lato: form.lato,
+            parent_id: mainId,
+          });
+        }
+      }
+    }
     setModal(false);
     load();
   };
@@ -432,6 +471,78 @@ export default function Ospiti() {
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
+
+              {!editId && (
+                <div className="border-t border-gray-100 pt-3 space-y-3">
+                  {/* Partner */}
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" className="rounded" checked={conPartner} onChange={e => setConPartner(e.target.checked)} />
+                    <Heart size={14} className="text-rose-400" />
+                    <span className="text-sm font-medium text-gray-700">Aggiungi partner / coniuge</span>
+                  </label>
+                  {conPartner && (
+                    <div className="pl-4 border-l-2 border-rose-200 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="form-label">Nome *</label>
+                          <input className="form-input" value={partnerForm.nome} onChange={e => setPartnerForm(p => ({ ...p, nome: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="form-label">Cognome</label>
+                          <input className="form-input" value={partnerForm.cognome} onChange={e => setPartnerForm(p => ({ ...p, cognome: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="form-label">RSVP</label>
+                        <select className="form-input" value={partnerForm.rsvp} onChange={e => setPartnerForm(p => ({ ...p, rsvp: e.target.value }))}>
+                          {RSVP.map(r => <option key={r} value={r}>{rsvpLabel[r]}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Figli */}
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" className="rounded" checked={conFigli} onChange={e => setConFigli(e.target.checked)} />
+                    <Users size={14} className="text-purple-400" />
+                    <span className="text-sm font-medium text-gray-700">Aggiungi figli</span>
+                  </label>
+                  {conFigli && (
+                    <div className="pl-4 border-l-2 border-purple-200 space-y-3">
+                      {figli.map((f, i) => (
+                        <div key={i} className="space-y-2">
+                          {i > 0 && <div className="border-t border-purple-100" />}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="col-span-2">
+                              <label className="form-label">Nome</label>
+                              <input className="form-input" value={f.nome} onChange={e => setFigli(fs => fs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                            </div>
+                            <div>
+                              <label className="form-label">Età</label>
+                              <input type="number" min="0" className="form-input" value={f.eta} onChange={e => setFigli(fs => fs.map((x, j) => j === i ? { ...x, eta: e.target.value } : x))} />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1">
+                              <label className="form-label">Intolleranze</label>
+                              <input className="form-input" value={f.intolleranze} onChange={e => setFigli(fs => fs.map((x, j) => j === i ? { ...x, intolleranze: e.target.value } : x))} />
+                            </div>
+                            {figli.length > 1 && (
+                              <button type="button" className="p-2 rounded hover:bg-red-50 text-red-400 mb-0.5" onClick={() => setFigli(fs => fs.filter((_, j) => j !== i))}>
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" className="text-sm text-purple-600 font-medium flex items-center gap-1 hover:text-purple-800" onClick={() => setFigli(fs => [...fs, { nome: '', eta: '', intolleranze: '' }])}>
+                        <Plus size={13} /> Aggiungi figlio
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="btn-primary">Salva</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>

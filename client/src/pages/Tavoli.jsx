@@ -44,6 +44,17 @@ export default function Tavoli() {
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
   const totaleAssegnati = ospiti.filter(o => o.tavolo_id).length;
+  const parentName = parentId => {
+    const p = ospiti.find(o => o.id === parentId);
+    return p ? (p.cognome ? `${p.cognome} ${p.nome}` : p.nome) : null;
+  };
+  const guestLabel = o => {
+    const base = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+    if (!o.parent_id) return base;
+    const pn = parentName(o.parent_id);
+    const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
+    return pn ? `${base} (${rel} di ${pn})` : base;
+  };
   const [exporting, setExporting] = useState(false);
 
   const exportSeatingPDF = () => {
@@ -194,7 +205,7 @@ export default function Tavoli() {
           <div className="flex flex-wrap gap-2">
             {senzaTavolo.map(o => (
               <div key={o.id} className="flex items-center gap-1 bg-white border border-yellow-200 rounded-lg px-2 py-1">
-                <span className="text-sm text-gray-700">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</span>
+                <span className="text-sm text-gray-700">{guestLabel(o)}</span>
                 <select
                   className="text-xs border-0 bg-transparent text-rose-500 font-semibold"
                   value=""
@@ -238,7 +249,7 @@ export default function Tavoli() {
               <div className="space-y-1">
                 {t.ospiti.map(o => (
                   <div key={o.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</span>
+                    <span className="text-gray-700">{guestLabel(o)}</span>
                     <button
                       className="text-xs text-gray-300 hover:text-red-400"
                       title="Rimuovi dal tavolo"
@@ -253,7 +264,7 @@ export default function Tavoli() {
                     onChange={e => e.target.value && assignGuest(parseInt(e.target.value), t.id)}
                   >
                     <option value="">+ Aggiungi ospite…</option>
-                    {senzaTavolo.map(o => <option key={o.id} value={o.id}>{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</option>)}
+                    {senzaTavolo.map(o => <option key={o.id} value={o.id}>{guestLabel(o)}</option>)}
                   </select>
                 )}
               </div>
