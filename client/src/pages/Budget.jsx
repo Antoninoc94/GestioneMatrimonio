@@ -19,6 +19,9 @@ export default function Budget() {
   const [editId, setEditId] = useState(null);
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [payModal, setPayModal] = useState(null);
+  const [payImporto, setPayImporto] = useState('');
+  const [payData, setPayData] = useState('');
 
   const load = () => {
     api.get('/costi').then(r => setItems(r.data));
@@ -44,8 +47,24 @@ export default function Budget() {
     load();
   };
 
-  const togglePagato = async item => {
-    await api.put(`/costi/${item.id}`, { ...item, pagato: !item.pagato });
+  const togglePagato = item => {
+    if (item.pagato) {
+      api.put(`/costi/${item.id}`, { ...item, pagato: false }).then(load);
+    } else {
+      setPayImporto(item.importo_preventivo > 0 ? item.importo_preventivo.toString() : '');
+      setPayData(new Date().toISOString().split('T')[0]);
+      setPayModal(item);
+    }
+  };
+
+  const confirmPay = async () => {
+    await api.put(`/costi/${payModal.id}`, {
+      ...payModal,
+      pagato: true,
+      importo_effettivo: parseFloat(payImporto) || 0,
+      data_pagamento: payData,
+    });
+    setPayModal(null);
     load();
   };
 
@@ -380,6 +399,50 @@ export default function Budget() {
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {payModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(null)}>
+          <div className="modal max-w-sm">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Conferma pagamento</h2>
+            <p className="text-sm text-gray-500 mb-4 truncate">{payModal.descrizione} · <span className="text-gray-400">{payModal.categoria}</span></p>
+            <div className="space-y-3">
+              <div>
+                <label className="form-label">Importo pagato (€) *</label>
+                <input
+                  type="number" step="0.01" min="0"
+                  className="form-input text-lg font-semibold"
+                  value={payImporto}
+                  onChange={e => setPayImporto(e.target.value)}
+                  autoFocus
+                />
+                {payModal.importo_preventivo > 0 && (
+                  <button
+                    type="button"
+                    className="mt-2 w-full text-sm border border-rose-200 text-rose-600 font-medium rounded-lg py-2 hover:bg-rose-50 transition-colors"
+                    onClick={() => setPayImporto(payModal.importo_preventivo.toString())}
+                  >
+                    Usa importo preventivato — {formatEuro(payModal.importo_preventivo)}
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="form-label">Data pagamento</label>
+                <input
+                  type="date" className="form-input"
+                  value={payData}
+                  onChange={e => setPayData(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-4">
+              <button className="btn-primary flex-1" onClick={confirmPay} disabled={!payImporto}>
+                ✓ Conferma pagamento
+              </button>
+              <button className="btn-secondary" onClick={() => setPayModal(null)}>Annulla</button>
+            </div>
           </div>
         </div>
       )}
