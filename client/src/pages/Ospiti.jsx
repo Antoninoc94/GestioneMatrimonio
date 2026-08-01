@@ -21,6 +21,7 @@ export default function Ospiti() {
   const [editId, setEditId] = useState(null);
   const [filtroRsvp, setFiltroRsvp] = useState('');
   const [filtroLato, setFiltroLato] = useState('');
+  const [filtroSito, setFiltroSito] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const load = () => {
@@ -49,8 +50,10 @@ export default function Ospiti() {
 
   const filtered = items.filter(i =>
     (!filtroRsvp || i.rsvp === filtroRsvp) &&
-    (!filtroLato || i.lato === filtroLato)
+    (!filtroLato || i.lato === filtroLato) &&
+    (!filtroSito || i.fonte === 'sito')
   );
+  const countSito = items.filter(i => i.fonte === 'sito').length;
 
   const totale = items.length;
   const confermati = items.filter(i => i.rsvp === 'confermato').length;
@@ -190,6 +193,16 @@ export default function Ospiti() {
             {latoLabel[l]}
           </button>
         ))}
+        {countSito > 0 && (
+          <>
+            <div className="w-px bg-gray-200 mx-1" />
+            <button
+              className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroSito ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'}`}
+              onClick={() => setFiltroSito(v => !v)}>
+              <Globe size={11} /> Da sito ({countSito})
+            </button>
+          </>
+        )}
       </div>
 
       {/* Mobile card view */}
