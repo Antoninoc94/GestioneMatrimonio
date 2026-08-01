@@ -42,10 +42,16 @@ function SectionTitle({ children }) {
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [nota, setNota] = useState(() => localStorage.getItem('matrimonio_nota') || '');
 
   useEffect(() => {
     api.get('/dashboard').then(r => setData(r.data)).catch(console.error);
   }, []);
+
+  const salvaNote = v => {
+    setNota(v);
+    localStorage.setItem('matrimonio_nota', v);
+  };
 
   if (!data) return (
     <div className="flex items-center justify-center h-64">
@@ -409,6 +415,22 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── NOTE VELOCI ── */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-3">
+          <FileText size={16} className="text-rose-400" />
+          <h3 className="text-sm font-bold text-gray-700">Note veloci</h3>
+          <span className="ml-auto text-xs text-gray-400">salvato in locale</span>
+        </div>
+        <textarea
+          className="w-full text-sm text-gray-700 resize-none bg-gray-50 rounded-lg p-3 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-transparent placeholder-gray-300"
+          rows={3}
+          placeholder="Appunti veloci, idee, cose da fare…"
+          value={nota}
+          onChange={e => salvaNote(e.target.value)}
+        />
       </div>
 
       {/* ── TAVOLI + VIAGGIO + REGALI ── */}
