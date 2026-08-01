@@ -2,8 +2,38 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const db = require('./db');
+const { sendScadenzeReminder } = require('./email');
 
 const app = express();
+
+// ── Scheduler promemoria automatici ──────────────────────────────
+const minIntervalOre = { giornaliero: 20, settimanale: 6 * 24, bisettimanale: 13 * 24, mensile: 28 * 24 };
+
+async function checkAutoReminder() {
+  try {
+    const cfg = db.prepare('SELECT * FROM email_config WHERE id = 1').get();
+    if (!cfg?.enabled || !cfg?.reminder_abilitato) return;
+
+    const now = new Date();
+    if (now.getHours() !== (cfg.reminder_ora ?? 8)) return;
+
+    const lastSent = cfg.ultimo_invio_auto ? new Date(cfg.ultimo_invio_auto) : null;
+    const minOre = minIntervalOre[cfg.reminder_frequenza] || minIntervalOre.settimanale;
+    if (lastSent && (now - lastSent) < minOre * 3600000) return;
+
+    await sendScadenzeReminder(cfg.reminder_giorni_anticipo || 14);
+    db.prepare('UPDATE email_config SET ultimo_invio_auto = ? WHERE id = 1').run(now.toISOString());
+    console.log(`[Auto-reminder] Promemoria scadenze inviato: ${now.toLocaleString('it-IT')}`);
+  } catch (err) {
+    console.error('[Auto-reminder] Errore:', err.message);
+  }
+}
+
+// Controlla ogni ora
+setInterval(checkAutoReminder, 60 * 60 * 1000);
+// Primo controllo dopo 1 minuto dall'avvio
+setTimeout(checkAutoReminder, 60 * 1000);
 
 app.use(cors());
 app.use(express.json());

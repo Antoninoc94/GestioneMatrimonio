@@ -61,8 +61,10 @@ export default function Dashboard() {
     costi, scadenzeImminenti, scadenzeScadute, cronologia, tavoli, viaggio, regali
   } = data;
 
-  const budgetUsato = budget.totale > 0 ? Math.round((budget.effettivo / budget.totale) * 100) : 0;
-  const budgetRimanente = Math.max(0, budget.totale - budget.effettivo);
+  // Impegnato = preventivi accettati + costi effettivi (le due sezioni sono separate)
+  const budgetImpegnato = (budget.preventiviAccettati || 0) + (budget.effettivo || 0);
+  const budgetUsato = budget.totale > 0 ? Math.round((budgetImpegnato / budget.totale) * 100) : 0;
+  const budgetRimanente = Math.max(0, budget.totale - budgetImpegnato);
 
   const preventiviChart = preventivi.perStato?.map(r => ({ ...r, stato: label(statoPreventivo, r.stato) }));
   const ospitiChartData = ospiti?.totale > 0 ? [
@@ -150,7 +152,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Budget rimasto" value={formatEuro(budgetRimanente)}
-            sub={`${budgetUsato}% utilizzato`} icon={Euro}
+            sub={`${budgetUsato}% impegnato`} icon={Euro}
             color={budgetUsato > 90 ? 'bg-red-100 text-red-600' : 'bg-rose-50 text-rose-600'}
             alert={budgetUsato > 90} to="/budget"
           />
@@ -179,10 +181,10 @@ export default function Dashboard() {
         <SectionTitle>Budget</SectionTitle>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
-            { label: 'Budget totale',  value: formatEuro(budget.totale),        icon: Euro,        color: 'bg-rose-50 text-rose-600' },
-            { label: 'Preventivato',   value: formatEuro(budget.preventivato),   icon: TrendingUp,  color: 'bg-blue-50 text-blue-600' },
-            { label: 'Speso',          value: formatEuro(budget.effettivo),      icon: Euro,        color: 'bg-orange-50 text-orange-600' },
-            { label: 'Pagato',         value: formatEuro(budget.pagato),         icon: CheckCircle, color: 'bg-green-50 text-green-600' },
+            { label: 'Budget totale',     value: formatEuro(budget.totale),              icon: Euro,        color: 'bg-rose-50 text-rose-600' },
+            { label: 'Prev. accettati',   value: formatEuro(budget.preventiviAccettati), icon: TrendingUp,  color: 'bg-blue-50 text-blue-600' },
+            { label: 'Speso (costi)',      value: formatEuro(budget.effettivo),           icon: Euro,        color: 'bg-orange-50 text-orange-600' },
+            { label: 'Pagato',            value: formatEuro(budget.pagato),              icon: CheckCircle, color: 'bg-green-50 text-green-600' },
           ].map(c => (
             <div key={c.label} className="card">
               <div className="flex items-start justify-between">
@@ -206,7 +208,7 @@ export default function Dashboard() {
               <div className="h-3 rounded-full transition-all" style={{ width: `${Math.min(budgetUsato, 100)}%`, background: budgetUsato > 90 ? '#e11d48' : '#34d399' }} />
             </div>
             <div className="flex flex-wrap justify-between gap-y-1 text-xs text-gray-400">
-              <span>Speso: {formatEuro(budget.effettivo)}</span>
+              <span>Impegnato: {formatEuro(budgetImpegnato)}</span>
               {costi.nonPagati?.count > 0 && <span className="text-orange-500 font-semibold">⚠ {costi.nonPagati.count} in sospeso: {formatEuro(costi.nonPagati.tot)}</span>}
               <span>Rimasto: {formatEuro(budgetRimanente)}</span>
             </div>

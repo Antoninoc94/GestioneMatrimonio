@@ -225,6 +225,24 @@ if (!emailConfigExists) {
   db.prepare('INSERT INTO email_config (id) VALUES (1)').run();
 }
 
+// Migrazione: aggiunge colonne scheduling email se non esistono
+const emailCols = db.prepare('PRAGMA table_info(email_config)').all().map(c => c.name);
+if (!emailCols.includes('reminder_abilitato')) {
+  db.prepare('ALTER TABLE email_config ADD COLUMN reminder_abilitato INTEGER DEFAULT 0').run();
+}
+if (!emailCols.includes('reminder_frequenza')) {
+  db.prepare("ALTER TABLE email_config ADD COLUMN reminder_frequenza TEXT DEFAULT 'settimanale'").run();
+}
+if (!emailCols.includes('reminder_giorni_anticipo')) {
+  db.prepare('ALTER TABLE email_config ADD COLUMN reminder_giorni_anticipo INTEGER DEFAULT 14').run();
+}
+if (!emailCols.includes('reminder_ora')) {
+  db.prepare('ALTER TABLE email_config ADD COLUMN reminder_ora INTEGER DEFAULT 8').run();
+}
+if (!emailCols.includes('ultimo_invio_auto')) {
+  db.prepare('ALTER TABLE email_config ADD COLUMN ultimo_invio_auto TEXT').run();
+}
+
 // Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();
 if (!userExists) {

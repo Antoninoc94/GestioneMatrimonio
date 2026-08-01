@@ -36,7 +36,7 @@ export default function Impostazioni() {
   const [showPwd, setShowPwd] = useState({ vecchia: false, nuova: false, conferma: false });
 
   // Email config
-  const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false });
+  const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false, reminder_abilitato: false, reminder_frequenza: 'settimanale', reminder_giorni_anticipo: 14, reminder_ora: 8, ultimo_invio_auto: null });
   const [emailMsg, setEmailMsg] = useState('');
   const [testingEmail, setTestingEmail] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
@@ -44,7 +44,7 @@ export default function Impostazioni() {
   useEffect(() => {
     api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '' }));
     api.get('/profilo/me').then(r => setProfilo({ nome: r.data.nome || '', username: r.data.username || '', email: r.data.email || '' }));
-    api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled }));
+    api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled, reminder_abilitato: !!r.data.reminder_abilitato }));
   }, []);
 
   const saveConfig = async e => {
@@ -95,7 +95,8 @@ export default function Impostazioni() {
     e.preventDefault();
     setEmailMsg('');
     try {
-      await api.put('/email-config', { ...emailCfg, smtp_port: parseInt(emailCfg.smtp_port) });
+      const { data } = await api.put('/email-config', { ...emailCfg, smtp_port: parseInt(emailCfg.smtp_port), reminder_ora: parseInt(emailCfg.reminder_ora), reminder_giorni_anticipo: parseInt(emailCfg.reminder_giorni_anticipo) });
+      setEmailCfg(prev => ({ ...prev, ultimo_invio_auto: data.ultimo_invio_auto }));
       setEmailMsg('✓ Configurazione salvata');
     } catch {
       setEmailMsg('✗ Errore nel salvataggio');
@@ -199,7 +200,7 @@ export default function Impostazioni() {
         {/* Dati matrimonio */}
         <Section title="Dati Matrimonio" icon={Settings}>
           <form onSubmit={saveConfig} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="form-label">Nome Sposo</label>
                 <input className="form-input" value={config.nome_sposo1} onChange={e => setConfig({ ...config, nome_sposo1: e.target.value })} />
@@ -263,8 +264,8 @@ export default function Impostazioni() {
               <label htmlFor="enabled" className="form-label mb-0">Abilita notifiche email</label>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
                 <label className="form-label">Server SMTP</label>
                 <input className="form-input" value={emailCfg.smtp_host} onChange={e => setEmailCfg({ ...emailCfg, smtp_host: e.target.value })} placeholder="smtp.gmail.com" />
               </div>
@@ -288,6 +289,50 @@ export default function Impostazioni() {
               <input className="form-input" value={emailCfg.from_name} onChange={e => setEmailCfg({ ...emailCfg, from_name: e.target.value })} placeholder="Il Nostro Matrimonio" />
             </div>
 
+            {/* ── Promemoria automatico ── */}
+            <div className="border-t border-gray-100 pt-3 mt-1">
+              <div className="flex items-center gap-3 mb-3">
+                <input type="checkbox" id="reminder_abilitato" checked={emailCfg.reminder_abilitato} onChange={e => setEmailCfg({ ...emailCfg, reminder_abilitato: e.target.checked })} className="w-4 h-4 accent-rose-500" />
+                <label htmlFor="reminder_abilitato" className="form-label mb-0 font-semibold">Promemoria automatico scadenze</label>
+              </div>
+
+              {emailCfg.reminder_abilitato && (
+                <div className="space-y-3 pl-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="form-label">Frequenza</label>
+                      <select className="form-input" value={emailCfg.reminder_frequenza} onChange={e => setEmailCfg({ ...emailCfg, reminder_frequenza: e.target.value })}>
+                        <option value="giornaliero">Ogni giorno</option>
+                        <option value="settimanale">Ogni settimana</option>
+                        <option value="bisettimanale">Ogni 2 settimane</option>
+                        <option value="mensile">Ogni mese</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Anticipo scadenze</label>
+                      <select className="form-input" value={emailCfg.reminder_giorni_anticipo} onChange={e => setEmailCfg({ ...emailCfg, reminder_giorni_anticipo: e.target.value })}>
+                        <option value={7}>7 giorni</option>
+                        <option value={14}>14 giorni</option>
+                        <option value={30}>30 giorni</option>
+                        <option value={60}>60 giorni</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Orario invio</label>
+                      <select className="form-input" value={emailCfg.reminder_ora} onChange={e => setEmailCfg({ ...emailCfg, reminder_ora: e.target.value })}>
+                        {[6,7,8,9,10,12,14,16,18,20].map(h => (
+                          <option key={h} value={h}>{String(h).padStart(2,'0')}:00</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {emailCfg.ultimo_invio_auto && (
+                    <p className="text-xs text-gray-400">Ultimo invio automatico: {new Date(emailCfg.ultimo_invio_auto).toLocaleString('it-IT')}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {emailMsg && (
               <p className={`text-sm font-medium flex items-center gap-1.5 ${emailMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
                 {emailMsg.startsWith('✓') ? <CheckCircle size={14} /> : <XCircle size={14} />}
@@ -298,13 +343,13 @@ export default function Impostazioni() {
             <div className="flex flex-wrap gap-2 pt-1">
               <button type="submit" className="btn-primary"><Save size={15} /> Salva</button>
               <button type="button" className="btn-secondary" onClick={testEmail} disabled={testingEmail}>
-                {testingEmail ? 'Invio...' : '📧 Invia email di test'}
+                {testingEmail ? 'Invio...' : '📧 Email di test'}
               </button>
               <button type="button" className="btn-secondary" onClick={sendReminder} disabled={sendingReminder}>
-                {sendingReminder ? 'Invio...' : '📅 Promemoria scadenze'}
+                {sendingReminder ? 'Invio...' : '📅 Invia promemoria ora'}
               </button>
             </div>
-            <p className="text-xs text-gray-400">Il test invia una vera email all'indirizzo configurato. Il promemoria invia un riepilogo delle scadenze entro 14 giorni.</p>
+            <p className="text-xs text-gray-400">Il promemoria include tutte le scadenze (manuali + automatiche da preventivi, viaggi e pagamenti).</p>
           </form>
         </Section>
 
