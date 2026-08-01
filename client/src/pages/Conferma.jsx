@@ -42,7 +42,6 @@ export default function Conferma() {
   const [conPartner, setConPartner] = useState(false);
   const [partnerNome, setPartnerNome] = useState('');
   const [partnerCognome, setPartnerCognome] = useState('');
-  const [partnerRsvp, setPartnerRsvp] = useState(null);
 
   // Figli
   const [conFigli, setConFigli] = useState(false);
@@ -67,7 +66,7 @@ export default function Conferma() {
       setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
       setIntolleranze(o.intolleranze || '');
       setMessaggio('');
-      setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerRsvp(null);
+      setConPartner(false); setPartnerNome(''); setPartnerCognome('');
       setConFigli(false); setFigli([emptyFiglio()]);
     } catch {
       setErrore('Errore di connessione. Riprova.');
@@ -80,8 +79,7 @@ export default function Conferma() {
   const rimuoviFiglio = i => setFigli(f => f.filter((_, idx) => idx !== i));
   const updateFiglio = (i, field, val) => setFigli(f => f.map((fig, idx) => idx === i ? { ...fig, [field]: val } : fig));
 
-  const canSubmit = rsvp && (!conPartner || partnerRsvp) &&
-    (!conFigli || figli.every(f => f.nome.trim()));
+  const canSubmit = rsvp && (!conFigli || figli.every(f => f.nome.trim()));
 
   const invia = async () => {
     if (!canSubmit) return;
@@ -94,7 +92,7 @@ export default function Conferma() {
         rsvp,
         intolleranze,
         messaggio_ospite: messaggio,
-        partner: conPartner ? { nome: partnerNome, cognome: partnerCognome, rsvp: partnerRsvp } : null,
+        partner: conPartner ? { nome: partnerNome, cognome: partnerCognome, rsvp: 'confermato' } : null,
         figli: conFigli ? figli.filter(f => f.nome.trim()) : [],
       });
       setInviato(true);
@@ -106,7 +104,7 @@ export default function Conferma() {
   const reset = () => {
     setOspite(null); setRsvp(null); setIntolleranze(''); setMessaggio('');
     setNome(''); setCognome(''); setErrore(''); setInviato(false);
-    setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerRsvp(null);
+    setConPartner(false); setPartnerNome(''); setPartnerCognome('');
     setConFigli(false); setFigli([emptyFiglio()]);
   };
 
@@ -135,9 +133,9 @@ export default function Conferma() {
                 {rsvp === 'confermato' ? 'Ci vediamo al matrimonio!' : 'Risposta registrata'}
               </h2>
               <p className="text-gray-500 text-sm mb-1">{ospite.cognome ? `${ospite.cognome} ${ospite.nome}` : ospite.nome}</p>
-              {conPartner && partnerRsvp && (
+              {conPartner && partnerNome && (
                 <p className="text-gray-400 text-xs mt-1">
-                  {partnerNome} {partnerCognome}: {partnerRsvp === 'confermato' ? 'presente' : 'non presente'}
+                  {partnerNome} {partnerCognome}: presente
                 </p>
               )}
               {conFigli && figli.filter(f => f.nome).length > 0 && (
@@ -218,13 +216,6 @@ export default function Conferma() {
                         <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
                           placeholder="Es: Bianchi"
                           value={partnerCognome} onChange={e => setPartnerCognome(e.target.value)} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Risposta del/la partner *</label>
-                      <div className="flex gap-2">
-                        <BtnRsvp value="confermato" current={partnerRsvp} onChange={setPartnerRsvp} />
-                        <BtnRsvp value="declinato" current={partnerRsvp} onChange={setPartnerRsvp} />
                       </div>
                     </div>
                   </div>
