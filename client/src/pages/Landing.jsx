@@ -128,14 +128,27 @@ export default function Landing() {
           </div>
         )}
 
-        {/* Label "Vi invitiamo" nell'hero, solo quando c'è la foto */}
-        {config.landing_foto && (
-          <div style={{ position: 'absolute', top: '1.5rem', left: 0, right: 0, textAlign: 'center', zIndex: 2 }}>
-            <span style={{ color: 'rgba(255,255,255,0.92)', letterSpacing: '0.2em', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: 500 }}>
-              ✦ vi invitiamo al nostro matrimonio ✦
-            </span>
+        {/* Label "Vi invitiamo" centrata nell'hero */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, pointerEvents: 'none' }}>
+          <div style={{ textAlign: 'center', padding: '0 2rem' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
+              background: 'rgba(0,0,0,0.28)', backdropFilter: 'blur(6px)',
+              borderRadius: '3rem', padding: '0.7rem 2rem',
+              border: '1px solid rgba(255,255,255,0.18)',
+            }}>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem' }}>✦</span>
+              <span style={{
+                color: '#fff', letterSpacing: '0.22em',
+                textTransform: 'uppercase', fontSize: '0.95rem', fontWeight: 500,
+                textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+              }}>
+                vi invitiamo al nostro matrimonio
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem' }}>✦</span>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Onda di transizione */}
