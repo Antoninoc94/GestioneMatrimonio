@@ -23,7 +23,7 @@ app.use('/api/idee', require('./routes/idee'));
 const clientDist = path.join(__dirname, '../client/dist');
 if (require('fs').existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  app.get('/{*splat}', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 }
 
 const PORT = process.env.PORT || 3001;
