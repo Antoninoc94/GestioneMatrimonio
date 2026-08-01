@@ -42,6 +42,7 @@ export default function Conferma() {
   const [conPartner, setConPartner] = useState(false);
   const [partnerNome, setPartnerNome] = useState('');
   const [partnerCognome, setPartnerCognome] = useState('');
+  const [partnerIntolleranze, setPartnerIntolleranze] = useState('');
 
   // Figli
   const [conFigli, setConFigli] = useState(false);
@@ -70,7 +71,7 @@ export default function Conferma() {
       setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
       setIntolleranze(o.intolleranze || '');
       setMessaggio('');
-      setConPartner(false); setPartnerNome(''); setPartnerCognome('');
+      setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
       setConFigli(false); setFigli([emptyFiglio()]);
     } catch (err) {
       if (err.response?.data?.disabilitata) {
@@ -100,7 +101,7 @@ export default function Conferma() {
         rsvp,
         intolleranze,
         messaggio_ospite: messaggio,
-        partner: conPartner ? { nome: partnerNome, cognome: partnerCognome, rsvp: 'confermato' } : null,
+        partner: conPartner ? { nome: partnerNome, cognome: partnerCognome, rsvp: 'confermato', intolleranze: partnerIntolleranze } : null,
         figli: conFigli ? figli.filter(f => f.nome.trim()) : [],
       });
       setInviato(true);
@@ -112,7 +113,7 @@ export default function Conferma() {
   const reset = () => {
     setOspite(null); setRsvp(null); setIntolleranze(''); setMessaggio('');
     setNome(''); setCognome(''); setErrore(''); setInviato(false);
-    setConPartner(false); setPartnerNome(''); setPartnerCognome('');
+    setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
     setConFigli(false); setFigli([emptyFiglio()]);
   };
 
@@ -234,6 +235,12 @@ export default function Conferma() {
                           placeholder="Es: Bianchi"
                           value={partnerCognome} onChange={e => setPartnerCognome(e.target.value)} />
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
+                      <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                        placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
+                        value={partnerIntolleranze} onChange={e => setPartnerIntolleranze(e.target.value)} />
                     </div>
                   </div>
                 )}

@@ -80,7 +80,7 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
   if (partner?.nome?.trim() && partner?.rsvp) {
     if (!['confermato', 'declinato'].includes(partner.rsvp))
       return res.status(400).json({ error: 'Stato partner non valido' });
-    upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, parent_id: mainId });
+    upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
   }
 
   // Figli (opzionale) — collegati al genitore tramite parent_id

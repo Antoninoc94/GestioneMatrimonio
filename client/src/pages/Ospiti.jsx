@@ -24,7 +24,7 @@ export default function Ospiti() {
   const [filtroSito, setFiltroSito] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [conPartner, setConPartner] = useState(false);
-  const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato' });
+  const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
   const [conFigli, setConFigli] = useState(false);
   const [figli, setFigli] = useState([{ nome: '', eta: '', intolleranze: '' }]);
 
@@ -36,7 +36,7 @@ export default function Ospiti() {
 
   const resetExtra = () => {
     setConPartner(false);
-    setPartnerForm({ nome: '', cognome: '', rsvp: 'confermato' });
+    setPartnerForm({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
     setConFigli(false);
     setFigli([{ nome: '', eta: '', intolleranze: '' }]);
   };
@@ -57,6 +57,7 @@ export default function Ospiti() {
           nome: partnerForm.nome.trim(),
           cognome: partnerForm.cognome.trim() || null,
           rsvp: partnerForm.rsvp,
+          intolleranze: partnerForm.intolleranze.trim() || null,
           lato: form.lato,
           tipo: 'adulto',
           parent_id: mainId,
@@ -497,6 +498,10 @@ export default function Ospiti() {
                         <select className="form-input" value={partnerForm.rsvp} onChange={e => setPartnerForm(p => ({ ...p, rsvp: e.target.value }))}>
                           {RSVP.map(r => <option key={r} value={r}>{rsvpLabel[r]}</option>)}
                         </select>
+                      </div>
+                      <div>
+                        <label className="form-label">Intolleranze</label>
+                        <input className="form-input" value={partnerForm.intolleranze} onChange={e => setPartnerForm(p => ({ ...p, intolleranze: e.target.value }))} placeholder="Es. celiaco, vegano…" />
                       </div>
                     </div>
                   )}
