@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette } from 'lucide-react';
+import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette, Eye, EyeOff } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
 import { useAppConfig } from '../AppConfigContext';
@@ -33,6 +33,7 @@ export default function Impostazioni() {
   // Password
   const [pwd, setPwd] = useState({ vecchia: '', nuova: '', conferma: '' });
   const [pwdMsg, setPwdMsg] = useState('');
+  const [showPwd, setShowPwd] = useState({ vecchia: false, nuova: false, conferma: false });
 
   // Email config
   const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false });
@@ -147,18 +148,33 @@ export default function Impostazioni() {
         {/* Cambio password */}
         <Section title="Cambia Password" icon={Settings}>
           <form onSubmit={savePwd} className="space-y-3">
-            <div>
-              <label className="form-label">Password attuale</label>
-              <input type="password" className="form-input" value={pwd.vecchia} onChange={e => setPwd({ ...pwd, vecchia: e.target.value })} required />
-            </div>
-            <div>
-              <label className="form-label">Nuova password</label>
-              <input type="password" className="form-input" value={pwd.nuova} onChange={e => setPwd({ ...pwd, nuova: e.target.value })} required minLength={6} />
-            </div>
-            <div>
-              <label className="form-label">Conferma nuova password</label>
-              <input type="password" className="form-input" value={pwd.conferma} onChange={e => setPwd({ ...pwd, conferma: e.target.value })} required />
-            </div>
+            {[
+              { label: 'Password attuale', key: 'vecchia', extra: {} },
+              { label: 'Nuova password', key: 'nuova', extra: { minLength: 6 } },
+              { label: 'Conferma nuova password', key: 'conferma', extra: {} },
+            ].map(({ label, key, extra }) => (
+              <div key={key}>
+                <label className="form-label">{label}</label>
+                <div className="relative">
+                  <input
+                    type={showPwd[key] ? 'text' : 'password'}
+                    className="form-input pr-10"
+                    value={pwd[key]}
+                    onChange={e => setPwd({ ...pwd, [key]: e.target.value })}
+                    required
+                    {...extra}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPwd(s => ({ ...s, [key]: !s[key] }))}
+                    tabIndex={-1}
+                  >
+                    {showPwd[key] ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            ))}
             {pwdMsg && <p className={`text-sm font-medium ${pwdMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>{pwdMsg}</p>}
             <button type="submit" className="btn-primary"><Save size={15} /> Aggiorna Password</button>
           </form>
