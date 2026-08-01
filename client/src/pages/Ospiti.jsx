@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -211,6 +211,7 @@ export default function Ospiti() {
                     <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
                     <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
                     {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino</span>}
+                    {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
                   </div>
                 </div>
               </div>
@@ -262,9 +263,16 @@ export default function Ospiti() {
                     <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
                     <td className="text-gray-500 text-sm capitalize">{o.tipo}</td>
                     <td>
-                      <span className={`badge flex items-center gap-1 w-fit ${rsvpColor[o.rsvp]}`}>
-                        <Icon size={11} />{rsvpLabel[o.rsvp]}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`badge flex items-center gap-1 w-fit ${rsvpColor[o.rsvp]}`}>
+                          <Icon size={11} />{rsvpLabel[o.rsvp]}
+                        </span>
+                        {o.fonte === 'sito' && (
+                          <span className="badge bg-blue-100 text-blue-600 flex items-center gap-1 w-fit text-xs">
+                            <Globe size={10} />Da sito
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="text-gray-500 text-sm">{o.tavolo_nome || '—'}</td>
                     <td className="text-gray-400 text-xs max-w-32">

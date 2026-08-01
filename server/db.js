@@ -255,6 +255,9 @@ const ospCols = db.prepare('PRAGMA table_info(ospiti)').all().map(c => c.name);
 if (!ospCols.includes('messaggio_ospite')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN messaggio_ospite TEXT').run();
 }
+if (!ospCols.includes('fonte')) {
+  db.prepare("ALTER TABLE ospiti ADD COLUMN fonte TEXT DEFAULT 'lista'").run();
+}
 
 // Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();

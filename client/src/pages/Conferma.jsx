@@ -40,7 +40,7 @@ export default function Conferma() {
       setIntolleranze(o.intolleranze || '');
       setMessaggio('');
     } catch {
-      setErrore('Non abbiamo trovato il tuo nome nella lista. Controlla di aver scritto correttamente o contattaci direttamente.');
+      setErrore('Errore di connessione. Riprova.');
     } finally {
       setLoading(false);
     }
@@ -50,7 +50,14 @@ export default function Conferma() {
     if (!rsvp) return;
     setLoading(true);
     try {
-      await api.post(`/conferma/${ospite.id}`, { rsvp, intolleranze, messaggio_ospite: messaggio });
+      await api.post('/conferma/rispondi', {
+        id: ospite.id || null,
+        nome: ospite.nome,
+        cognome: ospite.cognome,
+        rsvp,
+        intolleranze,
+        messaggio_ospite: messaggio,
+      });
       setInviato(true);
     } finally {
       setLoading(false);
