@@ -6,3 +6,5 @@ server/matrimonio.db
 client/dist/
 .env
 *.db
+*.db-shm
+*.db-wal
