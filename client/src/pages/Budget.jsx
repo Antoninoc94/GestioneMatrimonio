@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CheckCircle, Circle } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle, Circle, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../api';
 
 const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Location', 'Chiesa', 'Viaggio di nozze', 'Inviti', 'Bomboniere', 'Decorazioni', 'Altro'];
@@ -16,6 +18,7 @@ export default function Budget() {
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const load = () => {
     api.get('/costi').then(r => setItems(r.data));
@@ -60,6 +63,135 @@ export default function Budget() {
 
   const filtered = filtroCategoria ? items.filter(i => i.categoria === filtroCategoria) : items;
 
+  const exportPDF = () => {
+    setExporting(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+      const gray = [107, 114, 128];
+
+      // Header
+      doc.setFillColor(...rose);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Budget & Costi', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${items.length} voci · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
+
+      // Stats boxes
+      const statsY = 34;
+      [
+        [formatEuro(totalePrev), 'Preventivato', [59, 130, 246]],
+        [formatEuro(totaleEff), 'Speso', [249, 115, 22]],
+        [formatEuro(totalePagato), 'Pagato', [34, 197, 94]],
+      ].forEach(([val, label, color], i) => {
+        const x = 14 + i * 62;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x, statsY, 58, 16, 2, 2, 'F');
+        doc.setTextColor(...color);
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text(val, x + 29, statsY + 7, { align: 'center' });
+        doc.setTextColor(...gray);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.text(label, x + 29, statsY + 13, { align: 'center' });
+      });
+
+      // Category breakdown
+      const catRows = categorie.map(c => {
+        const prev = items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_preventivo, 0);
+        const eff = items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0);
+        return [c, prev, eff, eff - prev];
+      });
+
+      const sec1Y = statsY + 22;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(55, 65, 81);
+      doc.text('RIEPILOGO PER CATEGORIA', 14, sec1Y);
+
+      autoTable(doc, {
+        startY: sec1Y + 3,
+        head: [['Categoria', 'Preventivato', 'Effettivo', 'Differenza']],
+        body: catRows.map(r => [r[0], formatEuro(r[1]), formatEuro(r[2]), formatEuro(r[3])]),
+        headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8.5, textColor: [55, 65, 81] },
+        alternateRowStyles: { fillColor: [255, 251, 252] },
+        columnStyles: {
+          0: { cellWidth: 65 },
+          1: { cellWidth: 38, halign: 'right' },
+          2: { cellWidth: 38, halign: 'right' },
+          3: { cellWidth: 38, halign: 'right' },
+        },
+        didParseCell: data => {
+          if (data.section === 'body' && data.column.index === 3) {
+            const diff = catRows[data.row.index]?.[3];
+            if (diff > 0) data.cell.styles.textColor = [220, 38, 38];
+            else if (diff < 0) data.cell.styles.textColor = [22, 163, 74];
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Detail table
+      const sec2Y = doc.lastAutoTable.finalY + 8;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(55, 65, 81);
+      doc.text('DETTAGLIO VOCI DI SPESA', 14, sec2Y);
+
+      autoTable(doc, {
+        startY: sec2Y + 3,
+        head: [['Categoria', 'Descrizione', 'Preventivato', 'Effettivo', 'Pagato']],
+        body: items.map(c => [
+          c.categoria,
+          c.descrizione,
+          formatEuro(c.importo_preventivo),
+          formatEuro(c.importo_effettivo),
+          c.pagato ? (c.data_pagamento ? `✓ ${c.data_pagamento}` : '✓') : '—',
+        ]),
+        headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 7.5, textColor: [55, 65, 81] },
+        alternateRowStyles: { fillColor: [255, 251, 252] },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 28, halign: 'right' },
+          3: { cellWidth: 28, halign: 'right' },
+          4: { cellWidth: 26, halign: 'center' },
+        },
+        didParseCell: data => {
+          if (data.section === 'body' && data.column.index === 3) {
+            const item = items[data.row.index];
+            if (item && item.importo_effettivo > item.importo_preventivo)
+              data.cell.styles.textColor = [220, 38, 38];
+          }
+          if (data.section === 'body' && data.column.index === 4 && String(data.cell.raw).startsWith('✓'))
+            data.cell.styles.textColor = [22, 163, 74];
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
+        doc.text(`Budget & Costi — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+      }
+
+      doc.save('budget-riepilogo.pdf');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -67,7 +199,12 @@ export default function Budget() {
           <h1 className="page-title">Budget & Costi</h1>
           <p className="page-subtitle">{items.length} voci di spesa</p>
         </div>
-        <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuova Voce</button>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={exportPDF} disabled={exporting}>
+            <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
+          </button>
+          <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuova Voce</button>
+        </div>
       </div>
 
       {/* Totali */}

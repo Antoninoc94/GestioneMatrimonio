@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserCheck, UserX } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
 import api from '../api';
 
 const rsvpColor = { confermato: 'text-green-600', declinato: 'text-red-400', attesa: 'text-yellow-500' };
@@ -43,6 +44,131 @@ export default function Tavoli() {
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
   const totaleAssegnati = ospiti.filter(o => o.tavolo_id).length;
+  const [exporting, setExporting] = useState(false);
+
+  const exportSeatingPDF = () => {
+    setExporting(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+      const gray = [107, 114, 128];
+      const COL_W = 85;
+      const GAP = 12;
+      const LEFT = 14;
+      const PAGE_H = 297;
+      const FOOTER_H = 15;
+      const CARD_PAD = 4;
+      const CARD_HEAD = 16; // name + bar + spacing
+      const GUEST_ROW = 5;
+      const ROW_GAP = 4;
+
+      const cardHeight = t => CARD_HEAD + Math.max(1, t.ospiti.length) * GUEST_ROW + CARD_PAD;
+
+      const drawCard = (t, cx, cy, height) => {
+        const pieno = t.ospiti.length >= t.capienza;
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(...(pieno ? [253, 186, 116] : [229, 231, 235]));
+        doc.setLineWidth(0.4);
+        doc.roundedRect(cx, cy, COL_W, height, 3, 3, 'FD');
+
+        // Name
+        doc.setFontSize(10.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(17, 24, 39);
+        doc.text(t.nome, cx + CARD_PAD, cy + CARD_PAD + 4);
+
+        // Capacity label
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...gray);
+        doc.text(`${t.ospiti.length}/${t.capienza}`, cx + COL_W - CARD_PAD, cy + CARD_PAD + 4, { align: 'right' });
+
+        // Capacity bar
+        const barW = COL_W - 2 * CARD_PAD;
+        const fillW = t.capienza > 0 ? Math.min((t.ospiti.length / t.capienza) * barW, barW) : 0;
+        doc.setFillColor(229, 231, 235);
+        doc.roundedRect(cx + CARD_PAD, cy + CARD_PAD + 7, barW, 2, 1, 1, 'F');
+        if (fillW > 0) {
+          doc.setFillColor(...(pieno ? [249, 115, 22] : [52, 211, 153]));
+          doc.roundedRect(cx + CARD_PAD, cy + CARD_PAD + 7, fillW, 2, 1, 1, 'F');
+        }
+
+        // Guests
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        if (t.ospiti.length === 0) {
+          doc.setTextColor(156, 163, 175);
+          doc.text('Nessun ospite assegnato', cx + CARD_PAD, cy + CARD_HEAD + CARD_PAD);
+        } else {
+          doc.setTextColor(55, 65, 81);
+          t.ospiti.forEach((o, idx) => {
+            const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+            doc.text(`• ${name}`, cx + CARD_PAD, cy + CARD_HEAD + idx * GUEST_ROW);
+          });
+        }
+      };
+
+      // Header
+      doc.setFillColor(...rose);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Disposizione Tavoli', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${tavoli.length} tavoli · ${totaleAssegnati}/${ospiti.length} ospiti · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
+
+      // Cards — paired rows, 2 columns
+      let y = 34;
+      for (let i = 0; i < tavoli.length; i += 2) {
+        const tL = tavoli[i];
+        const tR = tavoli[i + 1];
+        const rowH = Math.max(cardHeight(tL), tR ? cardHeight(tR) : 0);
+
+        if (y + rowH > PAGE_H - FOOTER_H) {
+          doc.addPage();
+          y = 14;
+        }
+
+        drawCard(tL, LEFT, y, rowH);
+        if (tR) drawCard(tR, LEFT + COL_W + GAP, y, rowH);
+
+        y += rowH + ROW_GAP;
+      }
+
+      // Senza Tavolo
+      if (senzaTavolo.length > 0) {
+        const sectionH = 14 + Math.ceil(senzaTavolo.length / 3) * 5;
+        if (y + sectionH > PAGE_H - FOOTER_H) { doc.addPage(); y = 14; }
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...rose);
+        doc.text(`OSPITI SENZA TAVOLO (${senzaTavolo.length})`, 14, y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(55, 65, 81);
+        senzaTavolo.forEach((o, i) => {
+          const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+          doc.text(`• ${name}`, 14 + (i % 3) * 61, y + 11 + Math.floor(i / 3) * 5);
+        });
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
+        doc.text(`Seating Chart — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+      }
+
+      doc.save('seating-chart.pdf');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div>
@@ -51,7 +177,12 @@ export default function Tavoli() {
           <h1 className="page-title">Disposizione Tavoli</h1>
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
         </div>
-        <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuovo Tavolo</button>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={exportSeatingPDF} disabled={exporting}>
+            <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
+          </button>
+          <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuovo Tavolo</button>
+        </div>
       </div>
 
       {senzaTavolo.length > 0 && (
