@@ -18,6 +18,7 @@ import Cronologia from './pages/Cronologia';
 import Regali from './pages/Regali';
 import Viaggio from './pages/Viaggio';
 import Inviti from './pages/Inviti';
+import Conferma from './pages/Conferma';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
+      <Route path="/conferma" element={<Conferma />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />

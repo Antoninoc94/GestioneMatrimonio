@@ -250,6 +250,12 @@ if (!emailCols.includes('ultimo_invio_auto')) {
   db.prepare('ALTER TABLE email_config ADD COLUMN ultimo_invio_auto TEXT').run();
 }
 
+// Migrazione: aggiunge messaggio_ospite agli ospiti
+const ospCols = db.prepare('PRAGMA table_info(ospiti)').all().map(c => c.name);
+if (!ospCols.includes('messaggio_ospite')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN messaggio_ospite TEXT').run();
+}
+
 // Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();
 if (!userExists) {

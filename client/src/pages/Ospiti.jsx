@@ -218,6 +218,9 @@ export default function Ospiti() {
                 {o.tavolo_nome && <div><span className="text-gray-400">Tavolo:</span> {o.tavolo_nome}</div>}
                 {o.intolleranze && <div className="truncate"><span className="text-gray-400">Intoll.:</span> {o.intolleranze}</div>}
               </div>
+              {o.messaggio_ospite && (
+                <p className="text-xs text-gray-400 italic mb-2 truncate">"{o.messaggio_ospite}"</p>
+              )}
               <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
                 <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
                 <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
@@ -264,7 +267,10 @@ export default function Ospiti() {
                       </span>
                     </td>
                     <td className="text-gray-500 text-sm">{o.tavolo_nome || '—'}</td>
-                    <td className="text-gray-400 text-xs max-w-32 truncate">{o.intolleranze || '—'}</td>
+                    <td className="text-gray-400 text-xs max-w-32">
+                      <div className="truncate">{o.intolleranze || '—'}</div>
+                      {o.messaggio_ospite && <div className="italic truncate text-gray-300 mt-0.5">"{o.messaggio_ospite}"</div>}
+                    </td>
                     <td>
                       <div className="flex gap-1">
                         <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
