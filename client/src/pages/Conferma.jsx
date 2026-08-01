@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Heart, CheckCircle, XCircle, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Heart, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
@@ -13,9 +13,9 @@ const formatData = d => {
 
 export default function Conferma() {
   const [info, setInfo] = useState(null);
-  const [query, setQuery] = useState('');
-  const [risultati, setRisultati] = useState([]);
-  const [cercato, setCercato] = useState(false);
+  const [nome, setNome] = useState('');
+  const [cognome, setCognome] = useState('');
+  const [errore, setErrore] = useState('');
   const [ospite, setOspite] = useState(null);
   const [rsvp, setRsvp] = useState(null);
   const [intolleranze, setIntolleranze] = useState('');
@@ -27,19 +27,23 @@ export default function Conferma() {
     api.get('/conferma/info').then(r => setInfo(r.data)).catch(() => {});
   }, []);
 
-  const cerca = async e => {
-    e?.preventDefault();
-    if (query.trim().length < 2) return;
-    const r = await api.get('/conferma/cerca', { params: { q: query.trim() } });
-    setRisultati(r.data);
-    setCercato(true);
-  };
-
-  const seleziona = o => {
-    setOspite(o);
-    setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
-    setIntolleranze(o.intolleranze || '');
-    setMessaggio('');
+  const trova = async e => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setErrore('');
+    setLoading(true);
+    try {
+      const r = await api.get('/conferma/trova', { params: { nome: nome.trim(), cognome: cognome.trim() } });
+      const o = r.data;
+      setOspite(o);
+      setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
+      setIntolleranze(o.intolleranze || '');
+      setMessaggio('');
+    } catch {
+      setErrore('Non abbiamo trovato il tuo nome nella lista. Controlla di aver scritto correttamente o contattaci direttamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const invia = async () => {
@@ -55,7 +59,7 @@ export default function Conferma() {
 
   const reset = () => {
     setOspite(null); setRsvp(null); setIntolleranze(''); setMessaggio('');
-    setQuery(''); setRisultati([]); setCercato(false); setInviato(false);
+    setNome(''); setCognome(''); setErrore(''); setInviato(false);
   };
 
   const nomeSposi = info ? `${info.nome_sposo1 || ''} & ${info.nome_sposo2 || ''}` : '';
@@ -92,11 +96,11 @@ export default function Conferma() {
               </p>
               {rsvp === 'confermato'
                 ? <p className="text-gray-500 text-sm">Non vediamo l'ora di festeggiare con te!</p>
-                : <p className="text-gray-500 text-sm">Ci dispiace non poterci essere con te, grazie per averci avvisato.</p>
+                : <p className="text-gray-500 text-sm">Ci dispiace non poter festeggiare con te, grazie per averci avvisato.</p>
               }
               <button onClick={reset}
                 className="mt-8 text-sm text-rose-500 underline underline-offset-2">
-                Cerca un altro ospite
+                Invia un'altra risposta
               </button>
             </div>
           )}
@@ -104,9 +108,9 @@ export default function Conferma() {
           {/* Step 2: Conferma */}
           {!inviato && ospite && (
             <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6">
-              <button onClick={() => { setOspite(null); setRsvp(null); }}
+              <button onClick={() => { setOspite(null); setRsvp(null); setErrore(''); }}
                 className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 mb-4">
-                <ArrowLeft size={14} /> Torna alla ricerca
+                <ArrowLeft size={14} /> Indietro
               </button>
 
               <h2 className="font-bold text-gray-900 text-lg mb-1">
@@ -140,7 +144,7 @@ export default function Conferma() {
                   </label>
                   <input
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                    placeholder="Es: celiaco, lattosio, frutta a guscio… (lascia vuoto se nessuna)"
+                    placeholder="Es: celiaco, lattosio, frutta a guscio... (lascia vuoto se nessuna)"
                     value={intolleranze}
                     onChange={e => setIntolleranze(e.target.value)}
                   />
@@ -170,54 +174,43 @@ export default function Conferma() {
             </div>
           )}
 
-          {/* Step 1: Cerca */}
+          {/* Step 1: Inserisci nome */}
           {!inviato && !ospite && (
-            <>
-              <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 mb-4">
-                <h2 className="font-semibold text-gray-800 mb-3">Cerca il tuo nome</h2>
-                <form onSubmit={cerca} className="flex gap-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6">
+              <h2 className="font-semibold text-gray-800 mb-1">Inserisci il tuo nome</h2>
+              <p className="text-xs text-gray-400 mb-4">Esattamente come appare sull'invito</p>
+              <form onSubmit={trova} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
                   <input
-                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                    placeholder="Nome o cognome..."
-                    value={query}
-                    onChange={e => { setQuery(e.target.value); setCercato(false); setRisultati([]); }}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    placeholder="Es: Mario"
+                    value={nome}
+                    onChange={e => { setNome(e.target.value); setErrore(''); }}
                     autoFocus
+                    required
                   />
-                  <button type="submit"
-                    className="bg-rose-500 hover:bg-rose-600 text-white px-4 rounded-xl transition-colors">
-                    <Search size={18} />
-                  </button>
-                </form>
-              </div>
-
-              {cercato && risultati.length === 0 && (
-                <div className="text-center py-6 text-gray-400 text-sm">
-                  Nessun ospite trovato. Controlla l'ortografia del nome.
                 </div>
-              )}
-
-              {risultati.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden">
-                  {risultati.map((o, i) => (
-                    <button key={o.id} onClick={() => seleziona(o)}
-                      className={`w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-rose-50 transition-colors
-                        ${i < risultati.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                      <div>
-                        <div className="font-medium text-gray-900 text-sm">
-                          {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                        </div>
-                        <div className="text-xs mt-0.5"
-                          style={{ color: o.rsvp === 'confermato' ? '#16a34a' : o.rsvp === 'declinato' ? '#dc2626' : '#9ca3af' }}>
-                          {o.rsvp === 'confermato' ? 'Confermato' : o.rsvp === 'declinato' ? 'Declinato' : 'In attesa di risposta'}
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="text-gray-300" />
-                    </button>
-                  ))}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Cognome</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    placeholder="Es: Rossi"
+                    value={cognome}
+                    onChange={e => { setCognome(e.target.value); setErrore(''); }}
+                  />
                 </div>
-              )}
-            </>
+                {errore && (
+                  <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{errore}</p>
+                )}
+                <button type="submit" disabled={loading || !nome.trim()}
+                  className="w-full py-3 rounded-xl font-semibold text-white text-sm bg-rose-500 hover:bg-rose-600 transition-colors disabled:opacity-40">
+                  {loading ? 'Ricerca...' : 'Continua'}
+                </button>
+              </form>
+            </div>
           )}
+
         </div>
       </main>
 

@@ -7,19 +7,22 @@ router.get('/info', (req, res) => {
   res.json(cfg || {});
 });
 
-// Cerca ospite per nome o cognome
-router.get('/cerca', (req, res) => {
-  const q = (req.query.q || '').trim();
-  if (q.length < 2) return res.json([]);
-  const like = `%${q}%`;
-  const ospiti = db.prepare(`
+// Trova ospite per nome + cognome esatti (case-insensitive)
+router.get('/trova', (req, res) => {
+  const nome = (req.query.nome || '').trim();
+  const cognome = (req.query.cognome || '').trim();
+  if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
+
+  const ospite = db.prepare(`
     SELECT id, nome, cognome, rsvp, intolleranze
     FROM ospiti
-    WHERE nome LIKE ? OR cognome LIKE ?
-    ORDER BY cognome ASC, nome ASC
-    LIMIT 20
-  `).all(like, like);
-  res.json(ospiti);
+    WHERE LOWER(nome) = LOWER(?)
+      AND LOWER(COALESCE(cognome, '')) = LOWER(?)
+    LIMIT 1
+  `).get(nome, cognome);
+
+  if (!ospite) return res.status(404).json({ error: 'Non trovato' });
+  res.json(ospite);
 });
 
 // Conferma presenza (pubblica)
