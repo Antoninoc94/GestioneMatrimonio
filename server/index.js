@@ -19,5 +19,12 @@ app.use('/api/location', require('./routes/location'));
 app.use('/api/documenti', require('./routes/documenti'));
 app.use('/api/idee', require('./routes/idee'));
 
+// Serve React build in production
+const clientDist = path.join(__dirname, '../client/dist');
+if (require('fs').existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server avviato su porta ${PORT}`));
