@@ -204,7 +204,7 @@ export default function Tavoli() {
               <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             {(() => {
               const mainGuests = senzaTavolo.filter(o => !o.parent_id);
               const familyOf = id => senzaTavolo.filter(o => o.parent_id === id);
