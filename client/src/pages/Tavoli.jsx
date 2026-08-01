@@ -272,16 +272,29 @@ export default function Tavoli() {
               {t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
 
               <div className="space-y-1">
-                {t.ospiti.map(o => (
-                  <div key={o.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700">{guestLabel(o)}</span>
-                    <button
-                      className="text-xs text-gray-300 hover:text-red-400"
-                      title="Rimuovi dal tavolo"
-                      onClick={() => assignGuest(o.id, null)}
-                    >✕</button>
-                  </div>
-                ))}
+                {t.ospiti.map(o => {
+                  const isChild = o.tipo === 'bambino';
+                  const isPartner = !!o.parent_id && !isChild;
+                  return (
+                    <div key={o.id} className={`flex items-center justify-between text-sm rounded px-1.5 py-0.5 -mx-1.5 ${
+                      isChild ? 'bg-purple-50' : isPartner ? 'bg-rose-50' : ''
+                    }`}>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
+                        {isChild  && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
+                        <span className={`truncate ${isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-700'}`}>
+                          {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                          {isChild && o.eta ? <span className="text-purple-300 ml-1 text-xs">({o.eta}a)</span> : null}
+                        </span>
+                      </div>
+                      <button
+                        className="text-xs text-gray-300 hover:text-red-400 flex-shrink-0 ml-2"
+                        title="Rimuovi dal tavolo"
+                        onClick={() => assignGuest(o.id, null)}
+                      >✕</button>
+                    </div>
+                  );
+                })}
                 {!pieno && (
                   <select
                     className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1"

@@ -4,7 +4,7 @@ const auth = require('../middleware/auth');
 
 router.get('/', auth, (req, res) => {
   const tavoli = db.prepare('SELECT * FROM tavoli ORDER BY nome ASC').all();
-  const ospiti = db.prepare('SELECT id, nome, cognome, tavolo_id, rsvp FROM ospiti ORDER BY cognome ASC, nome ASC').all();
+  const ospiti = db.prepare('SELECT id, nome, cognome, tavolo_id, rsvp, tipo, parent_id FROM ospiti ORDER BY cognome ASC, nome ASC').all();
   res.json(tavoli.map(t => ({
     ...t,
     ospiti: ospiti.filter(o => o.tavolo_id === t.id),
