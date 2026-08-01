@@ -105,22 +105,24 @@ export default function Ospiti() {
         rsvpText[o.rsvp] || o.rsvp,
         o.tavolo_nome || '-',
         o.intolleranze || '-',
+        o.fonte === 'sito' ? 'Da sito' : 'Lista',
       ]);
 
       autoTable(doc, {
         startY: statsY + 20,
-        head: [['Nome', 'Lato', 'Tipo', 'RSVP', 'Tavolo', 'Intolleranze']],
+        head: [['Nome', 'Lato', 'Tipo', 'RSVP', 'Tavolo', 'Intolleranze', 'Fonte']],
         body: rows,
         headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
         bodyStyles: { fontSize: 8, textColor: [55, 65, 81] },
         alternateRowStyles: { fillColor: [255, 251, 252] },
         columnStyles: {
-          0: { cellWidth: 45 },
-          1: { cellWidth: 22 },
-          2: { cellWidth: 18 },
-          3: { cellWidth: 32 },
-          4: { cellWidth: 28 },
+          0: { cellWidth: 42 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 16 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 26 },
           5: { cellWidth: 'auto' },
+          6: { cellWidth: 18, halign: 'center' },
         },
         didParseCell: data => {
           if (data.section === 'body' && data.column.index === 3) {
@@ -129,6 +131,8 @@ export default function Ospiti() {
             else if (v === 'Declinato') data.cell.styles.textColor = [220, 38, 38];
             else data.cell.styles.textColor = [161, 98, 7];
           }
+          if (data.section === 'body' && data.column.index === 6 && data.cell.raw === 'Da sito')
+            data.cell.styles.textColor = [37, 99, 235];
         },
         margin: { left: 14, right: 14 },
       });
