@@ -249,7 +249,7 @@ export default function Ospiti() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Ospite' : 'Nuovo Ospite'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Nome *</label>
                   <input className="form-input" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
@@ -259,7 +259,7 @@ export default function Ospiti() {
                   <input className="form-input" value={form.cognome} onChange={e => setForm({ ...form, cognome: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="form-label">Lato</label>
                   <select className="form-input" value={form.lato} onChange={e => setForm({ ...form, lato: e.target.value })}>
@@ -280,7 +280,7 @@ export default function Ospiti() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Telefono</label>
                   <input className="form-input" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />

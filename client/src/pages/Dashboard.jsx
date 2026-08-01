@@ -205,9 +205,9 @@ export default function Dashboard() {
             <div className="w-full bg-gray-100 rounded-full h-3 mb-1">
               <div className="h-3 rounded-full transition-all" style={{ width: `${Math.min(budgetUsato, 100)}%`, background: budgetUsato > 90 ? '#e11d48' : '#34d399' }} />
             </div>
-            <div className="flex justify-between text-xs text-gray-400">
+            <div className="flex flex-wrap justify-between gap-y-1 text-xs text-gray-400">
               <span>Speso: {formatEuro(budget.effettivo)}</span>
-              {costi.nonPagati?.count > 0 && <span className="text-orange-500 font-semibold">⚠ {costi.nonPagati.count} pagamenti in sospeso: {formatEuro(costi.nonPagati.tot)}</span>}
+              {costi.nonPagati?.count > 0 && <span className="text-orange-500 font-semibold">⚠ {costi.nonPagati.count} in sospeso: {formatEuro(costi.nonPagati.tot)}</span>}
               <span>Rimasto: {formatEuro(budgetRimanente)}</span>
             </div>
           </div>
@@ -219,16 +219,18 @@ export default function Dashboard() {
         {costi.perCategoria?.length > 0 && (
           <div className="card">
             <h3 className="text-sm font-bold text-gray-700 mb-4">Spese per categoria</h3>
-            <div className="flex gap-4 items-center">
-              <ResponsiveContainer width={160} height={160}>
-                <PieChart>
-                  <Pie data={costi.perCategoria} dataKey="tot" nameKey="categoria" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
-                    {costi.perCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={v => formatEuro(v)} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-1.5">
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
+              <div className="w-40 h-40 flex-shrink-0 mx-auto sm:mx-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={costi.perCategoria} dataKey="tot" nameKey="categoria" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
+                      {costi.perCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={v => formatEuro(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 w-full space-y-1.5">
                 {costi.perCategoria.slice(0, 6).map((c, i) => (
                   <div key={c.categoria} className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -246,18 +248,20 @@ export default function Dashboard() {
         {ospitiChartData.length > 0 && (
           <div className="card">
             <h3 className="text-sm font-bold text-gray-700 mb-4">Risposte ospiti</h3>
-            <div className="flex gap-4 items-center">
-              <ResponsiveContainer width={160} height={160}>
-                <PieChart>
-                  <Pie data={ospitiChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
-                    <Cell fill="#34d399" />
-                    <Cell fill="#fbbf24" />
-                    <Cell fill="#f43f5e" />
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
+              <div className="w-40 h-40 flex-shrink-0 mx-auto sm:mx-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={ospitiChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
+                      <Cell fill="#34d399" />
+                      <Cell fill="#fbbf24" />
+                      <Cell fill="#f43f5e" />
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 w-full space-y-3">
                 {[
                   { label: 'Confermati', value: ospiti?.confermati || 0, color: 'text-green-600', bar: '#34d399' },
                   { label: 'In attesa',  value: ospiti?.attesa || 0,     color: 'text-yellow-600', bar: '#fbbf24' },

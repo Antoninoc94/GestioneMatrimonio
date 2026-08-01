@@ -135,7 +135,7 @@ export default function Regali() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Regalo' : 'Nuovo Regalo'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Ospite (dalla lista)</label>
                   <select className="form-input" value={form.ospite_id} onChange={e => setForm({ ...form, ospite_id: e.target.value })}>
@@ -152,7 +152,7 @@ export default function Regali() {
                 <label className="form-label">Descrizione *</label>
                 <input className="form-input" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} required placeholder="Es. Busta con 200€, Set pentole…" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Tipo</label>
                   <select className="form-input" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>

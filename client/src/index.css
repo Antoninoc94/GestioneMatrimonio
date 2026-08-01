@@ -63,8 +63,14 @@ body {
   background: white;
   border-radius: 0.75rem;
   border: 1px solid #f3f4f6;
-  padding: 1.5rem;
+  padding: 1rem;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 1.5rem;
+  }
 }
 
 /* ── Buttons ────────────────────────────────────────────────── */

@@ -131,7 +131,7 @@ export default function Tavoli() {
         })}
 
         {tavoli.length === 0 && (
-          <div className="col-span-3 card text-center py-12 text-gray-400">
+          <div className="col-span-full card text-center py-12 text-gray-400">
             <Users size={40} className="mx-auto mb-2 opacity-30" />
             <p>Nessun tavolo ancora. Creane uno!</p>
           </div>
@@ -143,7 +143,7 @@ export default function Tavoli() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Tavolo' : 'Nuovo Tavolo'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Nome tavolo *</label>
                   <input className="form-input" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Es. Tavolo degli Sposi" required />

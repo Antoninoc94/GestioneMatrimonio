@@ -92,7 +92,7 @@ export default function Fornitori() {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-3 text-center py-12 text-gray-400">
+          <div className="col-span-full text-center py-12 text-gray-400">
             <User size={40} className="mx-auto mb-2 opacity-30" />
             <p>Nessun fornitore trovato</p>
           </div>
@@ -104,7 +104,7 @@ export default function Fornitori() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Fornitore' : 'Nuovo Fornitore'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Categoria *</label>
                   <select className="form-input" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })} required>
@@ -122,7 +122,7 @@ export default function Fornitori() {
                 <label className="form-label">Nome Azienda / Professionista *</label>
                 <input className="form-input" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Referente</label>
                   <input className="form-input" value={form.contatto} onChange={e => setForm({ ...form, contatto: e.target.value })} />

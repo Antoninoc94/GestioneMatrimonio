@@ -113,7 +113,7 @@ export default function Preventivi() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Preventivo' : 'Nuovo Preventivo'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Categoria *</label>
                   <select className="form-input" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })} required>
@@ -139,7 +139,7 @@ export default function Preventivi() {
                 <label className="form-label">Descrizione</label>
                 <input className="form-input" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Importo (€) *</label>
                   <input type="number" step="0.01" min="0" className="form-input" value={form.importo} onChange={e => setForm({ ...form, importo: e.target.value })} required />

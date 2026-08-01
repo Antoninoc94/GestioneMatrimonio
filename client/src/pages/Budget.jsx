@@ -71,7 +71,7 @@ export default function Budget() {
       </div>
 
       {/* Totali */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Preventivato', value: formatEuro(totalePrev), color: 'text-blue-600' },
           { label: 'Speso', value: formatEuro(totaleEff), color: 'text-orange-600' },
@@ -157,7 +157,7 @@ export default function Budget() {
           <div className="modal">
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Voce' : 'Nuova Voce di Spesa'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Categoria *</label>
                   <select className="form-input" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
@@ -176,7 +176,7 @@ export default function Budget() {
                 <label className="form-label">Descrizione *</label>
                 <input className="form-input" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Importo Preventivo (€)</label>
                   <input type="number" step="0.01" min="0" className="form-input" value={form.importo_preventivo} onChange={e => setForm({ ...form, importo_preventivo: e.target.value })} />
