@@ -31,7 +31,7 @@ RUN mkdir -p /app/data /app/server/uploads
 
 EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -qO- http://localhost:3001/api/dashboard || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+  CMD wget -qO- http://localhost:3001/ || exit 1
 
 CMD ["node", "server/index.js"]
