@@ -17,10 +17,10 @@ router.get('/trova', (req, res) => {
   const ospite = db.prepare(`
     SELECT id, nome, cognome, rsvp, intolleranze
     FROM ospiti
-    WHERE LOWER(nome) = LOWER(?)
-      AND LOWER(COALESCE(cognome, '')) = LOWER(?)
+    WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
+       OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
     LIMIT 1
-  `).get(nome, cognome);
+  `).get(nome, cognome, cognome, nome);
 
   if (ospite) {
     res.json({ trovato: true, ...ospite });
