@@ -171,7 +171,7 @@ export default function Budget() {
           c.descrizione,
           formatEuro(c.importo_preventivo),
           formatEuro(c.importo_effettivo),
-          c.pagato ? (c.data_pagamento ? `✓ ${c.data_pagamento}` : '✓') : '—',
+          c.pagato ? (c.data_pagamento ? `Si ${c.data_pagamento}` : 'Si') : 'No',
         ]),
         headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 7.5, textColor: [55, 65, 81] },
@@ -189,7 +189,7 @@ export default function Budget() {
             if (item && item.importo_effettivo > item.importo_preventivo)
               data.cell.styles.textColor = [220, 38, 38];
           }
-          if (data.section === 'body' && data.column.index === 4 && String(data.cell.raw).startsWith('✓'))
+          if (data.section === 'body' && data.column.index === 4 && String(data.cell.raw).startsWith('Si'))
             data.cell.styles.textColor = [22, 163, 74];
         },
         margin: { left: 14, right: 14 },
