@@ -314,18 +314,24 @@ export default function Tavoli() {
                   const getFamily = id => t.ospiti.filter(o => o.parent_id === id);
                   const orphans = t.ospiti.filter(o => o.parent_id && !t.ospiti.find(mg => mg.id === o.parent_id));
 
-                  const rowJsx = o => {
+                  const rowJsx = (o, showParentHint = false) => {
                     const isChild = o.tipo === 'bambino';
                     const isPartner = !!o.parent_id && !isChild;
+                    const pName = showParentHint && o.parent_id ? parentName(o.parent_id) : null;
                     return (
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
                           {isChild   && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
-                          <span className={`truncate ${isChild ? 'text-purple-700 text-xs' : isPartner ? 'text-rose-600 text-xs' : 'text-gray-800 font-medium'}`}>
-                            {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                            {isChild && o.eta ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className={`truncate ${isChild ? 'text-purple-700 text-xs' : isPartner ? 'text-rose-600 text-xs' : 'text-gray-800 font-medium'}`}>
+                              {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                              {isChild && o.eta ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
+                            </div>
+                            {pName && (
+                              <div className="text-gray-400 text-xs">{isChild ? 'figlio' : 'partner'} di {pName}</div>
+                            )}
+                          </div>
                         </div>
                         <button className="text-xs text-gray-300 hover:text-red-400 flex-shrink-0 ml-2" onClick={() => assignGuest(o.id, null)}>✕</button>
                       </div>
@@ -347,7 +353,7 @@ export default function Tavoli() {
                           </div>
                         );
                       })}
-                      {orphans.map(o => <div key={o.id}>{rowJsx(o)}</div>)}
+                      {orphans.map(o => <div key={o.id}>{rowJsx(o, true)}</div>)}
                     </>
                   );
                 })()}
