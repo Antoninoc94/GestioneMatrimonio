@@ -54,7 +54,8 @@ export default function Impostazioni() {
     setProfiloError('');
     try {
       const { data } = await api.put('/profilo/me', profilo);
-      updateUser(data);
+      localStorage.setItem('token', data.token);
+      updateUser(data.user);
       setProfiloSaved(true);
       setTimeout(() => setProfiloSaved(false), 2500);
     } catch (err) {

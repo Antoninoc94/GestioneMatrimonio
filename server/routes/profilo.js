@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 
 // Profilo utente corrente
 router.get('/me', auth, (req, res) => {
@@ -22,7 +23,12 @@ router.put('/me', auth, (req, res) => {
     .run(nome.trim(), username.trim().toLowerCase(), email?.trim() || null, req.user.id);
 
   const updated = db.prepare('SELECT id, nome, username, email, ruolo FROM users WHERE id = ?').get(req.user.id);
-  res.json(updated);
+  const token = jwt.sign(
+    { id: updated.id, nome: updated.nome, username: updated.username, email: updated.email, ruolo: updated.ruolo },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  res.json({ user: updated, token });
 });
 
 // Lista utenti (per vedere il partner)
