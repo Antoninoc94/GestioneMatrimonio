@@ -39,6 +39,7 @@ export default function Impostazioni() {
   const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false });
   const [emailMsg, setEmailMsg] = useState('');
   const [testingEmail, setTestingEmail] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
     api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '' }));
@@ -109,9 +110,22 @@ export default function Impostazioni() {
       const { data } = await api.post('/email-config/test');
       setEmailMsg('✓ ' + data.message);
     } catch (err) {
-      setEmailMsg('✗ ' + (err.response?.data?.error || 'Connessione fallita'));
+      setEmailMsg('✗ ' + (err.response?.data?.error || 'Invio fallito'));
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const sendReminder = async () => {
+    setSendingReminder(true);
+    setEmailMsg('');
+    try {
+      const { data } = await api.post('/email-config/remind-scadenze', { giorni: 14 });
+      setEmailMsg('✓ ' + data.message);
+    } catch (err) {
+      setEmailMsg('✗ ' + (err.response?.data?.error || 'Invio fallito'));
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -281,12 +295,16 @@ export default function Impostazioni() {
               </p>
             )}
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               <button type="submit" className="btn-primary"><Save size={15} /> Salva</button>
               <button type="button" className="btn-secondary" onClick={testEmail} disabled={testingEmail}>
-                {testingEmail ? 'Test...' : 'Testa Connessione'}
+                {testingEmail ? 'Invio...' : '📧 Invia email di test'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={sendReminder} disabled={sendingReminder}>
+                {sendingReminder ? 'Invio...' : '📅 Promemoria scadenze'}
               </button>
             </div>
+            <p className="text-xs text-gray-400">Il test invia una vera email all'indirizzo configurato. Il promemoria invia un riepilogo delle scadenze entro 14 giorni.</p>
           </form>
         </Section>
 
