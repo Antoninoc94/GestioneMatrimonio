@@ -12,6 +12,12 @@ import Location from './pages/Location';
 import Documenti from './pages/Documenti';
 import Idee from './pages/Idee';
 import Impostazioni from './pages/Impostazioni';
+import Ospiti from './pages/Ospiti';
+import Tavoli from './pages/Tavoli';
+import Cronologia from './pages/Cronologia';
+import Regali from './pages/Regali';
+import Viaggio from './pages/Viaggio';
+import Inviti from './pages/Inviti';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -33,6 +39,12 @@ function AppRoutes() {
         <Route path="documenti" element={<Documenti />} />
         <Route path="idee" element={<Idee />} />
         <Route path="impostazioni" element={<Impostazioni />} />
+        <Route path="ospiti" element={<Ospiti />} />
+        <Route path="tavoli" element={<Tavoli />} />
+        <Route path="cronologia" element={<Cronologia />} />
+        <Route path="regali" element={<Regali />} />
+        <Route path="viaggio" element={<Viaggio />} />
+        <Route path="inviti" element={<Inviti />} />
       </Route>
     </Routes>
   );

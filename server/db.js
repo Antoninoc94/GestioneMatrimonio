@@ -127,6 +127,66 @@ db.exec(`
     from_email TEXT,
     enabled INTEGER DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS tavoli (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    capienza INTEGER DEFAULT 8,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS ospiti (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    cognome TEXT,
+    lato TEXT DEFAULT 'comune',
+    tipo TEXT DEFAULT 'adulto',
+    rsvp TEXT DEFAULT 'attesa',
+    tavolo_id INTEGER REFERENCES tavoli(id) ON DELETE SET NULL,
+    email TEXT,
+    telefono TEXT,
+    intolleranze TEXT,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS cronologia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ora TEXT NOT NULL,
+    titolo TEXT NOT NULL,
+    descrizione TEXT,
+    luogo TEXT,
+    durata INTEGER,
+    tipo TEXT DEFAULT 'altro',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS regali (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ospite_id INTEGER REFERENCES ospiti(id) ON DELETE SET NULL,
+    mittente TEXT,
+    descrizione TEXT NOT NULL,
+    tipo TEXT DEFAULT 'altro',
+    valore_stimato REAL,
+    ringraziamento_inviato INTEGER DEFAULT 0,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS viaggio (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT DEFAULT 'altro',
+    titolo TEXT NOT NULL,
+    luogo TEXT,
+    data_inizio TEXT,
+    data_fine TEXT,
+    costo REAL,
+    numero_prenotazione TEXT,
+    stato TEXT DEFAULT 'da_prenotare',
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Migrazione: aggiunge colonne config se non esistono

@@ -20,6 +20,11 @@ app.use('/api/documenti', require('./routes/documenti'));
 app.use('/api/idee', require('./routes/idee'));
 app.use('/api/profilo', require('./routes/profilo'));
 app.use('/api/email-config', require('./routes/email-config'));
+app.use('/api/ospiti', require('./routes/ospiti'));
+app.use('/api/tavoli', require('./routes/tavoli'));
+app.use('/api/cronologia', require('./routes/cronologia'));
+app.use('/api/regali', require('./routes/regali'));
+app.use('/api/viaggio', require('./routes/viaggio'));
 
 // Serve React build in production
 const clientDist = path.join(__dirname, '../client/dist');

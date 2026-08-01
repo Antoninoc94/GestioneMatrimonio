@@ -3,17 +3,28 @@ import { useAuth } from '../AuthContext';
 import { useAppConfig } from '../AppConfigContext';
 import {
   LayoutDashboard, Users, FileText, DollarSign, CalendarCheck,
-  MapPin, FolderOpen, Lightbulb, Settings, LogOut, Menu
+  MapPin, FolderOpen, Lightbulb, Settings, LogOut, Menu,
+  UserCheck, Clock, Gift, Plane, Mail
 } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { group: 'Ospiti & Logistica' },
+  { to: '/ospiti', icon: Users, label: 'Lista Ospiti' },
+  { to: '/tavoli', icon: UserCheck, label: 'Tavoli' },
+  { to: '/regali', icon: Gift, label: 'Regali' },
+  { group: 'Fornitori & Budget' },
   { to: '/fornitori', icon: Users, label: 'Fornitori' },
   { to: '/preventivi', icon: FileText, label: 'Preventivi' },
   { to: '/budget', icon: DollarSign, label: 'Budget & Costi' },
+  { group: 'Organizzazione' },
   { to: '/scadenze', icon: CalendarCheck, label: 'Scadenze' },
+  { to: '/cronologia', icon: Clock, label: 'Cronologia Giorno' },
   { to: '/location', icon: MapPin, label: 'Location & Chiesa' },
+  { to: '/viaggio', icon: Plane, label: 'Viaggio di Nozze' },
+  { group: 'Strumenti' },
+  { to: '/inviti', icon: Mail, label: 'Inviti' },
   { to: '/documenti', icon: FolderOpen, label: 'Documenti' },
   { to: '/idee', icon: Lightbulb, label: 'Idee' },
   { to: '/impostazioni', icon: Settings, label: 'Impostazioni' },
@@ -46,18 +57,26 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <Icon size={18} />
-              {label}
-            </NavLink>
-          ))}
+          {navItems.map((item, idx) => {
+            if (item.group) return (
+              <div key={idx} className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-4 pb-1 first:pt-1">
+                {item.group}
+              </div>
+            );
+            const { to, icon: Icon, label } = item;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon size={18} />
+                {label}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="p-3 border-t border-gray-100">
