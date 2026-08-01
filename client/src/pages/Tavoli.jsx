@@ -150,7 +150,14 @@ export default function Tavoli() {
                 </div>
                 <div>
                   <label className="form-label">Capienza</label>
-                  <input type="number" min={1} className="form-input" value={form.capienza} onChange={e => setForm({ ...form, capienza: parseInt(e.target.value) || 8 })} />
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-100 flex-shrink-0"
+                      onClick={() => setForm({ ...form, capienza: Math.max(1, (form.capienza || 1) - 1) })}>−</button>
+                    <input type="number" min={1} inputMode="numeric" className="form-input text-center font-bold text-lg" value={form.capienza}
+                      onChange={e => setForm({ ...form, capienza: parseInt(e.target.value) || 1 })} />
+                    <button type="button" className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-100 flex-shrink-0"
+                      onClick={() => setForm({ ...form, capienza: (form.capienza || 1) + 1 })}>+</button>
+                  </div>
                 </div>
               </div>
               <div>

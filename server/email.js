@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const db = require('./db');
+const { getAllScadenze } = require('./utils/scadenze-helper');
 
 function getConfig() {
   return db.prepare('SELECT * FROM email_config WHERE id = 1').get();
@@ -70,19 +71,16 @@ async function sendScadenzeReminder(giorni = 14) {
   const appCfg = db.prepare('SELECT app_name, nome_sposo1, nome_sposo2, data_matrimonio FROM config LIMIT 1').get();
   const appName = appCfg?.app_name || 'Il Nostro Matrimonio';
 
-  const scadenze = db.prepare(`
-    SELECT * FROM scadenze
-    WHERE completata = 0
-      AND data_scadenza >= date('now')
-      AND data_scadenza <= date('now', '+${giorni} days')
-    ORDER BY data_scadenza ASC
-  `).all();
+  const oggi = new Date().toISOString().split('T')[0];
+  const fraGiorni = new Date(Date.now() + giorni * 86400000).toISOString().split('T')[0];
 
-  const scaduteGia = db.prepare(`
-    SELECT * FROM scadenze
-    WHERE completata = 0 AND data_scadenza < date('now')
-    ORDER BY data_scadenza ASC
-  `).all();
+  const tutteScadenze = getAllScadenze(db);
+  const scadenze = tutteScadenze.filter(s =>
+    !s.completata && s.data_scadenza && s.data_scadenza >= oggi && s.data_scadenza <= fraGiorni
+  );
+  const scaduteGia = tutteScadenze.filter(s =>
+    !s.completata && s.data_scadenza && s.data_scadenza < oggi
+  );
 
   const dest = cfg.from_email || cfg.smtp_user;
 
