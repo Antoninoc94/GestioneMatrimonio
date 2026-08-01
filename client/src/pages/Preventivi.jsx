@@ -146,19 +146,31 @@ export default function Preventivi() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Categoria *</label>
-                  <select className="form-input" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })} required>
+                  <select className="form-input" value={form.categoria} onChange={e => {
+                    const cat = e.target.value;
+                    const stillValid = fornitori.find(f => f.id === parseInt(form.fornitore_id) && f.categoria === cat);
+                    setForm({ ...form, categoria: cat, fornitore_id: stillValid ? form.fornitore_id : '', fornitore_nome: stillValid ? form.fornitore_nome : '' });
+                  }} required>
                     {CATEGORIE.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="form-label">Fornitore (opzionale)</label>
-                  <select className="form-input" value={form.fornitore_id} onChange={e => {
-                    const f = fornitori.find(f => f.id === parseInt(e.target.value));
-                    setForm({ ...form, fornitore_id: e.target.value, fornitore_nome: f?.nome || form.fornitore_nome });
-                  }}>
-                    <option value="">-- Seleziona --</option>
-                    {fornitori.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                  </select>
+                  {(() => {
+                    const filt = fornitori.filter(f => f.categoria === form.categoria);
+                    return (
+                      <select className="form-input" value={form.fornitore_id} onChange={e => {
+                        const f = fornitori.find(f => f.id === parseInt(e.target.value));
+                        setForm({ ...form, fornitore_id: e.target.value, fornitore_nome: f?.nome || form.fornitore_nome });
+                      }}>
+                        <option value="">-- Seleziona --</option>
+                        {filt.length === 0
+                          ? <option disabled>Nessun fornitore per questa categoria</option>
+                          : filt.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)
+                        }
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
               <div>

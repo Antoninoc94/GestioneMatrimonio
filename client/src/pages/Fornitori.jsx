@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Phone, Mail, User } from 'lucide-react';
 import api from '../api';
 
-const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Altro'];
+const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Location', 'Chiesa', 'Viaggio di nozze', 'Inviti', 'Bomboniere', 'Decorazioni', 'Altro'];
 const STATI = ['da_contattare', 'contattato', 'preventivo_ricevuto', 'confermato', 'escluso'];
 const statoColor = { da_contattare: 'bg-gray-100 text-gray-600', contattato: 'bg-blue-100 text-blue-600', preventivo_ricevuto: 'bg-yellow-100 text-yellow-700', confermato: 'bg-green-100 text-green-700', escluso: 'bg-red-100 text-red-600' };
 const statoLabel = { da_contattare: 'Da contattare', contattato: 'Contattato', preventivo_ricevuto: 'Preventivo ricevuto', confermato: 'Confermato', escluso: 'Escluso' };

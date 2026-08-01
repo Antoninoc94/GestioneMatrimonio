@@ -354,16 +354,28 @@ export default function Budget() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Categoria *</label>
-                  <select className="form-input" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
+                  <select className="form-input" value={form.categoria} onChange={e => {
+                    const cat = e.target.value;
+                    const stillValid = fornitori.find(f => f.id === parseInt(form.fornitore_id) && f.categoria === cat);
+                    setForm({ ...form, categoria: cat, fornitore_id: stillValid ? form.fornitore_id : '' });
+                  }}>
                     {CATEGORIE.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="form-label">Fornitore</label>
-                  <select className="form-input" value={form.fornitore_id} onChange={e => setForm({ ...form, fornitore_id: e.target.value })}>
-                    <option value="">-- Nessuno --</option>
-                    {fornitori.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                  </select>
+                  {(() => {
+                    const filt = fornitori.filter(f => f.categoria === form.categoria);
+                    return (
+                      <select className="form-input" value={form.fornitore_id} onChange={e => setForm({ ...form, fornitore_id: e.target.value })}>
+                        <option value="">-- Nessuno --</option>
+                        {filt.length === 0
+                          ? <option disabled>Nessun fornitore per questa categoria</option>
+                          : filt.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)
+                        }
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
               <div>
