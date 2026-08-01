@@ -11,7 +11,7 @@ const checkAbilitata = (req, res, next) => {
 
 // Info matrimonio (pubblica — sempre accessibile, serve per mostrare msg disabilitata)
 router.get('/info', (req, res) => {
-  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, app_name, app_emoji FROM config LIMIT 1').get();
+  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, app_name, app_emoji, conferma_abilitata FROM config LIMIT 1').get();
   res.json(cfg || {});
 });
 

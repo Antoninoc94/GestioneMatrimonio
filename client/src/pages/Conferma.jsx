@@ -52,7 +52,10 @@ export default function Conferma() {
   const [disabilitata, setDisabilitata] = useState(false);
 
   useEffect(() => {
-    api.get('/conferma/info').then(r => setInfo(r.data)).catch(() => {});
+    api.get('/conferma/info').then(r => {
+      setInfo(r.data);
+      if (r.data.conferma_abilitata === 0) setDisabilitata(true);
+    }).catch(() => {});
   }, []);
 
   const trova = async e => {
