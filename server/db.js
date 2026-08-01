@@ -258,6 +258,9 @@ if (!ospCols.includes('messaggio_ospite')) {
 if (!ospCols.includes('fonte')) {
   db.prepare("ALTER TABLE ospiti ADD COLUMN fonte TEXT DEFAULT 'lista'").run();
 }
+if (!ospCols.includes('eta')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN eta INTEGER').run();
+}
 
 // Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();
