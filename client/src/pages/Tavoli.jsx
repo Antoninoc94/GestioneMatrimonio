@@ -204,43 +204,80 @@ export default function Tavoli() {
               <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {[...senzaTavolo].sort((a, b) => {
-              const aKey = a.parent_id || a.id;
-              const bKey = b.parent_id || b.id;
-              if (aKey !== bKey) return aKey - bKey;
-              if (!a.parent_id) return -1;
-              if (!b.parent_id) return 1;
-              return a.tipo === 'adulto' ? -1 : 1;
-            }).map(o => {
-              const isChild = o.tipo === 'bambino';
-              const isPartner = !!o.parent_id && !isChild;
-              const pn = o.parent_id ? parentName(o.parent_id) : null;
-              const displayName = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
-              return (
-                <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${
-                  isChild ? 'border-purple-100' : isPartner ? 'border-rose-100' : 'border-gray-100 shadow-sm'
-                }`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-800 truncate">{displayName}</div>
-                    {pn && (
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Bambino' : '♥ Partner'}</span>
-                        {' '}di {pn}
-                      </div>
-                    )}
-                  </div>
-                  <select
-                    className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
-                    value=""
-                    onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
-                  >
-                    <option value="">Assegna…</option>
-                    {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                  </select>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(() => {
+              const mainGuests = senzaTavolo.filter(o => !o.parent_id);
+              const familyOf = id => senzaTavolo.filter(o => o.parent_id === id);
+              // Partner/figli il cui genitore è già assegnato a un tavolo
+              const orphans = senzaTavolo.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id));
+
+              const AssegnaSelect = ({ o }) => (
+                <select
+                  className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
+                  value=""
+                  onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
+                >
+                  <option value="">Assegna…</option>
+                  {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </select>
               );
-            })}
+
+              const cards = [
+                ...mainGuests.map(mg => {
+                  const family = familyOf(mg.id);
+                  return (
+                    <div key={mg.id} className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
+                      {/* Intestazione — ospite principale */}
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <span className="flex-1 text-sm font-semibold text-gray-800 truncate">
+                          {mg.cognome ? `${mg.cognome} ${mg.nome}` : mg.nome}
+                        </span>
+                        <AssegnaSelect o={mg} />
+                      </div>
+                      {/* Famiglia */}
+                      {family.length > 0 && (
+                        <div className="border-t border-gray-50 divide-y divide-gray-50">
+                          {family.map(f => {
+                            const isChild = f.tipo === 'bambino';
+                            return (
+                              <div key={f.id} className={`flex items-center gap-3 pl-5 pr-3 py-2 ${isChild ? 'bg-purple-50/50' : 'bg-rose-50/50'}`}>
+                                <span className={`text-xs flex-shrink-0 ${isChild ? 'text-purple-300' : 'text-rose-300'}`}>
+                                  {isChild ? '↳' : '♥'}
+                                </span>
+                                <span className={`flex-1 text-xs truncate ${isChild ? 'text-purple-700' : 'text-rose-600'}`}>
+                                  {f.cognome ? `${f.cognome} ${f.nome}` : f.nome}
+                                  {isChild && f.eta ? <span className="ml-1 opacity-60">({f.eta}a)</span> : null}
+                                </span>
+                                <AssegnaSelect o={f} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }),
+                ...orphans.map(o => {
+                  const isChild = o.tipo === 'bambino';
+                  return (
+                    <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${isChild ? 'border-purple-100' : 'border-rose-100'}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-semibold truncate ${isChild ? 'text-purple-700' : 'text-rose-600'}`}>
+                          {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Bambino' : '♥ Partner'}</span>
+                          {' '}di {parentName(o.parent_id)}
+                        </div>
+                      </div>
+                      <AssegnaSelect o={o} />
+                    </div>
+                  );
+                }),
+              ];
+
+              return cards;
+            })()}
           </div>
         </div>
       )}
