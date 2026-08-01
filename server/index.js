@@ -1,0 +1,23 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/config', require('./routes/config'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/fornitori', require('./routes/fornitori'));
+app.use('/api/preventivi', require('./routes/preventivi'));
+app.use('/api/costi', require('./routes/costi'));
+app.use('/api/scadenze', require('./routes/scadenze'));
+app.use('/api/location', require('./routes/location'));
+app.use('/api/documenti', require('./routes/documenti'));
+app.use('/api/idee', require('./routes/idee'));
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server avviato su porta ${PORT}`));
