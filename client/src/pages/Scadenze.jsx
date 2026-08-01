@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import api from '../api';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { prioritaLabel } from '../labels';
+import { prioritaLabel, statoPreventivo } from '../labels';
 
 const CATEGORIE = ['Documenti', 'Fornitori', 'Pagamenti', 'Abbigliamento', 'Location', 'Viaggio', 'Inviti', 'Altro'];
 const PRIORITA = ['alta', 'media', 'bassa'];
@@ -117,7 +117,7 @@ export default function Scadenze() {
 
           {/* Info aggiuntive per scadenze auto */}
           {s.source === 'preventivo' && s.importo && (
-            <p className="text-xs text-gray-400 mt-0.5">{formatEuro(s.importo)} · Stato: {s.stato}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatEuro(s.importo)} · Stato: {statoPreventivo[s.stato] ?? s.stato}</p>
           )}
           {s.source === 'costo' && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">Da pagare: {formatEuro(s.importo)}</p>
