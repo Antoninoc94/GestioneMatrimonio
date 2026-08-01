@@ -255,9 +255,10 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={ospitiChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
-                      <Cell fill="#34d399" />
-                      <Cell fill="#fbbf24" />
-                      <Cell fill="#f43f5e" />
+                      {ospitiChartData.map(entry => {
+                        const c = { Confermati: '#34d399', 'In attesa': '#fbbf24', Declinati: '#f43f5e' };
+                        return <Cell key={entry.name} fill={c[entry.name] || '#e5e7eb'} />;
+                      })}
                     </Pie>
                     <Tooltip />
                   </PieChart>
@@ -279,7 +280,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {(ospiti?.adulti || ospiti?.bambini) && (
+                {(ospiti?.adulti > 0 || ospiti?.bambini > 0) && (
                   <div className="text-xs text-gray-400 pt-1 border-t border-gray-100">
                     Confermati: {ospiti.adulti} adulti + {ospiti.bambini} bambini
                   </div>
