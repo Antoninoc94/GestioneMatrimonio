@@ -209,12 +209,13 @@ export default function Landing() {
 
         {/* Messaggio benvenuto */}
         {config.landing_messaggio && (
-          <div style={{ textAlign: 'center', margin: '0 auto 4rem', maxWidth: '600px', position: 'relative' }}>
-            <span style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '6rem', color: tema.border, lineHeight: 0, display: 'block', marginBottom: '-1.5rem', userSelect: 'none' }}>"</span>
-            <p style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '1.125rem', fontStyle: 'italic', color: '#4b5563', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>
+          <div style={{ textAlign: 'center', margin: '0 auto 4rem', maxWidth: '600px', position: 'relative', padding: '2rem 3rem' }}>
+            {/* Virgolette decorative agli angoli, fuori dal flusso del testo */}
+            <span aria-hidden="true" style={{ position: 'absolute', top: 0, left: 0, fontFamily: '"Playfair Display", Georgia, serif', fontSize: '4.5rem', color: tema.border, lineHeight: 1, userSelect: 'none' }}>"</span>
+            <span aria-hidden="true" style={{ position: 'absolute', bottom: 0, right: 0, fontFamily: '"Playfair Display", Georgia, serif', fontSize: '4.5rem', color: tema.border, lineHeight: 1, userSelect: 'none', transform: 'rotate(180deg)' }}>"</span>
+            <p style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '1.125rem', fontStyle: 'italic', color: '#4b5563', lineHeight: 1.9, whiteSpace: 'pre-wrap', position: 'relative' }}>
               {config.landing_messaggio}
             </p>
-            <span style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '6rem', color: tema.border, lineHeight: 0, display: 'block', marginTop: '-0.5rem', userSelect: 'none' }}>"</span>
           </div>
         )}
 
