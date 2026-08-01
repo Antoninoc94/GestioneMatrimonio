@@ -2,6 +2,7 @@
 
 * {
   box-sizing: border-box;
+  cursor: default;
 }
 
 body {
@@ -9,6 +10,15 @@ body {
   background-color: #fafafa;
   color: #1a1a1a;
   margin: 0;
+}
+
+input, textarea, select, [contenteditable] {
+  cursor: text;
+}
+
+button, a, [role="button"], label[for],
+.sidebar-link, .btn-primary, .btn-secondary, .btn-danger {
+  cursor: pointer;
 }
 
 #root {
