@@ -43,7 +43,7 @@ export default function Login() {
                 className="form-input"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                placeholder="sposo"
+                placeholder="username"
                 required
                 autoComplete="username"
               />
@@ -66,11 +66,6 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
-            <strong>Accesso predefinito:</strong><br />
-            Username: <code>sposo</code> / Password: <code>sposo1</code><br />
-            Username: <code>sposa</code> / Password: <code>sposa1</code>
-          </div>
         </div>
       </div>
     </div>
