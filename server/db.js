@@ -129,6 +129,20 @@ db.exec(`
   );
 `);
 
+// Migrazione: aggiunge colonne config se non esistono
+const configCols = db.prepare('PRAGMA table_info(config)').all();
+if (!configCols.find(c => c.name === 'app_name')) {
+  db.prepare("ALTER TABLE config ADD COLUMN app_name TEXT DEFAULT 'Il Nostro Matrimonio'").run();
+  db.prepare("UPDATE config SET app_name = 'Il Nostro Matrimonio' WHERE app_name IS NULL").run();
+}
+if (!configCols.find(c => c.name === 'app_emoji')) {
+  db.prepare("ALTER TABLE config ADD COLUMN app_emoji TEXT DEFAULT '💍'").run();
+  db.prepare("UPDATE config SET app_emoji = '💍' WHERE app_emoji IS NULL").run();
+}
+if (!configCols.find(c => c.name === 'login_subtitle')) {
+  db.prepare("ALTER TABLE config ADD COLUMN login_subtitle TEXT DEFAULT ''").run();
+}
+
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();
 if (!cols.find(c => c.name === 'username')) {
@@ -141,8 +155,8 @@ if (!cols.find(c => c.name === 'email') || cols.find(c => c.name === 'email')?.n
 // Seed default config
 const configExists = db.prepare('SELECT id FROM config LIMIT 1').get();
 if (!configExists) {
-  db.prepare('INSERT INTO config (data_matrimonio, budget_totale, nome_sposo1, nome_sposo2) VALUES (?, ?, ?, ?)')
-    .run(null, 0, 'Sposo 1', 'Sposo 2');
+  db.prepare('INSERT INTO config (data_matrimonio, budget_totale, nome_sposo1, nome_sposo2, app_name, app_emoji, login_subtitle) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(null, 0, 'Sposo 1', 'Sposo 2', 'Il Nostro Matrimonio', '💍', '');
 }
 
 // Seed email config

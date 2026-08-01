@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useAppConfig } from '../AppConfigContext';
 import {
   LayoutDashboard, Users, FileText, DollarSign, CalendarCheck,
-  MapPin, FolderOpen, Lightbulb, Settings, LogOut, Heart, Menu, X
+  MapPin, FolderOpen, Lightbulb, Settings, LogOut, Menu
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -20,6 +21,7 @@ const navItems = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { app_name, app_emoji } = useAppConfig();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -33,11 +35,11 @@ export default function Layout() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 flex flex-col transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center">
-              <Heart size={16} className="text-rose-500" />
+            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-lg">
+              {app_emoji}
             </div>
             <div>
-              <div className="text-sm font-bold text-gray-900">Il Nostro Matrimonio</div>
+              <div className="text-sm font-bold text-gray-900">{app_name}</div>
               <div className="text-xs text-gray-400">Gestione completa</div>
             </div>
           </div>
@@ -82,7 +84,7 @@ export default function Layout() {
           <button onClick={() => setMobileOpen(true)} className="text-gray-600">
             <Menu size={22} />
           </button>
-          <span className="font-bold text-gray-800">Il Nostro Matrimonio</span>
+          <span className="font-bold text-gray-800">{app_name}</span>
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">

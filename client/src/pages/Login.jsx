@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
-import { Heart } from 'lucide-react';
+import { useAppConfig } from '../AppConfigContext';
 
 export default function Login() {
   const { login } = useAuth();
+  const { app_name, app_emoji, login_subtitle } = useAppConfig();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,11 +27,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #fff1f2 0%, #fce7f3 100%)' }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 mb-4">
-            <Heart className="text-rose-500" size={32} />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 mb-4 text-4xl">
+            {app_emoji}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Il Nostro Matrimonio</h1>
-          <p className="text-gray-500 mt-2">Accedi per gestire il tuo grande giorno</p>
+          <h1 className="text-3xl font-bold text-gray-900">{app_name}</h1>
+          <p className="text-gray-500 mt-2">{login_subtitle || 'Accedi per gestire il tuo grande giorno'}</p>
         </div>
 
         <div className="card">

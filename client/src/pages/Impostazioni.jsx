@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Save, Settings, User, Mail, Users, CheckCircle, XCircle } from 'lucide-react';
+import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { useAppConfig } from '../AppConfigContext';
 
 function Section({ title, icon: Icon, children }) {
   return (
@@ -17,10 +18,12 @@ function Section({ title, icon: Icon, children }) {
 
 export default function Impostazioni() {
   const { user, updateUser } = useAuth();
+  const { updateAppConfig } = useAppConfig();
 
-  // Config matrimonio
-  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '' });
+  // Config matrimonio + aspetto
+  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '', app_name: 'Il Nostro Matrimonio', app_emoji: '💍', login_subtitle: '' });
   const [configSaved, setConfigSaved] = useState(false);
+  const [aspettoSaved, setAspettoSaved] = useState(false);
 
   // Profilo
   const [profilo, setProfilo] = useState({ nome: '', username: '', email: '' });
@@ -37,7 +40,7 @@ export default function Impostazioni() {
   const [testingEmail, setTestingEmail] = useState(false);
 
   useEffect(() => {
-    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '' }));
+    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '' }));
     api.get('/profilo/me').then(r => setProfilo({ nome: r.data.nome || '', username: r.data.username || '', email: r.data.email || '' }));
     api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled }));
   }, []);
@@ -47,6 +50,14 @@ export default function Impostazioni() {
     await api.put('/config', { ...config, budget_totale: parseFloat(config.budget_totale) || 0 });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 2500);
+  };
+
+  const saveAspetto = async e => {
+    e.preventDefault();
+    await api.put('/config', { ...config, budget_totale: parseFloat(config.budget_totale) || 0 });
+    updateAppConfig({ app_name: config.app_name, app_emoji: config.app_emoji, login_subtitle: config.login_subtitle });
+    setAspettoSaved(true);
+    setTimeout(() => setAspettoSaved(false), 2500);
   };
 
   const saveProfilo = async e => {
@@ -176,6 +187,33 @@ export default function Impostazioni() {
             </div>
             <button type="submit" className="btn-primary">
               <Save size={15} /> {configSaved ? 'Salvato!' : 'Salva'}
+            </button>
+          </form>
+        </Section>
+
+        {/* Personalizzazione app */}
+        <Section title="Personalizzazione App" icon={Palette}>
+          <form onSubmit={saveAspetto} className="space-y-3">
+            <div>
+              <label className="form-label">Nome applicazione</label>
+              <input className="form-input" value={config.app_name} onChange={e => setConfig({ ...config, app_name: e.target.value })} placeholder="Il Nostro Matrimonio" required />
+              <p className="text-xs text-gray-400 mt-1">Appare nella barra del browser e nella sidebar</p>
+            </div>
+            <div>
+              <label className="form-label">Emoji icona</label>
+              <input className="form-input" value={config.app_emoji} onChange={e => setConfig({ ...config, app_emoji: e.target.value })} placeholder="💍" maxLength={4} style={{ fontSize: '1.4rem' }} />
+              <p className="text-xs text-gray-400 mt-1">Un singolo emoji — diventa la favicon del browser e l'icona nella sidebar</p>
+            </div>
+            <div>
+              <label className="form-label">Sottotitolo pagina di accesso</label>
+              <input className="form-input" value={config.login_subtitle} onChange={e => setConfig({ ...config, login_subtitle: e.target.value })} placeholder="Accedi per gestire il tuo grande giorno" />
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-rose-50 rounded-lg text-xs text-rose-700">
+              <span className="text-lg">{config.app_emoji || '💍'}</span>
+              <span>Anteprima: <strong>{config.app_name || 'Il Nostro Matrimonio'}</strong></span>
+            </div>
+            <button type="submit" className="btn-primary">
+              <Save size={15} /> {aspettoSaved ? 'Salvato!' : 'Salva Aspetto'}
             </button>
           </form>
         </Section>
