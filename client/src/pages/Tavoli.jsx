@@ -161,7 +161,7 @@ export default function Tavoli() {
         doc.setFontSize(7);
         doc.setTextColor(...gray);
         doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
-        doc.text(`Seating Chart — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+        doc.text(`Seating Chart - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
       }
 
       doc.save('seating-chart.pdf');

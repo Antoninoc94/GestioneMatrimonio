@@ -202,7 +202,7 @@ export default function Budget() {
         doc.setFontSize(7);
         doc.setTextColor(...gray);
         doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
-        doc.text(`Budget & Costi — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+        doc.text(`Budget & Costi - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
       }
 
       doc.save('budget-riepilogo.pdf');

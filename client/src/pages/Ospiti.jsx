@@ -100,8 +100,8 @@ export default function Ospiti() {
         latoLabel[o.lato] || o.lato,
         o.tipo === 'bambino' ? 'Bambino' : 'Adulto',
         rsvpText[o.rsvp] || o.rsvp,
-        o.tavolo_nome || '—',
-        o.intolleranze || '—',
+        o.tavolo_nome || '-',
+        o.intolleranze || '-',
       ]);
 
       autoTable(doc, {
@@ -137,7 +137,7 @@ export default function Ospiti() {
         doc.setFontSize(7);
         doc.setTextColor(...gray);
         doc.text(`Pagina ${i} di ${pageCount}`, 196, 290, { align: 'right' });
-        doc.text(`Lista Ospiti — ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+        doc.text(`Lista Ospiti - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
       }
 
       doc.save('lista-ospiti.pdf');
