@@ -14,6 +14,7 @@ import { statoPreventivo, statoFornitore, label } from '../labels';
 const COLORS = ['#e11d48','#f43f5e','#fb7185','#fda4af','#f97316','#fbbf24','#34d399','#60a5fa'];
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
 const fmtDate = d => { try { return format(parseISO(d), 'd MMM', { locale: it }); } catch { return d; } };
+const fmtDateTime = s => { try { return format(parseISO(s), "d MMM, HH:mm", { locale: it }); } catch { return s; } };
 
 const rsvpColors = { confermati: '#34d399', declinati: '#f43f5e', attesa: '#fbbf24' };
 const sourceColor = { preventivo: 'text-blue-600 bg-blue-50', viaggio: 'text-purple-600 bg-purple-50', costo: 'text-orange-600 bg-orange-50', manuale: 'text-gray-600 bg-gray-50' };
@@ -42,15 +43,29 @@ function SectionTitle({ children }) {
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
-  const [nota, setNota] = useState(() => localStorage.getItem('matrimonio_nota') || '');
+  const [noteList, setNoteList] = useState([]);
+  const [newNota, setNewNota] = useState('');
+  const [savingNota, setSavingNota] = useState(false);
 
   useEffect(() => {
     api.get('/dashboard').then(r => setData(r.data)).catch(console.error);
+    api.get('/note').then(r => setNoteList(r.data)).catch(() => {});
   }, []);
 
-  const salvaNote = v => {
-    setNota(v);
-    localStorage.setItem('matrimonio_nota', v);
+  const salvaNote = async () => {
+    if (!newNota.trim()) return;
+    setSavingNota(true);
+    try {
+      const r = await api.post('/note', { testo: newNota.trim() });
+      setNoteList(prev => [r.data, ...prev]);
+      setNewNota('');
+    } catch {}
+    setSavingNota(false);
+  };
+
+  const eliminaNota = async (id) => {
+    await api.delete(`/note/${id}`);
+    setNoteList(prev => prev.filter(n => n.id !== id));
   };
 
   if (!data) return (
@@ -422,15 +437,46 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 mb-3">
           <FileText size={16} className="text-rose-400" />
           <h3 className="text-sm font-bold text-gray-700">Note veloci</h3>
-          <span className="ml-auto text-xs text-gray-400">salvato in locale</span>
         </div>
-        <textarea
-          className="w-full text-sm text-gray-700 resize-none bg-gray-50 rounded-lg p-3 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-transparent placeholder-gray-300"
-          rows={3}
-          placeholder="Appunti veloci, idee, cose da fare…"
-          value={nota}
-          onChange={e => salvaNote(e.target.value)}
-        />
+        <div className="flex gap-2 items-end">
+          <textarea
+            className="flex-1 text-sm text-gray-700 resize-none bg-gray-50 rounded-lg p-3 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-transparent placeholder-gray-300"
+            rows={2}
+            placeholder="Scrivi una nota… (Ctrl+Invio per salvare)"
+            value={newNota}
+            onChange={e => setNewNota(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) salvaNote(); }}
+          />
+          <button
+            className="btn-primary flex-shrink-0"
+            onClick={salvaNote}
+            disabled={savingNota || !newNota.trim()}
+          >
+            {savingNota ? '…' : 'Salva'}
+          </button>
+        </div>
+        {noteList.length > 0 && (
+          <div className="mt-3 space-y-2 max-h-52 overflow-y-auto">
+            {noteList.map(n => (
+              <div key={n.id} className="flex items-start gap-2 bg-rose-50/40 border border-rose-100 rounded-lg p-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{n.testo}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    <span className="font-medium text-rose-400">{n.autore}</span>
+                    {' · '}{fmtDateTime(n.created_at)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => eliminaNota(n.id)}
+                  className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 text-lg leading-none mt-0.5"
+                  title="Elimina nota"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── TAVOLI + VIAGGIO + REGALI ── */}
