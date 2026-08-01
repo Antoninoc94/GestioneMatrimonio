@@ -10,11 +10,16 @@ const TEMI = [
   { key: 'oro',     label: 'Champagne', primary: '#b45309', light: '#fffbeb', border: '#fde68a' },
 ];
 
-// Griglia 3×3 delle posizioni CSS object-position
 const POSIZIONI = [
-  { label: '↖', value: 'left top' },    { label: '↑', value: 'center top' },    { label: '↗', value: 'right top' },
-  { label: '←', value: 'left center' }, { label: '·', value: 'center center' }, { label: '→', value: 'right center' },
-  { label: '↙', value: 'left bottom' }, { label: '↓', value: 'center bottom' }, { label: '↘', value: 'right bottom' },
+  { label: 'Alto sinistra',  value: 'left top' },
+  { label: 'Alto centro',    value: 'center top' },
+  { label: 'Alto destra',    value: 'right top' },
+  { label: 'Centro sinistra',value: 'left center' },
+  { label: 'Centro',         value: 'center center' },
+  { label: 'Centro destra',  value: 'right center' },
+  { label: 'Basso sinistra', value: 'left bottom' },
+  { label: 'Basso centro',   value: 'center bottom' },
+  { label: 'Basso destra',   value: 'right bottom' },
 ];
 
 const empty = {
@@ -173,56 +178,61 @@ export default function LandingEditor() {
             <h2 className="font-bold text-gray-800 mb-4">Foto di copertina</h2>
             {foto ? (
               <div className="space-y-3">
-                <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                {/* Anteprima pulita */}
+                <div className="rounded-xl overflow-hidden border border-gray-100" style={{ aspectRatio: '16/9' }}>
                   <img
                     src={`/uploads/landing/${foto}`}
                     alt="Foto copertina"
                     className="w-full h-full object-cover"
                     style={{ objectPosition: form.landing_foto_posizione }}
                   />
-                  {/* Overlay con indicatore posizione attiva */}
-                  <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gridTemplateRows: 'repeat(3,1fr)' }}>
-                    {POSIZIONI.map(p => (
-                      <div
-                        key={p.value}
-                        className="pointer-events-auto flex items-center justify-center cursor-pointer transition-all"
-                        style={{ background: form.landing_foto_posizione === p.value ? 'rgba(255,255,255,0.35)' : 'transparent' }}
-                        title={p.value}
-                        onClick={() => setForm(f => ({ ...f, landing_foto_posizione: p.value }))}
-                      >
-                        {form.landing_foto_posizione === p.value && (
-                          <div className="w-3 h-3 rounded-full bg-white shadow-md border-2 border-rose-400" />
-                        )}
-                      </div>
-                    ))}
+                </div>
+
+                {/* Picker inquadratura */}
+                <div className="flex items-center gap-4 py-1">
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-2">Inquadratura</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 40px)', gap: '4px' }}>
+                      {POSIZIONI.map(p => {
+                        const active = form.landing_foto_posizione === p.value;
+                        return (
+                          <button
+                            key={p.value}
+                            type="button"
+                            title={p.label}
+                            onClick={() => setForm(f => ({ ...f, landing_foto_posizione: p.value }))}
+                            style={{
+                              height: '40px', borderRadius: '8px',
+                              border: active ? '2px solid #e11d48' : '1px solid #e5e7eb',
+                              background: active ? '#fff1f2' : '#f9fafb',
+                              cursor: 'pointer', transition: 'all 0.12s',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            <div style={{
+                              width: active ? '10px' : '6px',
+                              height: active ? '10px' : '6px',
+                              borderRadius: '50%',
+                              background: active ? '#e11d48' : '#d1d5db',
+                              transition: 'all 0.12s',
+                            }} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500 pt-5">
+                    <span className="block text-xs text-gray-400 mb-0.5">Zona selezionata</span>
+                    <span className="font-semibold text-gray-700">
+                      {POSIZIONI.find(p => p.value === form.landing_foto_posizione)?.label || 'Centro'}
+                    </span>
                   </div>
                 </div>
-                {/* Picker posizione testuale sotto l'anteprima */}
-                <div>
-                  <p className="text-xs text-gray-500 mb-1.5">Posizione della foto — clicca sull'anteprima o scegli qui:</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px', maxWidth: '160px' }}>
-                    {POSIZIONI.map(p => (
-                      <button
-                        key={p.value}
-                        type="button"
-                        title={p.value}
-                        onClick={() => setForm(f => ({ ...f, landing_foto_posizione: p.value }))}
-                        style={{
-                          height: '32px', borderRadius: '6px', fontSize: '0.9rem',
-                          border: form.landing_foto_posizione === p.value ? '2px solid #e11d48' : '1px solid #e5e7eb',
-                          background: form.landing_foto_posizione === p.value ? '#fff1f2' : '#fff',
-                          cursor: 'pointer', transition: 'all 0.12s',
-                          color: form.landing_foto_posizione === p.value ? '#e11d48' : '#6b7280',
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2">
+                <p className="text-xs text-gray-400">Scegli la zona della foto che deve rimanere visibile nell'intestazione.</p>
+
+                <div className="flex gap-2 pt-1">
                   <button type="button" className="btn-secondary flex-1" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    <Image size={15} /> Sostituisci
+                    <Image size={15} /> Sostituisci foto
                   </button>
                   <button type="button" className="p-2 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 transition-colors" onClick={deleteFoto}>
                     <Trash2 size={15} />
