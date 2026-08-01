@@ -271,30 +271,49 @@ export default function Tavoli() {
 
               {t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
 
-              <div className="space-y-1">
-                {t.ospiti.map(o => {
-                  const isChild = o.tipo === 'bambino';
-                  const isPartner = !!o.parent_id && !isChild;
-                  return (
-                    <div key={o.id} className={`flex items-center justify-between text-sm rounded px-1.5 py-0.5 -mx-1.5 ${
-                      isChild ? 'bg-purple-50' : isPartner ? 'bg-rose-50' : ''
-                    }`}>
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
-                        {isChild  && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
-                        <span className={`truncate ${isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-700'}`}>
-                          {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                          {isChild && o.eta ? <span className="text-purple-300 ml-1 text-xs">({o.eta}a)</span> : null}
-                        </span>
+              <div className="space-y-1.5">
+                {(() => {
+                  const mainGuests = t.ospiti.filter(o => !o.parent_id);
+                  const getFamily = id => t.ospiti.filter(o => o.parent_id === id);
+                  const orphans = t.ospiti.filter(o => o.parent_id && !t.ospiti.find(mg => mg.id === o.parent_id));
+
+                  const rowJsx = o => {
+                    const isChild = o.tipo === 'bambino';
+                    const isPartner = !!o.parent_id && !isChild;
+                    return (
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
+                          {isChild   && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
+                          <span className={`truncate ${isChild ? 'text-purple-700 text-xs' : isPartner ? 'text-rose-600 text-xs' : 'text-gray-800 font-medium'}`}>
+                            {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                            {isChild && o.eta ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
+                          </span>
+                        </div>
+                        <button className="text-xs text-gray-300 hover:text-red-400 flex-shrink-0 ml-2" onClick={() => assignGuest(o.id, null)}>✕</button>
                       </div>
-                      <button
-                        className="text-xs text-gray-300 hover:text-red-400 flex-shrink-0 ml-2"
-                        title="Rimuovi dal tavolo"
-                        onClick={() => assignGuest(o.id, null)}
-                      >✕</button>
-                    </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      {mainGuests.map(mg => {
+                        const family = getFamily(mg.id);
+                        return (
+                          <div key={mg.id}>
+                            {rowJsx(mg)}
+                            {family.length > 0 && (
+                              <div className="ml-2 mt-0.5 pl-2 border-l-2 border-gray-100 space-y-0.5">
+                                {family.map(f => <div key={f.id}>{rowJsx(f)}</div>)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {orphans.map(o => <div key={o.id}>{rowJsx(o)}</div>)}
+                    </>
                   );
-                })}
+                })()}
                 {!pieno && (
                   <select
                     className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1"
