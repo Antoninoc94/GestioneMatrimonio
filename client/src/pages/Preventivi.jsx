@@ -69,7 +69,37 @@ export default function Preventivi() {
         </div>
       </div>
 
-      <div className="card">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-3">
+        {filtered.length === 0 && (
+          <div className="card text-center py-10 text-gray-400">Nessun preventivo</div>
+        )}
+        {filtered.map(p => (
+          <div key={p.id} className="card p-3">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-gray-900 truncate">{p.fornitore_nome || '—'}</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <span className="badge bg-gray-100 text-gray-600 text-xs">{p.categoria}</span>
+                  <span className={`badge text-xs ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span>
+                </div>
+              </div>
+              <div className="font-bold text-gray-900 text-sm flex-shrink-0">{formatEuro(p.importo)}</div>
+            </div>
+            {p.descrizione && <div className="text-xs text-gray-500 mb-2 truncate">{p.descrizione}</div>}
+            {p.data_scadenza && (
+              <div className="text-xs text-gray-400 mb-2">Scade il {format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it })}</div>
+            )}
+            <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+              <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(p)}><Pencil size={14} /></button>
+              <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(p.id)}><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="card hidden sm:block">
         <div className="table-wrapper">
           <table>
             <thead>

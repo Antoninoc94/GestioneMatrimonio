@@ -16,6 +16,20 @@ const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', curr
 const fmtDate = d => { try { return format(parseISO(d), 'd MMM', { locale: it }); } catch { return d; } };
 const fmtDateTime = s => { try { return format(parseISO(s), "d MMM, HH:mm", { locale: it }); } catch { return s; } };
 
+const getMilestone = giorni => {
+  if (giorni > 365) return { emoji: '🏛️', title: 'Scegli la location', desc: 'Hai tempo — inizia dai luoghi prima che si prenotino' };
+  if (giorni > 270) return { emoji: '📸', title: 'Prenota fotografo e catering', desc: 'I migliori si prenotano con mesi di anticipo' };
+  if (giorni > 180) return { emoji: '💌', title: 'Invia i Save the Date', desc: '6 mesi al matrimonio: è il momento giusto' };
+  if (giorni > 120) return { emoji: '👗', title: 'Conferma abito e look', desc: '4 mesi: abiti e accessori devono essere pronti' };
+  if (giorni > 90)  return { emoji: '✅', title: 'Conferma tutti i fornitori', desc: '3 mesi: nessun dettaglio deve restare in sospeso' };
+  if (giorni > 60)  return { emoji: '✈️', title: 'Prenota il viaggio di nozze', desc: 'Le offerte migliori stanno finendo' };
+  if (giorni > 30)  return { emoji: '🪑', title: 'Definisci il seating chart', desc: 'Assegna i posti a tavola agli ospiti confermati' };
+  if (giorni > 14)  return { emoji: '📋', title: 'Conferma ospiti definitivi', desc: 'Lista finale al catering entro questa settimana' };
+  if (giorni > 7)   return { emoji: '📞', title: 'Chiama tutti i fornitori', desc: 'Settimana del matrimonio: ultimi controlli' };
+  if (giorni > 1)   return { emoji: '🎊', title: 'Quasi ci siete!', desc: 'Ultimi ritocchi, poi rilassatevi' };
+  return { emoji: '💍', title: 'Domani è il grande giorno!', desc: 'Dormite bene questa notte 💑' };
+};
+
 const rsvpColors = { confermati: '#34d399', declinati: '#f43f5e', attesa: '#fbbf24' };
 const sourceColor = { preventivo: 'text-blue-600 bg-blue-50', viaggio: 'text-purple-600 bg-purple-50', costo: 'text-orange-600 bg-orange-50', manuale: 'text-gray-600 bg-gray-50' };
 const sourceLabel = { preventivo: 'Preventivo', viaggio: 'Viaggio', costo: 'Pagamento', manuale: 'Manuale' };
@@ -82,6 +96,8 @@ export default function Dashboard() {
     costi, scadenzeImminenti, scadenzeScadute, cronologia, tavoli, viaggio, regali
   } = data;
 
+  const milestone = giorniAlMatrimonio > 0 ? getMilestone(giorniAlMatrimonio) : null;
+
   // Impegnato = preventivi accettati + costi effettivi (le due sezioni sono separate)
   const budgetImpegnato = (budget.preventiviAccettati || 0) + (budget.effettivo || 0);
   const budgetUsato = budget.totale > 0 ? Math.round((budgetImpegnato / budget.totale) * 100) : 0;
@@ -112,14 +128,28 @@ export default function Dashboard() {
           )}
         </div>
         {giorniAlMatrimonio !== null && (
-          <div className={`card flex items-center gap-3 py-3 px-5 ${giorniAlMatrimonio > 0 ? 'border-rose-200' : 'border-green-200 bg-green-50'}`}>
-            <Heart size={22} className={giorniAlMatrimonio > 0 ? 'text-rose-500' : 'text-green-500'} />
-            <div>
-              <div className="text-2xl font-bold" style={{ color: giorniAlMatrimonio > 0 ? '#e11d48' : '#16a34a' }}>
-                {giorniAlMatrimonio > 0 ? giorniAlMatrimonio : '🎉'}
+          <div className={`card min-w-48 ${giorniAlMatrimonio > 0 ? 'border-rose-200 bg-gradient-to-br from-rose-50/60 to-white' : 'border-green-200 bg-green-50'}`}>
+            <div className="flex items-center gap-3">
+              <Heart size={24} className={`flex-shrink-0 ${giorniAlMatrimonio > 0 ? 'text-rose-400' : 'text-green-500'}`} />
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-4xl font-black leading-none" style={{ color: giorniAlMatrimonio > 0 ? '#e11d48' : '#16a34a' }}>
+                    {giorniAlMatrimonio > 0 ? giorniAlMatrimonio : '🎉'}
+                  </span>
+                  {giorniAlMatrimonio > 0 && <span className="text-sm text-gray-500 font-medium">giorni</span>}
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">{giorniAlMatrimonio > 0 ? 'al matrimonio' : 'Oggi è il grande giorno!'}</div>
               </div>
-              <div className="text-xs text-gray-500">{giorniAlMatrimonio > 0 ? 'giorni al matrimonio' : 'Oggi è il grande giorno!'}</div>
             </div>
+            {milestone && (
+              <div className="mt-3 pt-2.5 border-t border-rose-100 flex items-start gap-2">
+                <span className="text-base leading-tight">{milestone.emoji}</span>
+                <div>
+                  <div className="text-xs font-bold text-rose-600 leading-tight">{milestone.title}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{milestone.desc}</div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

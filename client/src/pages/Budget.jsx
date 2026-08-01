@@ -109,7 +109,45 @@ export default function Budget() {
         </select>
       </div>
 
-      <div className="card">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-3">
+        {filtered.length === 0 && (
+          <div className="card text-center py-10 text-gray-400">Nessuna voce di spesa</div>
+        )}
+        {filtered.map(c => (
+          <div key={c.id} className="card p-3">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-gray-900 truncate">{c.descrizione}</div>
+                <span className="badge bg-gray-100 text-gray-600 text-xs mt-0.5">{c.categoria}</span>
+              </div>
+              <button onClick={() => togglePagato(c)} className="flex-shrink-0 mt-0.5">
+                {c.pagato ? <CheckCircle size={22} className="text-green-500" /> : <Circle size={22} className="text-gray-300" />}
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+              <div>
+                <div className="text-xs text-gray-400">Preventivato</div>
+                <div className="font-medium text-blue-600">{formatEuro(c.importo_preventivo)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Effettivo</div>
+                <div className={`font-bold ${c.importo_effettivo > c.importo_preventivo ? 'text-red-600' : 'text-gray-900'}`}>
+                  {formatEuro(c.importo_effettivo)}
+                </div>
+              </div>
+            </div>
+            {c.data_pagamento && <div className="text-xs text-gray-400 mb-2">Pagato il {c.data_pagamento}</div>}
+            <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+              <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(c)}><Pencil size={14} /></button>
+              <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(c.id)}><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="card hidden sm:block">
         <div className="table-wrapper">
           <table>
             <thead>

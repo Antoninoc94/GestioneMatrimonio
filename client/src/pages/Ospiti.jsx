@@ -192,8 +192,43 @@ export default function Ospiti() {
         ))}
       </div>
 
-      {/* Tabella */}
-      <div className="card">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-3">
+        {confermati > 0 && (
+          <div className="text-xs text-gray-400 px-1">Confermati: {adulti} adulti + {bambini} bambini</div>
+        )}
+        {filtered.length === 0 && (
+          <div className="card text-center py-10 text-gray-400">Nessun ospite</div>
+        )}
+        {filtered.map(o => {
+          const Icon = rsvpIcon[o.rsvp];
+          return (
+            <div key={o.id} className="card p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 truncate">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
+                    <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
+                    {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 text-xs text-gray-500 mb-2">
+                {o.tavolo_nome && <div><span className="text-gray-400">Tavolo:</span> {o.tavolo_nome}</div>}
+                {o.intolleranze && <div className="truncate"><span className="text-gray-400">Intoll.:</span> {o.intolleranze}</div>}
+              </div>
+              <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+                <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
+                <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="card hidden sm:block">
         {confermati > 0 && (
           <div className="text-xs text-gray-400 mb-3">
             Confermati: {adulti} adulti + {bambini} bambini
