@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { getAllScadenze } = require('../utils/scadenze-helper');
 
 router.get('/', auth, (req, res) => {
   const config = db.prepare('SELECT * FROM config LIMIT 1').get();
@@ -10,13 +11,9 @@ router.get('/', auth, (req, res) => {
   const totaleCosti = db.prepare('SELECT SUM(importo_effettivo) as tot, SUM(importo_preventivo) as prev FROM costi').get();
   const costiPagati = db.prepare('SELECT SUM(importo_effettivo) as tot FROM costi WHERE pagato = 1').get();
 
-  const scadenzeImminenti = db.prepare(
-    "SELECT * FROM scadenze WHERE completata = 0 AND data_scadenza >= ? ORDER BY data_scadenza ASC LIMIT 5"
-  ).all(oggi);
-
-  const scadenzeScadute = db.prepare(
-    "SELECT * FROM scadenze WHERE completata = 0 AND data_scadenza < ? ORDER BY data_scadenza DESC"
-  ).all(oggi);
+  const tutteScadenze = getAllScadenze(db);
+  const scadenzeImminenti = tutteScadenze.filter(s => !s.completata && s.data_scadenza >= oggi).slice(0, 5);
+  const scadenzeScadute = tutteScadenze.filter(s => !s.completata && s.data_scadenza < oggi);
 
   const totFornitoriPerCategoria = db.prepare(
     'SELECT categoria, COUNT(*) as count FROM fornitori GROUP BY categoria'
