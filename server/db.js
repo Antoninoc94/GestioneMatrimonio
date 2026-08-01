@@ -261,6 +261,9 @@ if (!ospCols.includes('fonte')) {
 if (!ospCols.includes('eta')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN eta INTEGER').run();
 }
+if (!ospCols.includes('parent_id')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN parent_id INTEGER REFERENCES ospiti(id) ON DELETE CASCADE').run();
+}
 
 // Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();

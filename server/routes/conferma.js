@@ -55,15 +55,17 @@ router.post('/rispondi', (req, res) => {
     return res.status(400).json({ error: 'Stato non valido' });
 
   // Ospite principale
+  let mainId = id;
   if (id) {
     const ospite = db.prepare('SELECT id FROM ospiti WHERE id = ?').get(id);
     if (!ospite) return res.status(404).json({ error: 'Ospite non trovato' });
     db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=? WHERE id=?')
       .run(rsvp, intolleranze || null, messaggio_ospite || null, id);
   } else {
-    db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, fonte)
+    const r = db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, fonte)
                 VALUES (?, ?, ?, ?, ?, 'sito')`)
       .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null);
+    mainId = r.lastInsertRowid;
   }
 
   // Partner (opzionale)
@@ -73,13 +75,13 @@ router.post('/rispondi', (req, res) => {
     upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp });
   }
 
-  // Figli (opzionale)
+  // Figli (opzionale) — collegati al genitore tramite parent_id
   if (Array.isArray(figli)) {
     for (const f of figli) {
       if (!f.nome?.trim()) continue;
-      db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte)
-                  VALUES (?, 'confermato', 'bambino', ?, ?, 'sito')`)
-        .run(f.nome.trim(), f.intolleranze?.trim() || null, parseInt(f.eta) || null);
+      db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id)
+                  VALUES (?, 'confermato', 'bambino', ?, ?, 'sito', ?)`)
+        .run(f.nome.trim(), f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainId);
     }
   }
 

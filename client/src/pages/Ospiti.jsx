@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
@@ -51,8 +51,10 @@ export default function Ospiti() {
   const filtered = items.filter(i =>
     (!filtroRsvp || i.rsvp === filtroRsvp) &&
     (!filtroLato || i.lato === filtroLato) &&
-    (!filtroSito || i.fonte === 'sito')
+    (!filtroSito || i.fonte === 'sito') &&
+    !i.parent_id
   );
+  const childrenOf = id => items.filter(i => i.parent_id === id);
   const countSito = items.filter(i => i.fonte === 'sito').length;
 
   const totale = items.length;
@@ -219,31 +221,52 @@ export default function Ospiti() {
         )}
         {filtered.map(o => {
           const Icon = rsvpIcon[o.rsvp];
+          const figli = childrenOf(o.id);
           return (
-            <div key={o.id} className="card p-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
-                    <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
-                    {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{o.eta ? ` (${o.eta}a)` : ''}</span>}
-                    {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
+            <Fragment key={o.id}>
+              <div className="card p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 truncate">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
+                      <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
+                      {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
+                    </div>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-x-4 text-xs text-gray-500 mb-2">
+                  {o.tavolo_nome && <div><span className="text-gray-400">Tavolo:</span> {o.tavolo_nome}</div>}
+                  {o.intolleranze && <div className="truncate"><span className="text-gray-400">Intoll.:</span> {o.intolleranze}</div>}
+                </div>
+                {o.messaggio_ospite && (
+                  <p className="text-xs text-gray-400 italic mb-2 truncate">"{o.messaggio_ospite}"</p>
+                )}
+                <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+                  <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
+                  <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 text-xs text-gray-500 mb-2">
-                {o.tavolo_nome && <div><span className="text-gray-400">Tavolo:</span> {o.tavolo_nome}</div>}
-                {o.intolleranze && <div className="truncate"><span className="text-gray-400">Intoll.:</span> {o.intolleranze}</div>}
-              </div>
-              {o.messaggio_ospite && (
-                <p className="text-xs text-gray-400 italic mb-2 truncate">"{o.messaggio_ospite}"</p>
-              )}
-              <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
-                <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
-                <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
-              </div>
-            </div>
+              {figli.map(c => (
+                <div key={c.id} className="ml-4 border-l-2 border-purple-200 pl-3">
+                  <div className="card p-2.5 border-purple-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-700 truncate">{c.nome}</div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>
+                          {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={12} /></button>
+                        <button className="p-1 rounded hover:bg-red-50 text-red-300" onClick={() => del(c.id)}><Trash2 size={12} /></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Fragment>
           );
         })}
       </div>
@@ -274,35 +297,60 @@ export default function Ospiti() {
               )}
               {filtered.map(o => {
                 const Icon = rsvpIcon[o.rsvp];
+                const figli = childrenOf(o.id);
                 return (
-                  <tr key={o.id}>
-                    <td className="font-medium text-gray-900">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</td>
-                    <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
-                    <td className="text-gray-500 text-sm capitalize">{o.tipo}{o.eta ? ` (${o.eta}a)` : ''}</td>
-                    <td>
-                      <div className="flex flex-col gap-1">
-                        <span className={`badge flex items-center gap-1 w-fit ${rsvpColor[o.rsvp]}`}>
-                          <Icon size={11} />{rsvpLabel[o.rsvp]}
-                        </span>
-                        {o.fonte === 'sito' && (
-                          <span className="badge bg-blue-100 text-blue-600 flex items-center gap-1 w-fit text-xs">
-                            <Globe size={10} />Da sito
+                  <Fragment key={o.id}>
+                    <tr>
+                      <td className="font-medium text-gray-900">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</td>
+                      <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
+                      <td className="text-gray-500 text-sm capitalize">Adulto</td>
+                      <td>
+                        <div className="flex flex-col gap-1">
+                          <span className={`badge flex items-center gap-1 w-fit ${rsvpColor[o.rsvp]}`}>
+                            <Icon size={11} />{rsvpLabel[o.rsvp]}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="text-gray-500 text-sm">{o.tavolo_nome || '—'}</td>
-                    <td className="text-gray-400 text-xs max-w-32">
-                      <div className="truncate">{o.intolleranze || '—'}</div>
-                      {o.messaggio_ospite && <div className="italic truncate text-gray-300 mt-0.5">"{o.messaggio_ospite}"</div>}
-                    </td>
-                    <td>
-                      <div className="flex gap-1">
-                        <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
-                        <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(o.id)}><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
+                          {o.fonte === 'sito' && (
+                            <span className="badge bg-blue-100 text-blue-600 flex items-center gap-1 w-fit text-xs">
+                              <Globe size={10} />Da sito
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-gray-500 text-sm">{o.tavolo_nome || '—'}</td>
+                      <td className="text-gray-400 text-xs max-w-32">
+                        <div className="truncate">{o.intolleranze || '—'}</div>
+                        {o.messaggio_ospite && <div className="italic truncate text-gray-300 mt-0.5">"{o.messaggio_ospite}"</div>}
+                      </td>
+                      <td>
+                        <div className="flex gap-1">
+                          <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
+                          <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(o.id)}><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                    {figli.map(c => (
+                      <tr key={c.id} className="bg-purple-50/40">
+                        <td className="text-gray-600 text-sm">
+                          <span className="inline-block w-4 text-purple-300 mr-1">↳</span>{c.nome}
+                        </td>
+                        <td className="text-gray-400 text-xs">—</td>
+                        <td>
+                          <span className="badge bg-purple-100 text-purple-600 text-xs">
+                            Bambino{c.eta ? ` (${c.eta}a)` : ''}
+                          </span>
+                        </td>
+                        <td><span className="badge bg-green-100 text-green-700 text-xs flex items-center gap-1 w-fit"><Check size={10} />Confermato</span></td>
+                        <td className="text-gray-400 text-xs">—</td>
+                        <td className="text-gray-400 text-xs">{c.intolleranze || '—'}</td>
+                        <td>
+                          <div className="flex gap-1">
+                            <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(c)}><Pencil size={13} /></button>
+                            <button className="p-1.5 rounded hover:bg-red-50 text-gray-300 hover:text-red-400" onClick={() => del(c.id)}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 );
               })}
             </tbody>
