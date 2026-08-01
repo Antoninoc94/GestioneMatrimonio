@@ -4,7 +4,7 @@ import { Heart } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,9 +14,9 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(username, password);
     } catch {
-      setError('Email o password non corrette');
+      setError('Username o password non corretti');
     } finally {
       setLoading(false);
     }
@@ -36,14 +36,15 @@ export default function Login() {
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="form-label">Email</label>
+              <label className="form-label">Username</label>
               <input
-                type="email"
+                type="text"
                 className="form-input"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="sposo@matrimonio.it"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="sposo"
                 required
+                autoComplete="username"
               />
             </div>
             <div>
@@ -55,6 +56,7 @@ export default function Login() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -65,8 +67,8 @@ export default function Login() {
 
           <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
             <strong>Accesso predefinito:</strong><br />
-            Sposo: sposo@matrimonio.it / sposo1<br />
-            Sposa: sposa@matrimonio.it / sposa1
+            Username: <code>sposo</code> / Password: <code>sposo1</code><br />
+            Username: <code>sposa</code> / Password: <code>sposa1</code>
           </div>
         </div>
       </div>

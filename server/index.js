@@ -18,6 +18,8 @@ app.use('/api/scadenze', require('./routes/scadenze'));
 app.use('/api/location', require('./routes/location'));
 app.use('/api/documenti', require('./routes/documenti'));
 app.use('/api/idee', require('./routes/idee'));
+app.use('/api/profilo', require('./routes/profilo'));
+app.use('/api/email-config', require('./routes/email-config'));
 
 // Serve React build in production
 const clientDist = path.join(__dirname, '../client/dist');

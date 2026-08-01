@@ -12,7 +12,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE,
+    email TEXT,
     password TEXT NOT NULL,
     ruolo TEXT DEFAULT 'sposo',
     created_at TEXT DEFAULT (datetime('now'))
@@ -115,22 +116,51 @@ db.exec(`
     note TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS email_config (
+    id INTEGER PRIMARY KEY,
+    smtp_host TEXT DEFAULT 'smtp.gmail.com',
+    smtp_port INTEGER DEFAULT 587,
+    smtp_user TEXT,
+    smtp_password TEXT,
+    from_name TEXT DEFAULT 'Il Nostro Matrimonio',
+    from_email TEXT,
+    enabled INTEGER DEFAULT 0
+  );
 `);
 
-// Seed default config if not exists
+// Migrazione: aggiunge colonna username se non esiste (DB già esistente)
+const cols = db.prepare('PRAGMA table_info(users)').all();
+if (!cols.find(c => c.name === 'username')) {
+  db.prepare('ALTER TABLE users ADD COLUMN username TEXT').run();
+}
+if (!cols.find(c => c.name === 'email') || cols.find(c => c.name === 'email')?.notnull) {
+  // email già presente come NOT NULL nei DB vecchi — la lasciamo com'è
+}
+
+// Seed default config
 const configExists = db.prepare('SELECT id FROM config LIMIT 1').get();
 if (!configExists) {
   db.prepare('INSERT INTO config (data_matrimonio, budget_totale, nome_sposo1, nome_sposo2) VALUES (?, ?, ?, ?)')
     .run(null, 0, 'Sposo 1', 'Sposo 2');
 }
 
-// Seed default users if not exists
+// Seed email config
+const emailConfigExists = db.prepare('SELECT id FROM email_config LIMIT 1').get();
+if (!emailConfigExists) {
+  db.prepare('INSERT INTO email_config (id) VALUES (1)').run();
+}
+
+// Seed default users
 const userExists = db.prepare('SELECT id FROM users LIMIT 1').get();
 if (!userExists) {
   const hash1 = bcrypt.hashSync('sposo1', 10);
   const hash2 = bcrypt.hashSync('sposa1', 10);
-  db.prepare('INSERT INTO users (nome, email, password, ruolo) VALUES (?, ?, ?, ?)').run('Sposo', 'sposo@matrimonio.it', hash1, 'sposo');
-  db.prepare('INSERT INTO users (nome, email, password, ruolo) VALUES (?, ?, ?, ?)').run('Sposa', 'sposa@matrimonio.it', hash2, 'sposa');
+  db.prepare('INSERT INTO users (nome, username, email, password, ruolo) VALUES (?, ?, ?, ?, ?)').run('Sposo', 'sposo', null, hash1, 'sposo');
+  db.prepare('INSERT INTO users (nome, username, email, password, ruolo) VALUES (?, ?, ?, ?, ?)').run('Sposa', 'sposa', null, hash2, 'sposa');
+} else {
+  // Migrazione: imposta username dagli utenti esistenti se null
+  db.prepare("UPDATE users SET username = LOWER(ruolo) WHERE username IS NULL").run();
 }
 
 module.exports = db;

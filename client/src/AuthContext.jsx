@@ -8,11 +8,17 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
   });
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (username, password) => {
+    const { data } = await api.post('/auth/login', { username, password });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
+  };
+
+  const updateUser = (updatedUser) => {
+    const merged = { ...user, ...updatedUser };
+    localStorage.setItem('user', JSON.stringify(merged));
+    setUser(merged);
   };
 
   const logout = () => {
@@ -21,7 +27,11 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);
