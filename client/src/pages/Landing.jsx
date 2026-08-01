@@ -17,18 +17,28 @@ const TEMI = {
 const TIPO_LABEL = { chiesa: 'Cerimonia', ricevimento: 'Ricevimento', altro: 'Location' };
 const TIPO_EMOJI = { cerimonia: '⛪', ricevimento: '🥂', aperitivo: '🍾', cena: '🍽️', ballo: '💃', altro: '✨' };
 
-// SVG ornamento botanico per divisori
+// SVG ornamento floreale per divisori
 function BotanicalDivider({ color, small = false }) {
-  const size = small ? 80 : 140;
+  const w = small ? 90 : 160;
   return (
-    <svg width={size} height={24} viewBox="0 0 140 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', margin: '0 auto' }}>
-      <g stroke={color} strokeWidth="1.2" strokeLinecap="round">
-        <path d="M0 12 C18 12 22 4 30 9 M8 12 C12 7 17 5 22 8 M22 9 C25 4 28 3 32 6"/>
-        <line x1="40" y1="12" x2="56" y2="12"/>
-        <path d="M140 12 C122 12 118 4 110 9 M132 12 C128 7 123 5 118 8 M118 9 C115 4 112 3 108 6"/>
-        <line x1="100" y1="12" x2="84" y2="12"/>
-      </g>
-      <path d="M70 5 L74 12 L70 19 L66 12 Z" fill={color} opacity="0.7"/>
+    <svg width={w} height={26} viewBox="0 0 160 26" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', margin: '0 auto' }}>
+      {/* Ricciolo sinistro */}
+      <path d="M4 13 C8 6,14 6,16 13 C18 20,24 20,28 13" stroke={color} strokeWidth="1.1" fill="none" strokeLinecap="round" opacity="0.7"/>
+      {/* Linea sinistra */}
+      <line x1="30" y1="13" x2="58" y2="13" stroke={color} strokeWidth="0.8" opacity="0.4"/>
+      {/* Pallino sinistro */}
+      <circle cx="62" cy="13" r="2.2" fill={color} opacity="0.45"/>
+      {/* Fiore centrale: 3 ellissi sovrapposte a 0° 60° 120° → 6 petali */}
+      <ellipse cx="80" cy="13" rx="3" ry="5.5" fill={color} opacity="0.2"/>
+      <ellipse cx="80" cy="13" rx="3" ry="5.5" fill={color} opacity="0.2" transform="rotate(60 80 13)"/>
+      <ellipse cx="80" cy="13" rx="3" ry="5.5" fill={color} opacity="0.2" transform="rotate(120 80 13)"/>
+      <circle cx="80" cy="13" r="3" fill={color} opacity="0.85"/>
+      {/* Pallino destro */}
+      <circle cx="98" cy="13" r="2.2" fill={color} opacity="0.45"/>
+      {/* Linea destra */}
+      <line x1="102" y1="13" x2="130" y2="13" stroke={color} strokeWidth="0.8" opacity="0.4"/>
+      {/* Ricciolo destro (speculare) */}
+      <path d="M156 13 C152 6,146 6,144 13 C142 20,136 20,132 13" stroke={color} strokeWidth="1.1" fill="none" strokeLinecap="round" opacity="0.7"/>
     </svg>
   );
 }
@@ -71,7 +81,7 @@ export default function Landing() {
   const { config = {}, locations = [], cronologia = [] } = data || {};
   const tema = TEMI[config.landing_tema] || TEMI.rose;
 
-  if (!config.landing_abilitata) {
+  if (config.landing_abilitata !== 1) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: tema.light, flexDirection: 'column', gap: '1rem', textAlign: 'center', padding: '2rem' }}>
         <div style={{ fontSize: '4rem' }}>💍</div>
