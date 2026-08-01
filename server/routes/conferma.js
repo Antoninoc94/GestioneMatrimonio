@@ -1,14 +1,22 @@
 const router = require('express').Router();
 const db = require('../db');
 
-// Info matrimonio (pubblica)
+const checkAbilitata = (req, res, next) => {
+  const cfg = db.prepare('SELECT conferma_abilitata FROM config LIMIT 1').get();
+  if (cfg && cfg.conferma_abilitata === 0) {
+    return res.status(403).json({ disabilitata: true, error: 'La pagina di conferma è momentaneamente disabilitata.' });
+  }
+  next();
+};
+
+// Info matrimonio (pubblica — sempre accessibile, serve per mostrare msg disabilitata)
 router.get('/info', (req, res) => {
   const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, app_name, app_emoji FROM config LIMIT 1').get();
   res.json(cfg || {});
 });
 
 // Trova ospite per nome + cognome esatti (case-insensitive, prova anche invertiti)
-router.get('/trova', (req, res) => {
+router.get('/trova', checkAbilitata, (req, res) => {
   const nome = (req.query.nome || '').trim();
   const cognome = (req.query.cognome || '').trim();
   if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
@@ -48,7 +56,7 @@ function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tip
 }
 
 // Invia risposta: ospite principale + partner opzionale + figli opzionali
-router.post('/rispondi', (req, res) => {
+router.post('/rispondi', checkAbilitata, (req, res) => {
   const { id, nome, cognome, rsvp, intolleranze, messaggio_ospite, partner, figli } = req.body;
 
   if (!['confermato', 'declinato', 'attesa'].includes(rsvp))

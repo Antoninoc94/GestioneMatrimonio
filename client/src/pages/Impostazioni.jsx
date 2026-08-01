@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette, Eye, EyeOff } from 'lucide-react';
+import { Save, Settings, User, Mail, Users, CheckCircle, XCircle, Palette, Eye, EyeOff, Globe } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
 import { useAppConfig } from '../AppConfigContext';
@@ -21,7 +21,7 @@ export default function Impostazioni() {
   const { updateAppConfig } = useAppConfig();
 
   // Config matrimonio + aspetto
-  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '', app_name: 'Il Nostro Matrimonio', app_emoji: '💍', login_subtitle: '' });
+  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '', app_name: 'Il Nostro Matrimonio', app_emoji: '💍', login_subtitle: '', conferma_abilitata: true });
   const [configSaved, setConfigSaved] = useState(false);
   const [aspettoSaved, setAspettoSaved] = useState(false);
 
@@ -42,7 +42,7 @@ export default function Impostazioni() {
   const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
-    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '' }));
+    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '', conferma_abilitata: r.data.conferma_abilitata !== 0 }));
     api.get('/profilo/me').then(r => setProfilo({ nome: r.data.nome || '', username: r.data.username || '', email: r.data.email || '' }));
     api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled, reminder_abilitato: !!r.data.reminder_abilitato }));
   }, []);
@@ -52,6 +52,12 @@ export default function Impostazioni() {
     await api.put('/config', { ...config, budget_totale: parseFloat(config.budget_totale) || 0 });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 2500);
+  };
+
+  const toggleConferma = async (val) => {
+    const updated = { ...config, conferma_abilitata: val, budget_totale: parseFloat(config.budget_totale) || 0 };
+    setConfig(c => ({ ...c, conferma_abilitata: val }));
+    await api.put('/config', updated);
   };
 
   const saveAspetto = async e => {
@@ -249,6 +255,39 @@ export default function Impostazioni() {
               <Save size={15} /> {aspettoSaved ? 'Salvato!' : 'Salva Aspetto'}
             </button>
           </form>
+        </Section>
+
+        {/* Pagina RSVP pubblica */}
+        <Section title="Pagina RSVP Pubblica" icon={Globe}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Abilita pagina conferma</p>
+                <p className="text-xs text-gray-400 mt-0.5">Gli ospiti possono confermare la presenza su <code className="bg-gray-100 px-1 rounded">/conferma</code></p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleConferma(!config.conferma_abilitata)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${config.conferma_abilitata ? 'bg-rose-500' : 'bg-gray-200'}`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${config.conferma_abilitata ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+
+            <div className={`rounded-lg p-3 text-xs ${config.conferma_abilitata ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
+              {config.conferma_abilitata ? (
+                <>
+                  <p className="font-semibold mb-1">Pagina attiva</p>
+                  <p>Gli ospiti possono accedere a <strong>/conferma</strong> e confermare la loro presenza. Condividi il link del sito con il percorso <code>/conferma</code>.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold mb-1">Pagina disabilitata</p>
+                  <p>Gli ospiti che visitano <strong>/conferma</strong> vedranno un messaggio di pagina non disponibile.</p>
+                </>
+              )}
+            </div>
+          </div>
         </Section>
 
         {/* Configurazione email */}

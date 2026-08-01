@@ -209,6 +209,9 @@ if (!configCols.find(c => c.name === 'app_emoji')) {
 if (!configCols.find(c => c.name === 'login_subtitle')) {
   db.prepare("ALTER TABLE config ADD COLUMN login_subtitle TEXT DEFAULT ''").run();
 }
+if (!configCols.find(c => c.name === 'conferma_abilitata')) {
+  db.prepare('ALTER TABLE config ADD COLUMN conferma_abilitata INTEGER DEFAULT 1').run();
+}
 
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();

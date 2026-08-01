@@ -13,10 +13,11 @@ router.get('/', auth, (req, res) => {
 });
 
 router.put('/', auth, (req, res) => {
-  const { data_matrimonio, budget_totale, nome_sposo1, nome_sposo2, app_name, app_emoji, login_subtitle } = req.body;
-  db.prepare(`UPDATE config SET data_matrimonio=?, budget_totale=?, nome_sposo1=?, nome_sposo2=?, app_name=?, app_emoji=?, login_subtitle=?, updated_at=datetime('now')`)
+  const { data_matrimonio, budget_totale, nome_sposo1, nome_sposo2, app_name, app_emoji, login_subtitle, conferma_abilitata } = req.body;
+  db.prepare(`UPDATE config SET data_matrimonio=?, budget_totale=?, nome_sposo1=?, nome_sposo2=?, app_name=?, app_emoji=?, login_subtitle=?, conferma_abilitata=?, updated_at=datetime('now')`)
     .run(data_matrimonio, budget_totale, nome_sposo1, nome_sposo2,
-      app_name || 'Il Nostro Matrimonio', app_emoji || '💍', login_subtitle || '');
+      app_name || 'Il Nostro Matrimonio', app_emoji || '💍', login_subtitle || '',
+      conferma_abilitata === false || conferma_abilitata === 0 ? 0 : 1);
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });
 
