@@ -488,7 +488,10 @@ export default function Dashboard() {
                   <div key={n.id} className="flex items-start gap-2 bg-rose-50/40 border border-rose-100 rounded-lg p-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{n.testo}</p>
-                      <p className="text-xs text-gray-400 mt-1">{fmtDateTime(n.created_at)}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {n.autore && <span className="font-medium text-rose-400 mr-1">{n.autore}</span>}
+                        {fmtDateTime(n.created_at)}
+                      </p>
                     </div>
                     <button onClick={() => eliminaNota(n.id)}
                       className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 text-lg leading-none mt-0.5">×</button>
