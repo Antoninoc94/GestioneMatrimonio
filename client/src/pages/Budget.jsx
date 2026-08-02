@@ -163,25 +163,33 @@ export default function Budget() {
       doc.setTextColor(55, 65, 81);
       doc.text('DETTAGLIO VOCI DI SPESA', 14, sec2Y);
 
+      const fmtData = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('it-IT') : '';
+
       autoTable(doc, {
         startY: sec2Y + 3,
-        head: [['Categoria', 'Descrizione', 'Preventivato', 'Effettivo', 'Pagato']],
-        body: items.map(c => [
-          c.categoria,
-          c.descrizione,
-          formatEuro(c.importo_preventivo),
-          formatEuro(c.importo_effettivo),
-          c.pagato ? (c.data_pagamento ? `Si ${c.data_pagamento}` : 'Si') : 'No',
-        ]),
+        head: [['Categoria', 'Descrizione / Fornitore / Note', 'Preventivato', 'Effettivo', 'Pagato']],
+        body: items.map(c => {
+          const forn = c.fornitore_id ? (fornitori.find(f => f.id === c.fornitore_id)?.nome || '') : '';
+          const lines = [c.descrizione];
+          if (forn) lines.push(`Fornitore: ${forn}`);
+          if (c.note) lines.push(`Note: ${c.note}`);
+          return [
+            c.categoria,
+            lines.join('\n'),
+            formatEuro(c.importo_preventivo),
+            formatEuro(c.importo_effettivo),
+            c.pagato ? (c.data_pagamento ? `Si - ${fmtData(c.data_pagamento)}` : 'Si') : 'No',
+          ];
+        }),
         headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 7.5, textColor: [55, 65, 81] },
         alternateRowStyles: { fillColor: [255, 251, 252] },
         columnStyles: {
-          0: { cellWidth: 30 },
+          0: { cellWidth: 28 },
           1: { cellWidth: 'auto' },
-          2: { cellWidth: 28, halign: 'right' },
-          3: { cellWidth: 28, halign: 'right' },
-          4: { cellWidth: 26, halign: 'center' },
+          2: { cellWidth: 26, halign: 'right' },
+          3: { cellWidth: 26, halign: 'right' },
+          4: { cellWidth: 28, halign: 'center' },
         },
         didParseCell: data => {
           if (data.section === 'body' && data.column.index === 3) {
@@ -191,6 +199,11 @@ export default function Budget() {
           }
           if (data.section === 'body' && data.column.index === 4 && String(data.cell.raw).startsWith('Si'))
             data.cell.styles.textColor = [22, 163, 74];
+          // Secondary lines in description cell (fornitore / note) shown in gray
+          if (data.section === 'body' && data.column.index === 1) {
+            const raw = String(data.cell.raw || '');
+            if (raw.includes('\n')) data.cell.styles.fontSize = 6.5;
+          }
         },
         margin: { left: 14, right: 14 },
       });
