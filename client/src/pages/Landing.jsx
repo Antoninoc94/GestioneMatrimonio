@@ -289,7 +289,7 @@ export default function Landing() {
         )}
 
         {/* RSVP CTA */}
-        {config.conferma_abilitata && (
+        {config.conferma_abilitata === 1 && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0 2rem' }}>
             <div style={{ marginBottom: '1.5rem' }}>
               <BotanicalDivider color={tema.border} />
