@@ -73,7 +73,26 @@ export default function Tavoli() {
       const GUEST_ROW = 5;
       const ROW_GAP = 4;
 
-      const cardHeight = t => CARD_HEAD + Math.max(1, t.ospiti.length) * GUEST_ROW + CARD_PAD;
+      // Build ordered guest lines per table (main guests + their children/partners indented)
+      const buildGuestLines = ospiti => {
+        const lines = [];
+        const mains = ospiti.filter(o => !o.parent_id);
+        const byParent = {};
+        ospiti.filter(o => o.parent_id).forEach(o => {
+          (byParent[o.parent_id] = byParent[o.parent_id] || []).push(o);
+        });
+        for (const o of mains) {
+          lines.push({ o, indent: false });
+          for (const c of byParent[o.id] || []) lines.push({ o: c, indent: true });
+        }
+        return lines;
+      };
+
+      const cardHeight = t => {
+        const lines = buildGuestLines(t.ospiti);
+        const rows = Math.max(1, lines.length);
+        return CARD_HEAD + rows * GUEST_ROW + CARD_PAD;
+      };
 
       const drawCard = (t, cx, cy, height) => {
         const pieno = t.ospiti.length >= t.capienza;
@@ -105,16 +124,28 @@ export default function Tavoli() {
         }
 
         // Guests
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
         if (t.ospiti.length === 0) {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
           doc.setTextColor(156, 163, 175);
           doc.text('Nessun ospite assegnato', cx + CARD_PAD, cy + CARD_HEAD + CARD_PAD);
         } else {
-          doc.setTextColor(55, 65, 81);
-          t.ospiti.forEach((o, idx) => {
+          const lines = buildGuestLines(t.ospiti);
+          lines.forEach(({ o, indent }, idx) => {
             const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
-            doc.text(`• ${name}`, cx + CARD_PAD, cy + CARD_HEAD + idx * GUEST_ROW);
+            const prefix = indent ? '  > ' : '- ';
+            const gy = cy + CARD_HEAD + idx * GUEST_ROW;
+            if (indent) {
+              doc.setFontSize(7);
+              doc.setFont('helvetica', 'italic');
+              doc.setTextColor(120, 130, 140);
+            } else {
+              doc.setFontSize(8);
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(55, 65, 81);
+            }
+            const label = o.intolleranze ? `${prefix}${name}  (${o.intolleranze})` : `${prefix}${name}`;
+            doc.text(label, cx + CARD_PAD, gy);
           });
         }
       };

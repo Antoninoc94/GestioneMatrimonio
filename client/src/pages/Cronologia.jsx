@@ -108,10 +108,12 @@ export default function Cronologia() {
                         {ev.luogo && <p className="text-sm text-gray-500 mt-0.5">📍 {ev.luogo}</p>}
                         {ev.descrizione && <p className="text-sm text-gray-500 mt-1">{ev.descrizione}</p>}
                       </div>
-                      <div className="flex gap-1 ml-2">
-                        <button className="p-1.5 rounded hover:bg-white/60" onClick={() => openEdit(ev)}><Pencil size={13} className="text-gray-400" /></button>
-                        <button className="p-1.5 rounded hover:bg-white/60" onClick={() => del(ev.id)}><Trash2 size={13} className="text-red-400" /></button>
-                      </div>
+                      {!exporting && (
+                        <div className="flex gap-1 ml-2">
+                          <button className="p-1.5 rounded hover:bg-white/60" onClick={() => openEdit(ev)}><Pencil size={13} className="text-gray-400" /></button>
+                          <button className="p-1.5 rounded hover:bg-white/60" onClick={() => del(ev.id)}><Trash2 size={13} className="text-red-400" /></button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
