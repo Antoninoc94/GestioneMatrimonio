@@ -21,6 +21,7 @@ import Inviti from './pages/Inviti';
 import Conferma from './pages/Conferma';
 import Landing from './pages/Landing';
 import LandingEditor from './pages/LandingEditor';
+import Checklist from './pages/Checklist';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="viaggio" element={<Viaggio />} />
         <Route path="inviti" element={<Inviti />} />
         <Route path="landing" element={<LandingEditor />} />
+        <Route path="checklist" element={<Checklist />} />
       </Route>
     </Routes>
   );

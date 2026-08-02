@@ -60,6 +60,7 @@ app.use('/api/cronologia', require('./routes/cronologia'));
 app.use('/api/regali', require('./routes/regali'));
 app.use('/api/viaggio', require('./routes/viaggio'));
 app.use('/api/note', require('./routes/note'));
+app.use('/api/checklist', require('./routes/checklist'));
 
 // Serve React build in production
 const clientDist = path.join(__dirname, '../client/dist');

@@ -4,7 +4,7 @@ import { useAppConfig } from '../AppConfigContext';
 import {
   LayoutDashboard, Users, FileText, DollarSign, CalendarCheck,
   MapPin, FolderOpen, Lightbulb, Settings, LogOut, Menu,
-  UserCheck, Clock, Gift, Plane, Mail, Globe
+  UserCheck, Clock, Gift, Plane, Mail, Globe, ListChecks
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -19,6 +19,7 @@ const navItems = [
   { to: '/preventivi', icon: FileText, label: 'Preventivi' },
   { to: '/budget', icon: DollarSign, label: 'Budget & Costi' },
   { group: 'Organizzazione' },
+  { to: '/checklist', icon: ListChecks, label: 'Checklist' },
   { to: '/scadenze', icon: CalendarCheck, label: 'Scadenze' },
   { to: '/cronologia', icon: Clock, label: 'Cronologia Giorno' },
   { to: '/location', icon: MapPin, label: 'Location & Chiesa' },

@@ -194,6 +194,16 @@ db.exec(`
     autore TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS checklist_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    testo TEXT NOT NULL,
+    fase TEXT NOT NULL,
+    completata INTEGER DEFAULT 0,
+    predefinita INTEGER DEFAULT 0,
+    ordine INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Migrazione: aggiunge colonne config se non esistono
@@ -287,6 +297,56 @@ if (!ospCols.includes('eta')) {
 }
 if (!ospCols.includes('parent_id')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN parent_id INTEGER REFERENCES ospiti(id) ON DELETE CASCADE').run();
+}
+
+// Seed checklist predefinita
+const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();
+if (!checklistExists) {
+  const insertItem = db.prepare('INSERT INTO checklist_items (testo, fase, predefinita, ordine) VALUES (?, ?, 1, ?)');
+  const items = [
+    ['12mesi', 'Definire la data del matrimonio'],
+    ['12mesi', 'Stabilire il budget totale'],
+    ['12mesi', 'Scegliere la formula (civile, religioso, simbolico)'],
+    ['12mesi', 'Creare la prima bozza della lista ospiti'],
+    ['12mesi', 'Visitare e prenotare la location'],
+    ['12mesi', 'Prenotare il catering'],
+    ['12mesi', 'Iniziare la ricerca dell\'abito da sposa'],
+    ['6mesi', 'Prenotare il fotografo'],
+    ['6mesi', 'Prenotare il videomaker'],
+    ['6mesi', 'Scegliere e prenotare il fiorista'],
+    ['6mesi', 'Prenotare la musica (DJ o orchestra)'],
+    ['6mesi', 'Prenotare parrucchiere e makeup'],
+    ['6mesi', 'Inviare i save-the-date'],
+    ['6mesi', 'Scegliere le fedi nuziali'],
+    ['6mesi', 'Prenotare il viaggio di nozze'],
+    ['3mesi', 'Ordinare l\'abito da sposa'],
+    ['3mesi', 'Scegliere l\'abito dello sposo'],
+    ['3mesi', 'Prenotare l\'auto / trasporto'],
+    ['3mesi', 'Scegliere e ordinare le bomboniere'],
+    ['3mesi', 'Definire il menu con il catering'],
+    ['3mesi', 'Organizzare l\'alloggio per ospiti da fuori'],
+    ['3mesi', 'Inviare gli inviti formali'],
+    ['3mesi', 'Creare la lista nozze'],
+    ['1mese', 'Confermare tutti i fornitori'],
+    ['1mese', 'Organizzare la cena di prova con il catering'],
+    ['1mese', 'Definire la disposizione dei tavoli'],
+    ['1mese', 'Creare la timeline della giornata'],
+    ['1mese', 'Prove abito finale'],
+    ['1mese', 'Consegnare il saldo ai fornitori'],
+    ['1mese', 'Preparare i segnaposti'],
+    ['settimana', 'Confermare orari con tutti i fornitori'],
+    ['settimana', 'Trial capelli e makeup'],
+    ['settimana', 'Preparare i documenti per la cerimonia'],
+    ['settimana', 'Preparare i bouquet con il fiorista'],
+    ['settimana', 'Caricare le playlist musicali'],
+    ['settimana', 'Rilassarsi e godersi il momento!'],
+    ['giorno', 'Colazione tranquilla con la famiglia'],
+    ['giorno', 'Trucco e capelli'],
+    ['giorno', 'Foto dei preparativi'],
+    ['giorno', 'Arrivare in orario alla cerimonia'],
+    ['giorno', 'Godersi ogni singolo momento'],
+  ];
+  items.forEach(([fase, testo], i) => insertItem.run(testo, fase, i));
 }
 
 // Seed default users

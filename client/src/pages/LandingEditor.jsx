@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Image, Trash2, ExternalLink, Globe } from 'lucide-react';
+import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { useRef } from 'react';
 import api from '../api';
 
 const TEMI = [
@@ -25,6 +27,16 @@ export default function LandingEditor() {
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState('');
   const fileRef = useRef();
+  const qrWeddingRef = useRef();
+  const qrConfermaRef = useRef();
+
+  const downloadQR = (canvasRef, filename) => {
+    const canvas = canvasRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+  };
 
   useEffect(() => {
     api.get('/config').then(r => {
@@ -256,6 +268,39 @@ export default function LandingEditor() {
         </div>
 
       </form>
+
+      {/* QR Code */}
+      <div className="card mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <QrCode size={18} className="text-rose-400" />
+          <h2 className="font-bold text-gray-800">QR Code</h2>
+        </div>
+        <p className="text-xs text-gray-400 mb-5">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {[
+            { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding.png' },
+            { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma.png' },
+          ].map(({ label, path, ref, file }) => {
+            const url = `${window.location.origin}${path}`;
+            return (
+              <div key={path} className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-sm font-semibold text-gray-700">{label}</p>
+                <div ref={ref} className="p-3 bg-white rounded-xl shadow-sm">
+                  <QRCodeCanvas value={url} size={160} fgColor="#1f2937" bgColor="#ffffff" level="M" />
+                </div>
+                <p className="text-xs text-gray-400 text-center break-all">{url}</p>
+                <button
+                  type="button"
+                  className="btn-secondary text-sm w-full justify-center"
+                  onClick={() => downloadQR(ref, file)}
+                >
+                  <Download size={13} /> Scarica PNG
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

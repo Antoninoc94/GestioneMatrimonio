@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download, Tag } from 'lucide-react';
 import jsPDF from 'jspdf';
 import api from '../api';
 
@@ -56,6 +56,82 @@ export default function Tavoli() {
     return pn ? `${base} (${rel} di ${pn})` : base;
   };
   const [exporting, setExporting] = useState(false);
+  const [exportingCards, setExportingCards] = useState(false);
+
+  const exportSegnaposti = () => {
+    const assegnati = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato' && !o.parent_id);
+    // Include anche figli/partner confermati
+    const tutti = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato');
+    if (tutti.length === 0) return alert('Nessun ospite confermato con tavolo assegnato.');
+    setExportingCards(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+
+      // 2 colonne × 4 righe = 8 card per pagina
+      const COLS = 2, ROWS = 4;
+      const MARGIN = 10;
+      const PAGE_W = 210, PAGE_H = 297;
+      const cardW = (PAGE_W - MARGIN * (COLS + 1)) / COLS;   // ~90mm
+      const cardH = (PAGE_H - MARGIN * (ROWS + 1)) / ROWS;   // ~63mm
+
+      const tavoloMap = {};
+      tavoli.forEach(t => { tavoloMap[t.id] = t.nome; });
+
+      tutti.forEach((o, idx) => {
+        const page = Math.floor(idx / (COLS * ROWS));
+        const pos  = idx % (COLS * ROWS);
+        const col  = pos % COLS;
+        const row  = Math.floor(pos / COLS);
+
+        if (pos === 0 && idx > 0) doc.addPage();
+
+        const cx = MARGIN + col * (cardW + MARGIN);
+        const cy = MARGIN + row * (cardH + MARGIN);
+
+        // Bordo card
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'S');
+
+        // Linea rose in alto
+        doc.setFillColor(...rose);
+        doc.roundedRect(cx, cy, cardW, 5, 3, 3, 'F');
+        doc.setFillColor(...rose);
+        doc.rect(cx, cy + 2, cardW, 3, 'F');
+
+        // Nome ospite
+        const nome = o.cognome ? `${o.nome} ${o.cognome}` : o.nome;
+        doc.setFont('times', 'bold');
+        doc.setFontSize(nome.length > 20 ? 14 : 17);
+        doc.setTextColor(17, 24, 39);
+        const nomeLines = doc.splitTextToSize(nome, cardW - 10);
+        const nomeY = cy + cardH / 2 - (nomeLines.length - 1) * 4;
+        doc.text(nomeLines, cx + cardW / 2, nomeY, { align: 'center', baseline: 'middle' });
+
+        // Separatore
+        doc.setDrawColor(...rose);
+        doc.setLineWidth(0.3);
+        doc.line(cx + 12, cy + cardH / 2 + 8, cx + cardW - 12, cy + cardH / 2 + 8);
+
+        // Nome tavolo
+        const tavolo = tavoloMap[o.tavolo_id] || '';
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(107, 114, 128);
+        doc.text(tavolo, cx + cardW / 2, cy + cardH / 2 + 15, { align: 'center' });
+
+        // Piccolo cuore decorativo
+        doc.setTextColor(...rose);
+        doc.setFontSize(8);
+        doc.text('*', cx + cardW / 2, cy + cardH - 6, { align: 'center' });
+      });
+
+      doc.save('segnaposti.pdf');
+    } finally {
+      setExportingCards(false);
+    }
+  };
 
   const exportSeatingPDF = () => {
     setExporting(true);
@@ -220,6 +296,9 @@ export default function Tavoli() {
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
         </div>
         <div className="flex gap-2">
+          <button className="btn-secondary" onClick={exportSegnaposti} disabled={exportingCards}>
+            <Tag size={15} /> {exportingCards ? 'Esporto…' : 'Segnaposti'}
+          </button>
           <button className="btn-secondary" onClick={exportSeatingPDF} disabled={exporting}>
             <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
           </button>
