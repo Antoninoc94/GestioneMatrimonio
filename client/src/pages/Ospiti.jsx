@@ -158,7 +158,7 @@ export default function Ospiti() {
         // Figli e partner collegati
         for (const c of items.filter(c => c.parent_id === o.id)) {
           rows.push([
-            `   ↳ ${c.cognome ? `${c.cognome} ${c.nome}` : c.nome}`,
+            `  > ${c.cognome ? `${c.cognome} ${c.nome}` : c.nome}`,
             latoLabel[c.lato] || '-',
             c.tipo === 'bambino' ? 'Bambino' : 'Partner',
             rsvpText[c.rsvp] || c.rsvp,
@@ -193,6 +193,8 @@ export default function Ospiti() {
             if (childRowIndices.has(data.row.index)) {
               data.cell.styles.textColor = [120, 130, 140];
               data.cell.styles.fillColor = [248, 250, 252];
+              data.cell.styles.fontSize = 8;
+              data.cell.styles.fontStyle = 'italic';
             }
             // Colore RSVP
             if (data.column.index === 3) {
