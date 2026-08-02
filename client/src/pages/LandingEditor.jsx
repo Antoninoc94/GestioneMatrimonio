@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { useRef } from 'react';
 import api from '../api';
 
 const TEMI = [
