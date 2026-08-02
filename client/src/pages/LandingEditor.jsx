@@ -61,6 +61,12 @@ export default function LandingEditor() {
     setTimeout(() => setSaved(false), 2500);
   };
 
+  const toggleAbilitata = async () => {
+    const nuovoValore = !form.landing_abilitata;
+    setForm(f => ({ ...f, landing_abilitata: nuovoValore }));
+    await api.put('/config', { landing_abilitata: nuovoValore });
+  };
+
   const uploadFoto = async file => {
     if (!file) return;
     setUploading(true);
@@ -119,7 +125,7 @@ export default function LandingEditor() {
             </div>
             <button
               type="button"
-              onClick={() => setForm(f => ({ ...f, landing_abilitata: !f.landing_abilitata }))}
+              onClick={toggleAbilitata}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${form.landing_abilitata ? 'bg-rose-500' : 'bg-gray-200'}`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${form.landing_abilitata ? 'translate-x-5' : 'translate-x-0'}`} />
