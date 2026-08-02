@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Upload, Trash2, Download, FolderOpen } from 'lucide-react';
+import { Upload, Trash2, Download, FolderOpen, X, Eye } from 'lucide-react';
 import api from '../api';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -25,6 +25,8 @@ const formatSize = bytes => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+
 export default function Documenti() {
   const [items, setItems] = useState([]);
   const [fornitori, setFornitori] = useState([]);
@@ -33,6 +35,8 @@ export default function Documenti() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [filtro, setFiltro] = useState('');
+  const [preview, setPreview] = useState(null); // { doc, url, ext }
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const fileRef = useRef();
 
   const load = () => {
@@ -76,6 +80,28 @@ export default function Documenti() {
     URL.revokeObjectURL(url);
   };
 
+  const openPreview = async (d) => {
+    const ext = d.nome_file.split('.').pop().toLowerCase();
+    if (!PREVIEWABLE.includes(ext)) {
+      setPreview({ doc: d, url: null, ext });
+      return;
+    }
+    setLoadingPreview(true);
+    try {
+      const response = await api.get(`/documenti/download/${d.id}`, { responseType: 'blob' });
+      const mime = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      const blob = new Blob([response.data], { type: mime });
+      setPreview({ doc: d, url: URL.createObjectURL(blob), ext });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  };
+
   const filtered = items.filter(i =>
     !filtro || i.titolo.toLowerCase().includes(filtro.toLowerCase()) || i.categoria.toLowerCase().includes(filtro.toLowerCase())
   );
@@ -110,7 +136,11 @@ export default function Documenti() {
             {filtered.filter(i => i.categoria === cat).map(d => {
               const ext = d.nome_file.split('.').pop().toLowerCase();
               return (
-                <div key={d.id} className="card flex items-center gap-3 group py-3">
+                <div
+                  key={d.id}
+                  className="card flex items-center gap-3 group py-3 cursor-pointer hover:border-rose-200 hover:shadow-sm transition-all"
+                  onClick={() => openPreview(d)}
+                >
                   <div className="text-2xl flex-shrink-0">{iconExt(ext)}</div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-gray-800 truncate">{d.titolo}</p>
@@ -121,9 +151,9 @@ export default function Documenti() {
                     </div>
                     {d.note && <p className="text-xs text-gray-400 mt-0.5 italic truncate">{d.note}</p>}
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <button className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500" onClick={() => download(d)}><Download size={14} /></button>
-                    <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(d.id)}><Trash2 size={14} /></button>
+                  <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <button className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500" onClick={() => download(d)} title="Scarica"><Download size={14} /></button>
+                    <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(d.id)} title="Elimina"><Trash2 size={14} /></button>
                   </div>
                 </div>
               );
@@ -131,6 +161,72 @@ export default function Documenti() {
           </div>
         </div>
       ))}
+
+      {/* Modal anteprima */}
+      {(preview || loadingPreview) && (
+        <div className="modal-overlay" onClick={closePreview}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            style={{ width: '90vw', maxWidth: '900px', maxHeight: '90vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+              {preview && <span className="text-xl">{iconExt(preview.ext)}</span>}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800 truncate">{preview?.doc?.titolo}</p>
+                <p className="text-xs text-gray-400 truncate">{preview?.doc?.nome_file}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {preview?.doc && (
+                  <button
+                    className="btn-secondary py-1 px-3 text-sm flex items-center gap-1"
+                    onClick={() => download(preview.doc)}
+                  >
+                    <Download size={13} /> Scarica
+                  </button>
+                )}
+                <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" onClick={closePreview}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenuto */}
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 p-4" style={{ minHeight: '300px' }}>
+              {loadingPreview && !preview && (
+                <p className="text-gray-400 text-sm">Caricamento anteprima…</p>
+              )}
+              {preview?.url && preview.ext === 'pdf' && (
+                <iframe
+                  src={preview.url}
+                  title={preview.doc.titolo}
+                  className="w-full rounded"
+                  style={{ height: '75vh', border: 'none' }}
+                />
+              )}
+              {preview?.url && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(preview.ext) && (
+                <img
+                  src={preview.url}
+                  alt={preview.doc.titolo}
+                  className="max-w-full max-h-full object-contain rounded shadow"
+                  style={{ maxHeight: '75vh' }}
+                />
+              )}
+              {preview && !preview.url && !loadingPreview && (
+                <div className="text-center py-12">
+                  <span className="text-6xl block mb-4">{iconExt(preview.ext)}</span>
+                  <p className="text-gray-500 font-medium mb-1">{preview.doc.titolo}</p>
+                  <p className="text-gray-400 text-sm mb-5">Anteprima non disponibile per i file .{preview.ext}</p>
+                  <button className="btn-primary" onClick={() => download(preview.doc)}>
+                    <Download size={14} /> Scarica il file
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
