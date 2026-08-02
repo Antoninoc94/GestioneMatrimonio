@@ -138,17 +138,38 @@ export default function Ospiti() {
         doc.text(lbl, x + 21.5, statsY + 12, { align: 'center' });
       });
 
-      // Table
+      // Table — ospiti principali + figli/partner come sub-righe
       const rsvpText = { confermato: 'Confermato', declinato: 'Declinato', attesa: 'In attesa' };
-      const rows = (filtered.length > 0 ? filtered : items).map(o => [
-        o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
-        latoLabel[o.lato] || o.lato,
-        o.tipo === 'bambino' ? 'Bambino' : 'Adulto',
-        rsvpText[o.rsvp] || o.rsvp,
-        o.tavolo_nome || '-',
-        o.intolleranze || '-',
-        o.fonte === 'sito' ? 'Da sito' : 'Lista',
-      ]);
+      const mainGuests = items.filter(o => !o.parent_id);
+      const rows = [];
+      const childRowIndices = new Set();
+      let rowIdx = 0;
+      for (const o of mainGuests) {
+        rows.push([
+          o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
+          latoLabel[o.lato] || o.lato,
+          'Adulto',
+          rsvpText[o.rsvp] || o.rsvp,
+          o.tavolo_nome || '-',
+          o.intolleranze || '-',
+          o.fonte === 'sito' ? 'Da sito' : 'Lista',
+        ]);
+        rowIdx++;
+        // Figli e partner collegati
+        for (const c of items.filter(c => c.parent_id === o.id)) {
+          rows.push([
+            `   ↳ ${c.cognome ? `${c.cognome} ${c.nome}` : c.nome}`,
+            latoLabel[c.lato] || '-',
+            c.tipo === 'bambino' ? 'Bambino' : 'Partner',
+            rsvpText[c.rsvp] || c.rsvp,
+            c.tavolo_nome || '-',
+            c.intolleranze || '-',
+            c.fonte === 'sito' ? 'Da sito' : 'Lista',
+          ]);
+          childRowIndices.add(rowIdx);
+          rowIdx++;
+        }
+      }
 
       autoTable(doc, {
         startY: statsY + 20,
@@ -167,14 +188,22 @@ export default function Ospiti() {
           6: { cellWidth: 18, halign: 'center' },
         },
         didParseCell: data => {
-          if (data.section === 'body' && data.column.index === 3) {
-            const v = data.cell.raw;
-            if (v === 'Confermato') data.cell.styles.textColor = [22, 163, 74];
-            else if (v === 'Declinato') data.cell.styles.textColor = [220, 38, 38];
-            else data.cell.styles.textColor = [161, 98, 7];
+          if (data.section === 'body') {
+            // Sub-righe (figli/partner): testo più chiaro
+            if (childRowIndices.has(data.row.index)) {
+              data.cell.styles.textColor = [120, 130, 140];
+              data.cell.styles.fillColor = [248, 250, 252];
+            }
+            // Colore RSVP
+            if (data.column.index === 3) {
+              const v = data.cell.raw;
+              if (v === 'Confermato') data.cell.styles.textColor = childRowIndices.has(data.row.index) ? [134, 200, 155] : [22, 163, 74];
+              else if (v === 'Declinato') data.cell.styles.textColor = childRowIndices.has(data.row.index) ? [220, 150, 150] : [220, 38, 38];
+              else data.cell.styles.textColor = [161, 98, 7];
+            }
+            if (data.column.index === 6 && data.cell.raw === 'Da sito')
+              data.cell.styles.textColor = [37, 99, 235];
           }
-          if (data.section === 'body' && data.column.index === 6 && data.cell.raw === 'Da sito')
-            data.cell.styles.textColor = [37, 99, 235];
         },
         margin: { left: 14, right: 14 },
       });
