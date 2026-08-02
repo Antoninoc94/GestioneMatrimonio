@@ -70,9 +70,25 @@ export default function Conferma() {
       setOspite(o);
       setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
       setIntolleranze(o.intolleranze || '');
-      setMessaggio('');
-      setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
-      setConFigli(false); setFigli([emptyFiglio()]);
+      setMessaggio(o.messaggio_ospite || '');
+
+      // Pre-carica partner esistente se presente
+      if (o.partner) {
+        setConPartner(true);
+        setPartnerNome(o.partner.nome || '');
+        setPartnerCognome(o.partner.cognome || '');
+        setPartnerIntolleranze(o.partner.intolleranze || '');
+      } else {
+        setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
+      }
+
+      // Pre-carica figli esistenti se presenti
+      if (o.figli && o.figli.length > 0) {
+        setConFigli(true);
+        setFigli(o.figli.map(f => ({ nome: f.nome || '', eta: f.eta != null ? String(f.eta) : '', intolleranze: f.intolleranze || '' })));
+      } else {
+        setConFigli(false); setFigli([emptyFiglio()]);
+      }
     } catch (err) {
       if (err.response?.data?.disabilitata) {
         setDisabilitata(true);

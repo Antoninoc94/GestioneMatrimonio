@@ -22,7 +22,7 @@ router.get('/trova', checkAbilitata, (req, res) => {
   if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
 
   const ospite = db.prepare(`
-    SELECT id, nome, cognome, rsvp, intolleranze
+    SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite
     FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
        OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
@@ -30,9 +30,23 @@ router.get('/trova', checkAbilitata, (req, res) => {
   `).get(nome, cognome, cognome, nome);
 
   if (ospite) {
-    res.json({ trovato: true, ...ospite });
+    // Carica il partner (adulto collegato tramite parent_id)
+    const partner = db.prepare(`
+      SELECT id, nome, cognome, intolleranze FROM ospiti
+      WHERE parent_id = ? AND tipo != 'bambino'
+      LIMIT 1
+    `).get(ospite.id);
+
+    // Carica i figli (bambini collegati tramite parent_id)
+    const figli = db.prepare(`
+      SELECT id, nome, eta, intolleranze FROM ospiti
+      WHERE parent_id = ? AND tipo = 'bambino'
+      ORDER BY id ASC
+    `).all(ospite.id);
+
+    res.json({ trovato: true, ...ospite, partner: partner || null, figli });
   } else {
-    res.json({ trovato: false, nome, cognome, rsvp: 'attesa', intolleranze: '' });
+    res.json({ trovato: false, nome, cognome, rsvp: 'attesa', intolleranze: '', partner: null, figli: [] });
   }
 });
 
@@ -83,8 +97,9 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
     upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
   }
 
-  // Figli (opzionale) — collegati al genitore tramite parent_id
+  // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione)
   if (Array.isArray(figli)) {
+    db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND tipo = 'bambino'").run(mainId);
     for (const f of figli) {
       if (!f.nome?.trim()) continue;
       db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id)
