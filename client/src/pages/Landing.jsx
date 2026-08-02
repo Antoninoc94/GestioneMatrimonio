@@ -110,15 +110,14 @@ export default function Landing() {
 
       {/* ── HERO ─────────────────────────────────── */}
       {config.landing_foto ? (
-        <div style={{ position: 'relative', width: '100%' }}>
-          {/* Foto a larghezza piena, altezza proporzionale alla foto */}
+        <div style={{ position: 'relative', width: '100%', height: '60vh', minHeight: '320px', background: '#111' }}>
+          {/* object-fit: contain → foto intera visibile, nessun ritaglio */}
           <img
             src={`/uploads/landing/${config.landing_foto}`}
             alt="Foto matrimonio"
-            style={{ display: 'block', width: '100%', height: 'auto' }}
+            style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center center' }}
           />
-          {/* vignette sul bordo inferiore per transizione morbida */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.45) 100%)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%)' }} />
         </div>
       ) : (
         <div style={{ position: 'relative', height: '38vh', minHeight: '280px', background: `linear-gradient(135deg, ${tema.dark} 0%, ${tema.primary} 60%, ${tema.mid} 100%)` }}>
