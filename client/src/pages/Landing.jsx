@@ -109,36 +109,33 @@ export default function Landing() {
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', background: bg, minHeight: '100vh' }}>
 
       {/* ── HERO ─────────────────────────────────── */}
-      <div style={{ position: 'relative', height: config.landing_foto ? '52vh' : '38vh', minHeight: '300px', maxHeight: '560px', overflow: 'hidden' }}>
-        {config.landing_foto ? (
-          <>
-            <img
-              src={`/uploads/landing/${config.landing_foto}`}
-              alt="Foto matrimonio"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: config.landing_foto_posizione || 'center top' }}
-            />
-            {/* vignette top */}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.55) 100%)' }} />
-          </>
-        ) : (
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${tema.dark} 0%, ${tema.primary} 60%, ${tema.mid} 100%)` }}>
-            {/* Pattern decorativo */}
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.06 }} xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <circle cx="20" cy="20" r="2" fill="white"/>
-                  <circle cx="0" cy="0" r="1" fill="white"/>
-                  <circle cx="40" cy="0" r="1" fill="white"/>
-                  <circle cx="0" cy="40" r="1" fill="white"/>
-                  <circle cx="40" cy="40" r="1" fill="white"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#dots)"/>
-            </svg>
-          </div>
-        )}
-
-      </div>
+      {config.landing_foto ? (
+        <div style={{ position: 'relative', width: '100%' }}>
+          {/* Foto a larghezza piena, altezza proporzionale alla foto */}
+          <img
+            src={`/uploads/landing/${config.landing_foto}`}
+            alt="Foto matrimonio"
+            style={{ display: 'block', width: '100%', height: 'auto' }}
+          />
+          {/* vignette sul bordo inferiore per transizione morbida */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.45) 100%)' }} />
+        </div>
+      ) : (
+        <div style={{ position: 'relative', height: '38vh', minHeight: '280px', background: `linear-gradient(135deg, ${tema.dark} 0%, ${tema.primary} 60%, ${tema.mid} 100%)` }}>
+          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.06 }} xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                <circle cx="20" cy="20" r="2" fill="white"/>
+                <circle cx="0" cy="0" r="1" fill="white"/>
+                <circle cx="40" cy="0" r="1" fill="white"/>
+                <circle cx="0" cy="40" r="1" fill="white"/>
+                <circle cx="40" cy="40" r="1" fill="white"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dots)"/>
+          </svg>
+        </div>
+      )}
 
       {/* Onda di transizione */}
       <HeroWave bg={bg} />
