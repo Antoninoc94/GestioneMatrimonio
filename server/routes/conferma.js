@@ -30,21 +30,31 @@ router.get('/trova', checkAbilitata, (req, res) => {
   `).get(nome, cognome, cognome, nome);
 
   if (ospite) {
+    // Se l'ospite trovato è un partner (ha parent_id), carica invece l'ospite principale
+    let principale = ospite;
+    if (ospite.parent_id) {
+      const parent = db.prepare(`
+        SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite
+        FROM ospiti WHERE id = ?
+      `).get(ospite.parent_id);
+      if (parent) principale = parent;
+    }
+
     // Carica il partner (adulto collegato tramite parent_id)
     const partner = db.prepare(`
       SELECT id, nome, cognome, intolleranze FROM ospiti
       WHERE parent_id = ? AND tipo != 'bambino'
       LIMIT 1
-    `).get(ospite.id);
+    `).get(principale.id);
 
     // Carica i figli (bambini collegati tramite parent_id)
     const figli = db.prepare(`
       SELECT id, nome, eta, intolleranze FROM ospiti
       WHERE parent_id = ? AND tipo = 'bambino'
       ORDER BY id ASC
-    `).all(ospite.id);
+    `).all(principale.id);
 
-    res.json({ trovato: true, ...ospite, partner: partner || null, figli });
+    res.json({ trovato: true, ...principale, partner: partner || null, figli });
   } else {
     res.json({ trovato: false, nome, cognome, rsvp: 'attesa', intolleranze: '', partner: null, figli: [] });
   }
