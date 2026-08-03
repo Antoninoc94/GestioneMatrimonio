@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Lightbulb, CheckCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Lightbulb, CheckCircle, ExternalLink, Music, Link } from 'lucide-react';
 import api from '../api';
 
 const CATEGORIE = ['Decorazioni', 'Fiori', 'Tableau', 'Bomboniere', 'Torta', 'Menu', 'Musica', 'Abito', 'Acconciatura', 'Viaggio di nozze', 'Foto', 'Altro'];
@@ -11,6 +11,143 @@ const categoriaEmoji = {
 };
 
 const empty = { titolo: '', descrizione: '', categoria: 'Decorazioni', immagine_url: '', priorita: 'media', realizzata: false, note: '' };
+
+// ── Helpers per tipo di media ──────────────────────────────────────
+
+const getYouTubeId = url => {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/\s]+)/);
+  return m ? m[1] : null;
+};
+
+const getSpotifyEmbed = url => {
+  if (!url) return null;
+  const m = url.match(/open\.spotify\.com\/(track|playlist|album|episode)\/([^?/\s]+)/);
+  return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator` : null;
+};
+
+const isImageUrl = url => {
+  if (!url) return false;
+  return /\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i.test(url);
+};
+
+// ── Componente anteprima media ─────────────────────────────────────
+
+function MediaPreview({ url }) {
+  if (!url) return null;
+
+  const ytId = getYouTubeId(url);
+  if (ytId) {
+    return (
+      <div className="aspect-video rounded-xl overflow-hidden mb-3 bg-black">
+        <iframe
+          src={`https://www.youtube.com/embed/${ytId}`}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title="YouTube"
+        />
+      </div>
+    );
+  }
+
+  const spotifyUrl = getSpotifyEmbed(url);
+  if (spotifyUrl) {
+    return (
+      <div className="rounded-xl overflow-hidden mb-3">
+        <iframe
+          src={spotifyUrl}
+          width="100%"
+          height="80"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          className="block"
+          title="Spotify"
+        />
+      </div>
+    );
+  }
+
+  if (isImageUrl(url)) {
+    return (
+      <div className="aspect-video rounded-xl overflow-hidden mb-3 bg-gray-100">
+        <img
+          src={url}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={e => { e.target.closest('.aspect-video').style.display = 'none'; }}
+        />
+      </div>
+    );
+  }
+
+  // Link generico
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-colors"
+      onClick={e => e.stopPropagation()}
+    >
+      <Link size={14} className="flex-shrink-0" />
+      <span className="text-xs truncate">{url}</span>
+      <ExternalLink size={12} className="flex-shrink-0 ml-auto" />
+    </a>
+  );
+}
+
+// ── Componente card idea ───────────────────────────────────────────
+
+function IdeaCard({ idea, onToggle, onEdit, onDel }) {
+  const hasYT = !!getYouTubeId(idea.immagine_url);
+  const hasSpotify = !!getSpotifyEmbed(idea.immagine_url);
+  const hasImg = isImageUrl(idea.immagine_url);
+  const hasLink = idea.immagine_url && !hasYT && !hasSpotify && !hasImg;
+
+  return (
+    <div className="card group flex flex-col">
+      <MediaPreview url={idea.immagine_url} />
+
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-lg flex-shrink-0">{categoriaEmoji[idea.categoria] || '💡'}</span>
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm leading-snug">{idea.titolo}</h3>
+            <span className="text-xs text-gray-400">{idea.categoria}</span>
+          </div>
+        </div>
+        <span className={`badge flex-shrink-0 ml-2 ${prioritaColor[idea.priorita]}`}>{idea.priorita}</span>
+      </div>
+
+      {idea.descrizione && <p className="text-sm text-gray-600 mt-1 mb-1">{idea.descrizione}</p>}
+      {idea.note && <p className="text-xs text-gray-400 mt-0.5 italic">{idea.note}</p>}
+
+      {/* Link apri-in-nuova-tab per YouTube/Spotify/immagini */}
+      {idea.immagine_url && (hasYT || hasSpotify || hasImg) && (
+        <a
+          href={idea.immagine_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 mt-2 transition-colors w-fit"
+          onClick={e => e.stopPropagation()}
+        >
+          <ExternalLink size={11} />
+          {hasYT ? 'Apri su YouTube' : hasSpotify ? 'Apri su Spotify' : 'Apri immagine'}
+        </a>
+      )}
+
+      <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100 mt-3">
+        <button className="btn-secondary text-xs py-1 px-2 flex-1 justify-center" onClick={() => onToggle(idea)}>
+          <CheckCircle size={13} /> Realizzata
+        </button>
+        <button className="btn-secondary text-xs py-1 px-2" onClick={() => onEdit(idea)} title="Modifica"><Pencil size={13} /></button>
+        <button className="btn-danger text-xs py-1 px-2" onClick={() => onDel(idea.id)} title="Elimina"><Trash2 size={13} /></button>
+      </div>
+    </div>
+  );
+}
+
+// ── Pagina principale ──────────────────────────────────────────────
 
 export default function Idee() {
   const [items, setItems] = useState([]);
@@ -47,8 +184,13 @@ export default function Idee() {
 
   const pending = items.filter(i => !i.realizzata);
   const realizzate = items.filter(i => i.realizzata);
-  const filtered = (filtroCategoria ? pending.filter(i => i.categoria === filtroCategoria) : pending);
+  const filtered = filtroCategoria ? pending.filter(i => i.categoria === filtroCategoria) : pending;
   const categorie = [...new Set(pending.map(i => i.categoria))];
+
+  // Anteprima URL nel form
+  const formYtId = getYouTubeId(form.immagine_url);
+  const formSpotify = getSpotifyEmbed(form.immagine_url);
+  const formIsImg = isImageUrl(form.immagine_url);
 
   return (
     <div>
@@ -82,32 +224,7 @@ export default function Idee() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         {filtered.map(idea => (
-          <div key={idea.id} className="card group">
-            {idea.immagine_url && (
-              <div className="aspect-video rounded-lg overflow-hidden mb-3 bg-gray-100">
-                <img src={idea.immagine_url} alt={idea.titolo} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
-              </div>
-            )}
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg">{categoriaEmoji[idea.categoria] || '💡'}</span>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">{idea.titolo}</h3>
-                  <span className="text-xs text-gray-400">{idea.categoria}</span>
-                </div>
-              </div>
-              <span className={`badge ${prioritaColor[idea.priorita]}`}>{idea.priorita}</span>
-            </div>
-            {idea.descrizione && <p className="text-sm text-gray-600 mt-1">{idea.descrizione}</p>}
-            {idea.note && <p className="text-xs text-gray-400 mt-1 italic">{idea.note}</p>}
-            <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-              <button className="btn-secondary text-xs py-1 px-2 flex-1 justify-center" onClick={() => toggleRealizzata(idea)}>
-                <CheckCircle size={13} /> Realizzata
-              </button>
-              <button className="btn-secondary text-xs py-1 px-2" onClick={() => openEdit(idea)}><Pencil size={13} /></button>
-              <button className="btn-danger text-xs py-1 px-2" onClick={() => del(idea.id)}><Trash2 size={13} /></button>
-            </div>
-          </div>
+          <IdeaCard key={idea.id} idea={idea} onToggle={toggleRealizzata} onEdit={openEdit} onDel={del} />
         ))}
       </div>
 
@@ -120,9 +237,9 @@ export default function Idee() {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 opacity-60">
               {realizzate.map(idea => (
                 <div key={idea.id} className="card border-green-200">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-gray-700 line-through">{idea.titolo}</span>
-                    <CheckCircle size={16} className="text-green-500" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm text-gray-700 line-through truncate">{idea.titolo}</span>
+                    <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
                   </div>
                   <div className="flex gap-2 mt-2">
                     <button className="text-xs text-gray-400 hover:text-gray-600" onClick={() => toggleRealizzata(idea)}>Riapri</button>
@@ -160,11 +277,42 @@ export default function Idee() {
               </div>
               <div>
                 <label className="form-label">Descrizione</label>
-                <textarea className="form-input" rows={3} value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
+                <textarea className="form-input" rows={2} value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
               </div>
               <div>
-                <label className="form-label">URL Immagine (opzionale)</label>
-                <input type="url" className="form-input" value={form.immagine_url} onChange={e => setForm({ ...form, immagine_url: e.target.value })} placeholder="https://..." />
+                <label className="form-label flex items-center gap-1.5">
+                  <Link size={13} className="text-gray-400" />
+                  Link o URL immagine
+                  <span className="text-gray-400 font-normal">(YouTube, Spotify, immagine…)</span>
+                </label>
+                <input
+                  type="url"
+                  className="form-input"
+                  value={form.immagine_url}
+                  onChange={e => setForm({ ...form, immagine_url: e.target.value })}
+                  placeholder="https://..."
+                />
+                {/* Anteprima live nel form */}
+                {form.immagine_url && (
+                  <div className="mt-2">
+                    {formYtId && (
+                      <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                        <iframe src={`https://www.youtube.com/embed/${formYtId}`} className="w-full h-full" allow="accelerometer; autoplay" allowFullScreen title="YouTube preview" />
+                      </div>
+                    )}
+                    {formSpotify && !formYtId && (
+                      <iframe src={formSpotify} width="100%" height="80" allow="autoplay; clipboard-write; encrypted-media; fullscreen" className="block rounded-lg" title="Spotify preview" />
+                    )}
+                    {formIsImg && !formYtId && !formSpotify && (
+                      <img src={form.immagine_url} alt="anteprima" className="max-h-32 rounded-lg object-cover" onError={e => e.target.style.display='none'} />
+                    )}
+                    {!formYtId && !formSpotify && !formIsImg && (
+                      <div className="flex items-center gap-2 text-xs text-blue-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                        <ExternalLink size={12} /> Link generico — verrà mostrato come pulsante sulla card
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">Note</label>
