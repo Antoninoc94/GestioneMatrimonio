@@ -22,7 +22,7 @@ router.get('/trova', checkAbilitata, (req, res) => {
   if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
 
   const ospite = db.prepare(`
-    SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite
+    SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id
     FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
        OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
