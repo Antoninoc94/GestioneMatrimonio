@@ -131,10 +131,16 @@ body {
   padding: 0.5rem 0.75rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16px — sotto soglia iOS fa auto-zoom indesiderato */
   background: white;
   transition: border-color 0.15s;
   outline: none;
+}
+
+@media (min-width: 640px) {
+  .form-input {
+    font-size: 0.875rem;
+  }
 }
 
 .form-input:focus {
