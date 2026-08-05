@@ -161,26 +161,66 @@ body {
 }
 
 /* ── Modal ──────────────────────────────────────────────────── */
+
+/* Mobile: bottom sheet */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0,0,0,0.45);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   z-index: 50;
-  padding: 1rem;
 }
 
 .modal {
   background: white;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+  border-radius: 1rem 1rem 0 0;
+  padding: 0.25rem 1rem 1.5rem;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
+  max-width: 100%;
+  max-height: 88vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px -10px rgba(0,0,0,0.3);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.12);
+}
+
+/* Drag handle visivo su mobile */
+.modal::before {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 0.25rem;
+  background: #d1d5db;
+  border-radius: 9999px;
+  margin: 0.75rem auto 1rem;
+}
+
+/* Su schermi più grandi: overlay centrato, modal classica */
+@media (min-width: 640px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+  .modal {
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    max-width: 600px;
+    max-height: 90vh;
+  }
+  .modal::before {
+    display: none;
+  }
+}
+
+/* Grid a 2+ colonne dentro modal: su mobile collassa a 1 colonna */
+@media (max-width: 639px) {
+  .modal .grid-cols-2,
+  .modal .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Table ──────────────────────────────────────────────────── */
@@ -222,9 +262,15 @@ tbody tr:hover td {
 }
 
 .page-title {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #111827;
+}
+
+@media (min-width: 640px) {
+  .page-title {
+    font-size: 1.5rem;
+  }
 }
 
 .page-subtitle {
