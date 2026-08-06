@@ -151,11 +151,12 @@ export default function Ospiti() {
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
 
-  const afterFiltri = mainGuests.filter(o =>
-    (!filtroRsvp || o.rsvp === filtroRsvp) &&
-    (!filtroLato || o.lato === filtroLato) &&
-    (!filtroSito || o.fonte === 'sito')
-  );
+  const afterFiltri = mainGuests.filter(o => {
+    const rsvpMatch = !filtroRsvp || o.rsvp === filtroRsvp || childrenOf(o.id).some(c => c.rsvp === filtroRsvp);
+    return rsvpMatch &&
+      (!filtroLato || o.lato === filtroLato) &&
+      (!filtroSito || o.fonte === 'sito');
+  });
 
   const q = search.toLowerCase().trim();
   const afterSearch = q
