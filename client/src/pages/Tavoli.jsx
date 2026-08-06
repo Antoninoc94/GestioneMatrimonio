@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search } from 'lucide-react';
 import jsPDF from 'jspdf';
 import api from '../api';
 
@@ -57,6 +57,9 @@ export default function Tavoli() {
   };
   const [exporting, setExporting] = useState(false);
   const [exportingCards, setExportingCards] = useState(false);
+  const [vistaCompatta, setVistaCompatta] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [searchSenza, setSearchSenza] = useState('');
 
   const exportSegnaposti = () => {
     const assegnati = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato' && !o.parent_id);
@@ -308,43 +311,144 @@ export default function Tavoli() {
 
       {senzaTavolo.length > 0 && (
         <div className="card mb-5 border-yellow-200 bg-yellow-50/40">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+          {/* Header */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mr-auto">
               <UserX size={16} className="text-yellow-500" />
               <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
             </div>
+            {/* Toggle vista */}
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => setVistaCompatta(false)}
+                className={`px-3 py-1.5 text-xs flex items-center gap-1 transition-colors ${!vistaCompatta ? 'bg-rose-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+              >
+                <LayoutGrid size={13} /> Carte
+              </button>
+              <button
+                onClick={() => setVistaCompatta(true)}
+                className={`px-3 py-1.5 text-xs flex items-center gap-1 transition-colors ${vistaCompatta ? 'bg-rose-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+              >
+                <List size={13} /> Lista
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-            {(() => {
-              const mainGuests = senzaTavolo.filter(o => !o.parent_id);
-              const familyOf = id => senzaTavolo.filter(o => o.parent_id === id);
-              // Partner/figli il cui genitore è già assegnato a un tavolo
-              const orphans = senzaTavolo.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id));
 
-              const AssegnaSelect = ({ o }) => (
-                <select
-                  className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
-                  value=""
-                  onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
+          {/* Ricerca + filtro tipo */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <div className="relative flex-1 min-w-40">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                className="form-input pl-8 py-1.5 text-sm"
+                placeholder="Cerca ospite…"
+                value={searchSenza}
+                onChange={e => setSearchSenza(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-1">
+              {[['', 'Tutti'], ['adulto', 'Adulti'], ['bambino', 'Bambini 👶']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFiltroTipo(val)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filtroTipo === val ? 'bg-rose-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 >
-                  <option value="">Assegna…</option>
-                  {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                </select>
-              );
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-              const cards = [
-                ...mainGuests.map(mg => {
+          {(() => {
+            // Filtro + ricerca
+            const q = searchSenza.toLowerCase().trim();
+            const senzaFiltrati = senzaTavolo.filter(o => {
+              if (filtroTipo === 'bambino' && o.tipo !== 'bambino') return false;
+              if (filtroTipo === 'adulto' && o.tipo === 'bambino') return false;
+              if (q) return (o.nome || '').toLowerCase().includes(q) || (o.cognome || '').toLowerCase().includes(q);
+              return true;
+            });
+
+            const nessunRisultato = senzaFiltrati.length === 0;
+
+            const AssegnaSelect = ({ o }) => (
+              <select
+                className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
+                value=""
+                onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
+              >
+                <option value="">Assegna…</option>
+                {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              </select>
+            );
+
+            if (nessunRisultato) {
+              return <p className="text-sm text-gray-400 text-center py-4">Nessun ospite trovato</p>;
+            }
+
+            // ── Vista LISTA compatta ──────────────────────────────────
+            if (vistaCompatta) {
+              // Ordine: main guests con i propri figli/partner subito dopo
+              const mains = senzaFiltrati.filter(o => !o.parent_id);
+              const byParent = {};
+              senzaTavolo.filter(o => o.parent_id).forEach(o => {
+                (byParent[o.parent_id] = byParent[o.parent_id] || []).push(o);
+              });
+              const flat = [];
+              for (const m of mains) {
+                flat.push(m);
+                for (const c of (byParent[m.id] || []).filter(c => senzaFiltrati.includes(c))) flat.push(c);
+              }
+              // Orfani filtrati (parent già assegnato)
+              senzaFiltrati.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id))
+                .forEach(o => flat.push(o));
+
+              return (
+                <div className="bg-white rounded-lg border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+                  {flat.map(o => {
+                    const isChild = o.tipo === 'bambino';
+                    const isPartner = !!o.parent_id && !isChild;
+                    const parent = o.parent_id ? ospiti.find(p => p.id === o.parent_id) : null;
+                    return (
+                      <div key={o.id} className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${o.parent_id ? 'pl-7' : ''}`}>
+                        {isChild   && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
+                        {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-sm truncate ${isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'}`}>
+                            {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                            {isChild && o.eta ? <span className="ml-1 text-xs opacity-50">({o.eta}a)</span> : null}
+                          </span>
+                          {parent && (
+                            <span className="text-xs text-gray-400 ml-1.5">
+                              — {isChild ? 'figlio' : 'partner'} di {parent.cognome ? `${parent.cognome} ${parent.nome}` : parent.nome}
+                            </span>
+                          )}
+                        </div>
+                        <AssegnaSelect o={o} />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            // ── Vista CARTE (default) ─────────────────────────────────
+            const mainGuests = senzaTavolo.filter(o => !o.parent_id)
+              .filter(mg => senzaFiltrati.find(f => f.id === mg.id || f.parent_id === mg.id));
+            const familyOf = id => senzaTavolo.filter(o => o.parent_id === id && senzaFiltrati.includes(o));
+            const orphans = senzaFiltrati.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id));
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+                {mainGuests.map(mg => {
                   const family = familyOf(mg.id);
                   return (
                     <div key={mg.id} className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
-                      {/* Intestazione — ospite principale */}
                       <div className="flex items-center gap-3 px-3 py-2.5">
                         <span className="flex-1 text-sm font-semibold text-gray-800 truncate">
                           {mg.cognome ? `${mg.cognome} ${mg.nome}` : mg.nome}
                         </span>
                         <AssegnaSelect o={mg} />
                       </div>
-                      {/* Famiglia */}
                       {family.length > 0 && (
                         <div className="border-t border-gray-50 divide-y divide-gray-50">
                           {family.map(f => {
@@ -366,8 +470,8 @@ export default function Tavoli() {
                       )}
                     </div>
                   );
-                }),
-                ...orphans.map(o => {
+                })}
+                {orphans.map(o => {
                   const isChild = o.tipo === 'bambino';
                   return (
                     <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${isChild ? 'border-purple-100' : 'border-rose-100'}`}>
@@ -383,12 +487,10 @@ export default function Tavoli() {
                       <AssegnaSelect o={o} />
                     </div>
                   );
-                }),
-              ];
-
-              return cards;
-            })()}
-          </div>
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
