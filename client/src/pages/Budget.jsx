@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CheckCircle, Circle, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle, Circle, Download, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,6 +10,25 @@ const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 
 const empty = { categoria: 'Catering', descrizione: '', importo_preventivo: '', importo_effettivo: '', pagato: false, data_pagamento: '', fornitore_id: '', note: '' };
 
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
+
+function SortTh({ label, col, sortKey, sortDir, onSort, className = '' }) {
+  const active = sortKey === col;
+  return (
+    <th
+      className={`cursor-pointer select-none hover:bg-rose-50 transition-colors ${className}`}
+      onClick={() => onSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {active
+          ? sortDir === 'asc'
+            ? <ChevronUp size={12} className="text-rose-500" />
+            : <ChevronDown size={12} className="text-rose-500" />
+          : <ChevronsUpDown size={12} className="text-gray-300" />}
+      </div>
+    </th>
+  );
+}
 
 export default function Budget() {
   const [items, setItems] = useState([]);
@@ -22,6 +41,11 @@ export default function Budget() {
   const [payModal, setPayModal] = useState(null);
   const [payImporto, setPayImporto] = useState('');
   const [payData, setPayData] = useState('');
+
+  // new state
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
 
   const load = () => {
     api.get('/costi').then(r => setItems(r.data));
@@ -80,7 +104,39 @@ export default function Budget() {
     Effettivo: items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0),
   }));
 
-  const filtered = filtroCategoria ? items.filter(i => i.categoria === filtroCategoria) : items;
+  const onSort = col => {
+    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(col); setSortDir('asc'); }
+  };
+
+  // filtering + sort pipeline
+  const afterCategoria = filtroCategoria ? items.filter(i => i.categoria === filtroCategoria) : items;
+  const q = search.toLowerCase().trim();
+  const afterSearch = q
+    ? afterCategoria.filter(i => {
+        const fornNome = (fornitori.find(f => f.id === i.fornitore_id)?.nome || '').toLowerCase();
+        return (
+          (i.descrizione || '').toLowerCase().includes(q) ||
+          (i.categoria || '').toLowerCase().includes(q) ||
+          fornNome.includes(q)
+        );
+      })
+    : afterCategoria;
+
+  const sorted = [...afterSearch].sort((a, b) => {
+    if (sortKey === 'importo') {
+      return sortDir === 'asc' ? a.importo_preventivo - b.importo_preventivo : b.importo_preventivo - a.importo_preventivo;
+    }
+    let av = '', bv = '';
+    if (sortKey === 'descrizione') { av = a.descrizione || ''; bv = b.descrizione || ''; }
+    else if (sortKey === 'fornitore') {
+      av = fornitori.find(f => f.id === a.fornitore_id)?.nome || '';
+      bv = fornitori.find(f => f.id === b.fornitore_id)?.nome || '';
+    }
+    else if (sortKey === 'data_pagamento') { av = a.data_pagamento || '9999'; bv = b.data_pagamento || '9999'; }
+    else { return 0; }
+    return sortDir === 'asc' ? av.localeCompare(bv, 'it') : bv.localeCompare(av, 'it');
+  });
 
   const exportPDF = () => {
     setExporting(true);
@@ -199,7 +255,6 @@ export default function Budget() {
           }
           if (data.section === 'body' && data.column.index === 4 && String(data.cell.raw).startsWith('Si'))
             data.cell.styles.textColor = [22, 163, 74];
-          // Secondary lines in description cell (fornitore / note) shown in gray
           if (data.section === 'body' && data.column.index === 1) {
             const raw = String(data.cell.raw || '');
             if (raw.includes('\n')) data.cell.styles.fontSize = 6.5;
@@ -270,8 +325,17 @@ export default function Budget() {
         </div>
       )}
 
-      {/* Filtro */}
+      {/* Filtro + Ricerca */}
       <div className="card mb-4">
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            className="form-input pl-9"
+            placeholder="Cerca descrizione, categoria, fornitore…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
         <select className="form-input" value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
           <option value="">Tutte le categorie</option>
           {categorie.map(c => <option key={c}>{c}</option>)}
@@ -280,10 +344,10 @@ export default function Budget() {
 
       {/* Mobile card view */}
       <div className="sm:hidden space-y-3">
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <div className="card text-center py-10 text-gray-400">Nessuna voce di spesa</div>
         )}
-        {filtered.map(c => (
+        {sorted.map(c => (
           <div key={c.id} className="card p-3">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
@@ -322,19 +386,19 @@ export default function Budget() {
             <thead>
               <tr>
                 <th>Pagato</th>
-                <th>Categoria</th>
-                <th>Descrizione</th>
-                <th>Preventivato</th>
+                <SortTh label="Categoria" col="categoria" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="Descrizione" col="descrizione" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="Preventivato" col="importo" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                 <th>Effettivo</th>
-                <th>Data Pag.</th>
+                <SortTh label="Data Pag." col="data_pagamento" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {sorted.length === 0 && (
                 <tr><td colSpan={7} className="text-center py-10 text-gray-400">Nessuna voce di spesa</td></tr>
               )}
-              {filtered.map(c => (
+              {sorted.map(c => (
                 <tr key={c.id}>
                   <td>
                     <button onClick={() => togglePagato(c)} className="text-gray-400 hover:text-green-500">

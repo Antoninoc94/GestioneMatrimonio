@@ -1,5 +1,5 @@
 import { useEffect, useState, Fragment } from 'react';
-import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,6 +12,25 @@ const rsvpIcon = { confermato: Check, declinato: X, attesa: Clock };
 const latoLabel = { sposo1: 'Sposo', sposo2: 'Sposa', comune: 'Comune' };
 
 const empty = { nome: '', cognome: '', lato: 'comune', tipo: 'adulto', rsvp: 'attesa', tavolo_id: '', email: '', telefono: '', intolleranze: '', note: '' };
+
+function SortTh({ label, col, sortKey, sortDir, onSort, className = '' }) {
+  const active = sortKey === col;
+  return (
+    <th
+      className={`cursor-pointer select-none hover:bg-rose-50 transition-colors ${className}`}
+      onClick={() => onSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {active
+          ? sortDir === 'asc'
+            ? <ChevronUp size={12} className="text-rose-500" />
+            : <ChevronDown size={12} className="text-rose-500" />
+          : <ChevronsUpDown size={12} className="text-gray-300" />}
+      </div>
+    </th>
+  );
+}
 
 export default function Ospiti() {
   const [items, setItems] = useState([]);
@@ -27,6 +46,14 @@ export default function Ospiti() {
   const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
   const [conFigli, setConFigli] = useState(false);
   const [figli, setFigli] = useState([{ nome: '', eta: '', intolleranze: '' }]);
+
+  // new state
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('cognome');
+  const [sortDir, setSortDir] = useState('asc');
+  const [perPage, setPerPage] = useState(25);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(new Set());
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
@@ -88,12 +115,6 @@ export default function Ospiti() {
     load();
   };
 
-  const filtered = items.filter(i =>
-    (!filtroRsvp || i.rsvp === filtroRsvp) &&
-    (!filtroLato || i.lato === filtroLato) &&
-    (!filtroSito || i.fonte === 'sito') &&
-    !i.parent_id
-  );
   const childrenOf = id => items.filter(i => i.parent_id === id);
   const countSito = items.filter(i => i.fonte === 'sito').length;
 
@@ -102,6 +123,90 @@ export default function Ospiti() {
   const declinati = items.filter(i => i.rsvp === 'declinato').length;
   const adulti = items.filter(i => i.tipo === 'adulto' && i.rsvp === 'confermato').length;
   const bambini = items.filter(i => i.tipo === 'bambino' && i.rsvp === 'confermato').length;
+
+  // filtering + sort pipeline
+  const mainGuests = items.filter(i => !i.parent_id);
+
+  const afterFiltri = mainGuests.filter(o =>
+    (!filtroRsvp || o.rsvp === filtroRsvp) &&
+    (!filtroLato || o.lato === filtroLato) &&
+    (!filtroSito || o.fonte === 'sito')
+  );
+
+  const q = search.toLowerCase().trim();
+  const afterSearch = q
+    ? afterFiltri.filter(o =>
+        (o.nome || '').toLowerCase().includes(q) ||
+        (o.cognome || '').toLowerCase().includes(q) ||
+        (o.tavolo_nome || '').toLowerCase().includes(q) ||
+        (o.intolleranze || '').toLowerCase().includes(q) ||
+        childrenOf(o.id).some(c =>
+          (c.nome || '').toLowerCase().includes(q) ||
+          (c.cognome || '').toLowerCase().includes(q)
+        )
+      )
+    : afterFiltri;
+
+  const onSort = col => {
+    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(col); setSortDir('asc'); }
+    setPage(1);
+  };
+
+  const getSortVal = o => {
+    if (sortKey === 'nome') return `${o.cognome || ''} ${o.nome || ''}`.trim().toLowerCase();
+    if (sortKey === 'rsvp') return o.rsvp || '';
+    if (sortKey === 'lato') return o.lato || '';
+    if (sortKey === 'tavolo') return o.tavolo_nome || '';
+    return `${o.cognome || ''} ${o.nome || ''}`.trim().toLowerCase();
+  };
+
+  const sorted = [...afterSearch].sort((a, b) => {
+    const av = getSortVal(a), bv = getSortVal(b);
+    return sortDir === 'asc' ? av.localeCompare(bv, 'it') : bv.localeCompare(av, 'it');
+  });
+
+  const totalPages = perPage > 0 ? Math.ceil(sorted.length / perPage) : 1;
+  const paginated = perPage > 0 ? sorted.slice((page - 1) * perPage, page * perPage) : sorted;
+
+  // bulk actions
+  const toggleSelect = id => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const toggleSelectAll = () =>
+    setSelected(selected.size === paginated.length && paginated.length > 0
+      ? new Set()
+      : new Set(paginated.map(o => o.id))
+    );
+
+  const bulkDelete = async () => {
+    if (!confirm(`Eliminare ${selected.size} ospiti selezionati?`)) return;
+    for (const id of selected) await api.delete(`/ospiti/${id}`);
+    setSelected(new Set());
+    load();
+  };
+
+  const bulkSetRsvp = async rsvp => {
+    for (const id of selected) {
+      const o = items.find(i => i.id === id);
+      if (o) await api.put(`/ospiti/${id}`, { ...o, rsvp });
+    }
+    setSelected(new Set());
+    load();
+  };
+
+  const bulkSetTavolo = async val => {
+    const tavolo_id = val === '' ? null : parseInt(val);
+    for (const id of selected) {
+      const o = items.find(i => i.id === id);
+      if (o) await api.put(`/ospiti/${id}`, { ...o, tavolo_id: isNaN(tavolo_id) ? null : tavolo_id });
+    }
+    setSelected(new Set());
+    load();
+  };
 
   const exportPDF = () => {
     setExporting(true);
@@ -140,11 +245,11 @@ export default function Ospiti() {
 
       // Table — ospiti principali + figli/partner come sub-righe
       const rsvpText = { confermato: 'Confermato', declinato: 'Declinato', attesa: 'In attesa' };
-      const mainGuests = items.filter(o => !o.parent_id);
+      const mainGuestsPdf = items.filter(o => !o.parent_id);
       const rows = [];
       const childRowIndices = new Set();
       let rowIdx = 0;
-      for (const o of mainGuests) {
+      for (const o of mainGuestsPdf) {
         rows.push([
           o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
           latoLabel[o.lato] || o.lato,
@@ -155,7 +260,6 @@ export default function Ospiti() {
           o.fonte === 'sito' ? 'Da sito' : 'Lista',
         ]);
         rowIdx++;
-        // Figli e partner collegati
         for (const c of items.filter(c => c.parent_id === o.id)) {
           rows.push([
             `  > ${c.cognome ? `${c.cognome} ${c.nome}` : c.nome}`,
@@ -189,14 +293,12 @@ export default function Ospiti() {
         },
         didParseCell: data => {
           if (data.section === 'body') {
-            // Sub-righe (figli/partner): testo più chiaro
             if (childRowIndices.has(data.row.index)) {
               data.cell.styles.textColor = [120, 130, 140];
               data.cell.styles.fillColor = [248, 250, 252];
               data.cell.styles.fontSize = 8;
               data.cell.styles.fontStyle = 'italic';
             }
-            // Colore RSVP
             if (data.column.index === 3) {
               const v = data.cell.raw;
               if (v === 'Confermato') data.cell.styles.textColor = childRowIndices.has(data.row.index) ? [134, 200, 155] : [22, 163, 74];
@@ -256,41 +358,79 @@ export default function Ospiti() {
         ))}
       </div>
 
-      {/* Filtri */}
-      <div className="card mb-4 flex flex-wrap gap-2">
-        <button className={`badge px-3 py-1.5 cursor-pointer ${!filtroRsvp ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroRsvp('')}>Tutti</button>
-        {RSVP.map(r => (
-          <button key={r} className={`badge px-3 py-1.5 cursor-pointer ${filtroRsvp === r ? 'bg-rose-500 text-white' : rsvpColor[r]}`} onClick={() => setFiltroRsvp(r === filtroRsvp ? '' : r)}>
-            {rsvpLabel[r]}
-          </button>
-        ))}
-        <div className="w-px bg-gray-200 mx-1" />
-        {LATO.map(l => (
-          <button key={l} className={`badge px-3 py-1.5 cursor-pointer ${filtroLato === l ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroLato(l === filtroLato ? '' : l)}>
-            {latoLabel[l]}
-          </button>
-        ))}
-        {countSito > 0 && (
-          <>
-            <div className="w-px bg-gray-200 mx-1" />
-            <button
-              className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroSito ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'}`}
-              onClick={() => setFiltroSito(v => !v)}>
-              <Globe size={11} /> Da sito ({countSito})
+      {/* Filtri + Ricerca */}
+      <div className="card mb-4">
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            className="form-input pl-9"
+            placeholder="Cerca nome, cognome, tavolo, intolleranze…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); setSelected(new Set()); }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className={`badge px-3 py-1.5 cursor-pointer ${!filtroRsvp ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+            onClick={() => { setFiltroRsvp(''); setPage(1); setSelected(new Set()); }}>Tutti</button>
+          {RSVP.map(r => (
+            <button key={r} className={`badge px-3 py-1.5 cursor-pointer ${filtroRsvp === r ? 'bg-rose-500 text-white' : rsvpColor[r]}`}
+              onClick={() => { setFiltroRsvp(r === filtroRsvp ? '' : r); setPage(1); setSelected(new Set()); }}>
+              {rsvpLabel[r]}
             </button>
-          </>
-        )}
+          ))}
+          <div className="w-px bg-gray-200 mx-1" />
+          {LATO.map(l => (
+            <button key={l} className={`badge px-3 py-1.5 cursor-pointer ${filtroLato === l ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+              onClick={() => { setFiltroLato(l === filtroLato ? '' : l); setPage(1); setSelected(new Set()); }}>
+              {latoLabel[l]}
+            </button>
+          ))}
+          {countSito > 0 && (
+            <>
+              <div className="w-px bg-gray-200 mx-1" />
+              <button
+                className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroSito ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'}`}
+                onClick={() => { setFiltroSito(v => !v); setPage(1); setSelected(new Set()); }}>
+                <Globe size={11} /> Da sito ({countSito})
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="card mb-4 flex flex-wrap items-center gap-3 bg-rose-50 border-rose-200">
+          <span className="text-sm font-semibold text-rose-700">{selected.size} selezionati</span>
+          <select className="form-input w-auto text-sm py-1" defaultValue=""
+            onChange={e => { if (e.target.value) { bulkSetRsvp(e.target.value); e.target.value = ''; } }}>
+            <option value="" disabled>Cambia RSVP…</option>
+            {RSVP.map(r => <option key={r} value={r}>{rsvpLabel[r]}</option>)}
+          </select>
+          <select className="form-input w-auto text-sm py-1" defaultValue="placeholder"
+            onChange={e => { if (e.target.value !== 'placeholder') { bulkSetTavolo(e.target.value); e.target.value = 'placeholder'; } }}>
+            <option value="placeholder" disabled>Assegna tavolo…</option>
+            <option value="">— Nessun tavolo —</option>
+            {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+          <button className="btn-danger text-sm py-1 px-3 inline-flex items-center gap-1" onClick={bulkDelete}>
+            <Trash2 size={14} /> Elimina
+          </button>
+          <button className="text-sm text-gray-500 hover:text-gray-700 ml-auto" onClick={() => setSelected(new Set())}>
+            Annulla selezione
+          </button>
+        </div>
+      )}
 
       {/* Mobile card view */}
       <div className="sm:hidden space-y-3">
         {confermati > 0 && (
           <div className="text-xs text-gray-400 px-1">Confermati: {adulti} adulti + {bambini} bambini</div>
         )}
-        {filtered.length === 0 && (
+        {afterSearch.length === 0 && (
           <div className="card text-center py-10 text-gray-400">Nessun ospite</div>
         )}
-        {filtered.map(o => {
+        {afterSearch.map(o => {
           const Icon = rsvpIcon[o.rsvp];
           return (
             <Fragment key={o.id}>
@@ -354,27 +494,36 @@ export default function Ospiti() {
           </div>
         )}
         <div className="table-wrapper">
-          <table>
+          <table className="table-pin-first">
             <thead>
               <tr>
-                <th>Nome</th>
-                <th>Lato</th>
+                <th className="w-10 text-center">
+                  <input type="checkbox"
+                    checked={selected.size === paginated.length && paginated.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+                <SortTh label="Nome" col="nome" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="Lato" col="lato" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                 <th>Tipo</th>
-                <th>RSVP</th>
-                <th>Tavolo</th>
+                <SortTh label="RSVP" col="rsvp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="Tavolo" col="tavolo" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                 <th>Intolleranze</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-10 text-gray-400">Nessun ospite</td></tr>
+              {paginated.length === 0 && (
+                <tr><td colSpan={8} className="text-center py-10 text-gray-400">Nessun ospite</td></tr>
               )}
-              {filtered.map(o => {
+              {paginated.map(o => {
                 const Icon = rsvpIcon[o.rsvp];
                 return (
                   <Fragment key={o.id}>
                     <tr>
+                      <td className="text-center">
+                        <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
+                      </td>
                       <td className="font-medium text-gray-900">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</td>
                       <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
                       <td className="text-gray-500 text-sm capitalize">Adulto</td>
@@ -406,6 +555,7 @@ export default function Ospiti() {
                       const isPartner = c.tipo !== 'bambino';
                       return (
                         <tr key={c.id} className={isPartner ? 'bg-rose-50/40' : 'bg-purple-50/40'}>
+                          <td />
                           <td className="text-gray-600 text-sm">
                             {isPartner
                               ? <Heart size={12} className="inline mr-1 text-rose-300" />
@@ -440,6 +590,31 @@ export default function Ospiti() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Paginazione */}
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Righe per pagina:</span>
+            <select className="form-input w-auto text-xs py-1" value={perPage}
+              onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}>
+              {[10, 25, 50, 0].map(n => <option key={n} value={n}>{n === 0 ? 'Tutti' : n}</option>)}
+            </select>
+            <span className="text-xs text-gray-400">{sorted.length} risultati</span>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button disabled={page === 1} onClick={() => setPage(1)}
+                className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">«</button>
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">‹</button>
+              <span className="text-xs px-2 text-gray-600">{page} / {totalPages}</span>
+              <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
+                className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">›</button>
+              <button disabled={page === totalPages} onClick={() => setPage(totalPages)}
+                className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">»</button>
+            </div>
+          )}
         </div>
       </div>
 

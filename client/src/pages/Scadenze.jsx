@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CheckCircle, Circle, AlertCircle, FileText, Plane, DollarSign, Lock } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle, Circle, AlertCircle, FileText, Plane, DollarSign, Lock, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { format, parseISO, isPast, isToday } from 'date-fns';
@@ -20,6 +20,8 @@ const formatEuro = n => n ? new Intl.NumberFormat('it-IT', { style: 'currency', 
 
 const empty = { titolo: '', descrizione: '', data_scadenza: '', categoria: 'Altro', priorita: 'media', completata: false };
 
+const prioritaOrder = { alta: 0, media: 1, bassa: 2 };
+
 export default function Scadenze() {
   const [items, setItems] = useState([]);
   const [modal, setModal] = useState(false);
@@ -27,6 +29,11 @@ export default function Scadenze() {
   const [editId, setEditId] = useState(null);
   const [mostraCompletate, setMostraCompletate] = useState(false);
   const [filtroSource, setFiltroSource] = useState('');
+
+  // new state
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('data');
+  const [sortDir, setSortDir] = useState('asc');
 
   const load = () => api.get('/scadenze').then(r => setItems(r.data));
   useEffect(() => { load(); }, []);
@@ -55,9 +62,39 @@ export default function Scadenze() {
 
   const isManuale = s => s.source === 'manuale';
 
+  const onSortToggle = key => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const sortItems = arr => {
+    if (!sortKey) return arr;
+    return [...arr].sort((a, b) => {
+      if (sortKey === 'titolo') {
+        const av = a.titolo || '', bv = b.titolo || '';
+        return sortDir === 'asc' ? av.localeCompare(bv, 'it') : bv.localeCompare(av, 'it');
+      }
+      if (sortKey === 'data') {
+        const av = a.data_scadenza || '9999-99-99';
+        const bv = b.data_scadenza || '9999-99-99';
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      if (sortKey === 'priorita') {
+        const av = prioritaOrder[a.priorita] ?? 1;
+        const bv = prioritaOrder[b.priorita] ?? 1;
+        return sortDir === 'asc' ? av - bv : bv - av;
+      }
+      return 0;
+    });
+  };
+
   const visibili = items.filter(i => {
     if (i.completata && !mostraCompletate) return false;
     if (filtroSource && i.source !== filtroSource) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(i.titolo || '').toLowerCase().includes(q) && !(i.descrizione || '').toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -83,7 +120,6 @@ export default function Scadenze() {
         : isOggiFlag ? 'bg-yellow-50 border-yellow-200'
         : 'bg-white border-gray-100'
       }`}>
-        {/* Toggle — solo per manuali */}
         {manuale ? (
           <button onClick={() => toggle(s)} className="mt-0.5 flex-shrink-0">
             {s.completata
@@ -101,9 +137,7 @@ export default function Scadenze() {
             <span className={`font-semibold text-sm ${s.completata ? 'line-through text-gray-400' : 'text-gray-900'}`}>
               {s.titolo}
             </span>
-            {/* Badge priorità */}
             <span className={`badge ${prioritaColor[s.priorita]}`}>{prioritaLabel[s.priorita] || s.priorita}</span>
-            {/* Badge source */}
             {src && (
               <span className={`badge flex items-center gap-1 ${src.color}`}>
                 <SrcIcon size={10} />{src.label}
@@ -115,7 +149,6 @@ export default function Scadenze() {
 
           {s.descrizione && <p className="text-xs text-gray-500 mt-0.5">{s.descrizione}</p>}
 
-          {/* Info aggiuntive per scadenze auto */}
           {s.source === 'preventivo' && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">{formatEuro(s.importo)} · Stato: {statoPreventivo[s.stato] ?? s.stato}</p>
           )}
@@ -148,12 +181,21 @@ export default function Scadenze() {
     );
   };
 
-  const Section = ({ title, items }) => items.length === 0 ? null : (
-    <div className="mb-6">
-      <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wide mb-3">{title} ({items.length})</h2>
-      <div className="space-y-2">{items.map(s => <ScadenzaCard key={s.id} s={s} />)}</div>
-    </div>
-  );
+  const Section = ({ title, items: sectionItems }) => {
+    const displayItems = sortItems(sectionItems);
+    if (displayItems.length === 0) return null;
+    return (
+      <div className="mb-6">
+        <h2
+          className="text-sm font-bold text-gray-600 uppercase tracking-wide mb-3"
+          style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 5, paddingTop: '0.375rem', paddingBottom: '0.375rem', marginTop: '-0.375rem' }}
+        >
+          {title} ({displayItems.length})
+        </h2>
+        <div className="space-y-2">{displayItems.map(s => <ScadenzaCard key={s.id} s={s} />)}</div>
+      </div>
+    );
+  };
 
   const scaduteVis  = visibili.filter(i => !i.completata && i.data_scadenza && isPast(parseISO(i.data_scadenza)) && !isToday(parseISO(i.data_scadenza)));
   const oggiVis     = visibili.filter(i => !i.completata && i.data_scadenza && isToday(parseISO(i.data_scadenza)));
@@ -184,23 +226,55 @@ export default function Scadenze() {
         </div>
       )}
 
-      {/* Filtri */}
-      <div className="card mb-4 flex flex-wrap gap-2">
-        <button className={`badge px-3 py-1.5 cursor-pointer ${!filtroSource ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroSource('')}>
-          Tutte ({pendenti.length})
-        </button>
-        <button className={`badge px-3 py-1.5 cursor-pointer ${filtroSource === 'manuale' ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroSource(f => f === 'manuale' ? '' : 'manuale')}>
-          ✏️ Manuali ({items.filter(i => i.source === 'manuale' && !i.completata).length})
-        </button>
-        {Object.entries(sourceInfo).map(([key, info]) => {
-          const count = items.filter(i => i.source === key && !i.completata).length;
-          if (count === 0) return null;
-          return (
-            <button key={key} className={`badge px-3 py-1.5 cursor-pointer ${filtroSource === key ? 'bg-rose-500 text-white' : info.color}`} onClick={() => setFiltroSource(f => f === key ? '' : key)}>
-              {info.label} ({count})
+      {/* Filtri + Ricerca + Sort */}
+      <div className="card mb-4">
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            className="form-input pl-9"
+            placeholder="Cerca titolo, descrizione…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button className={`badge px-3 py-1.5 cursor-pointer ${!filtroSource ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroSource('')}>
+            Tutte ({pendenti.length})
+          </button>
+          <button className={`badge px-3 py-1.5 cursor-pointer ${filtroSource === 'manuale' ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-600'}`} onClick={() => setFiltroSource(f => f === 'manuale' ? '' : 'manuale')}>
+            ✏️ Manuali ({items.filter(i => i.source === 'manuale' && !i.completata).length})
+          </button>
+          {Object.entries(sourceInfo).map(([key, info]) => {
+            const count = items.filter(i => i.source === key && !i.completata).length;
+            if (count === 0) return null;
+            return (
+              <button key={key} className={`badge px-3 py-1.5 cursor-pointer ${filtroSource === key ? 'bg-rose-500 text-white' : info.color}`} onClick={() => setFiltroSource(f => f === key ? '' : key)}>
+                {info.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-400">Ordina:</span>
+          {[
+            { label: 'Data', key: 'data' },
+            { label: 'Priorità', key: 'priorita' },
+            { label: 'Titolo', key: 'titolo' },
+          ].map(({ label, key }) => (
+            <button
+              key={key}
+              className={`text-xs px-2 py-1 rounded border inline-flex items-center gap-1 transition-colors ${
+                sortKey === key
+                  ? 'border-rose-300 text-rose-600 bg-rose-50'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+              onClick={() => onSortToggle(key)}
+            >
+              {label}
+              {sortKey === key && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
       <Section title="Scadute" items={scaduteVis} />

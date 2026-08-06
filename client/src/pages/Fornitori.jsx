@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Phone, Mail, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, Phone, Mail, User, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import api from '../api';
 
 const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Location', 'Chiesa', 'Viaggio di nozze', 'Inviti', 'Bomboniere', 'Decorazioni', 'Altro'];
 const STATI = ['da_contattare', 'contattato', 'preventivo_ricevuto', 'confermato', 'escluso'];
 const statoColor = { da_contattare: 'bg-gray-100 text-gray-600', contattato: 'bg-blue-100 text-blue-600', preventivo_ricevuto: 'bg-yellow-100 text-yellow-700', confermato: 'bg-green-100 text-green-700', escluso: 'bg-red-100 text-red-600' };
 const statoLabel = { da_contattare: 'Da contattare', contattato: 'Contattato', preventivo_ricevuto: 'Preventivo ricevuto', confermato: 'Confermato', escluso: 'Escluso' };
+const statoOrder = { da_contattare: 0, contattato: 1, preventivo_ricevuto: 2, confermato: 3, escluso: 4 };
 
 const empty = { categoria: 'Fotografo', nome: '', contatto: '', telefono: '', email: '', note: '', stato: 'da_contattare' };
 
@@ -14,7 +15,9 @@ export default function Fornitori() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
-  const [filtro, setFiltro] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('nome');
+  const [sortDir, setSortDir] = useState('asc');
 
   const load = () => api.get('/fornitori').then(r => setItems(r.data));
   useEffect(() => { load(); }, []);
@@ -36,9 +39,33 @@ export default function Fornitori() {
     load();
   };
 
-  const filtered = items.filter(i =>
-    !filtro || i.nome.toLowerCase().includes(filtro.toLowerCase()) || i.categoria.toLowerCase().includes(filtro.toLowerCase())
-  );
+  const onSortToggle = key => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const q = search.toLowerCase().trim();
+  const afterSearch = q
+    ? items.filter(i =>
+        i.nome.toLowerCase().includes(q) ||
+        i.categoria.toLowerCase().includes(q) ||
+        (i.contatto || '').toLowerCase().includes(q) ||
+        (statoLabel[i.stato] || '').toLowerCase().includes(q)
+      )
+    : items;
+
+  const sorted = [...afterSearch].sort((a, b) => {
+    if (sortKey === 'stato') {
+      const av = statoOrder[a.stato] ?? 0;
+      const bv = statoOrder[b.stato] ?? 0;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    }
+    let av = '', bv = '';
+    if (sortKey === 'nome') { av = a.nome || ''; bv = b.nome || ''; }
+    else if (sortKey === 'categoria') { av = a.categoria || ''; bv = b.categoria || ''; }
+    else { av = a.nome || ''; bv = b.nome || ''; }
+    return sortDir === 'asc' ? av.localeCompare(bv, 'it') : bv.localeCompare(av, 'it');
+  });
 
   return (
     <div>
@@ -51,16 +78,41 @@ export default function Fornitori() {
       </div>
 
       <div className="card mb-4">
-        <input
-          className="form-input"
-          placeholder="Cerca per nome o categoria..."
-          value={filtro}
-          onChange={e => setFiltro(e.target.value)}
-        />
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            className="form-input pl-9"
+            placeholder="Cerca per nome, categoria, referente…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-400">Ordina:</span>
+          {[
+            { label: 'Nome', key: 'nome' },
+            { label: 'Categoria', key: 'categoria' },
+            { label: 'Stato', key: 'stato' },
+          ].map(({ label, key }) => (
+            <button
+              key={key}
+              className={`text-xs px-2 py-1 rounded border inline-flex items-center gap-1 transition-colors ${
+                sortKey === key
+                  ? 'border-rose-300 text-rose-600 bg-rose-50'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+              onClick={() => onSortToggle(key)}
+            >
+              {label}
+              {sortKey === key && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+            </button>
+          ))}
+          <span className="text-xs text-gray-400 ml-auto">{sorted.length} risultati</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map(f => (
+        {sorted.map(f => (
           <div key={f.id} className="card group">
             <div className="flex items-start justify-between mb-3">
               <div>
@@ -91,7 +143,7 @@ export default function Fornitori() {
             </div>
           </div>
         ))}
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <div className="col-span-full text-center py-12 text-gray-400">
             <User size={40} className="mx-auto mb-2 opacity-30" />
             <p>Nessun fornitore trovato</p>

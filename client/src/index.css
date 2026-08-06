@@ -232,6 +232,8 @@ body {
 /* ── Table ──────────────────────────────────────────────────── */
 .table-wrapper {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
 }
 
 table {
@@ -250,6 +252,9 @@ thead th {
   letter-spacing: 0.05em;
   border-bottom: 1px solid #f3f4f6;
   background: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 tbody td {
@@ -259,6 +264,25 @@ tbody td {
 }
 
 tbody tr:hover td {
+  background: #fafafa;
+}
+
+/* ── Prima colonna pinned ───────────────────────────────────── */
+.table-pin-first th:first-child,
+.table-pin-first td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: white;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+}
+
+.table-pin-first thead th:first-child {
+  z-index: 15;
+  background: #fafafa;
+}
+
+.table-pin-first tbody tr:hover td:first-child {
   background: #fafafa;
 }
 
