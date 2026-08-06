@@ -134,7 +134,11 @@ export default function Ospiti() {
   };
 
   const del = async id => {
-    if (!confirm('Eliminare questo ospite?')) return;
+    const deps = items.filter(i => i.parent_id === id);
+    const msg = deps.length > 0
+      ? `Eliminare questo ospite? Verranno eliminati anche ${deps.length} familiare/i collegati (partner/figli).`
+      : 'Eliminare questo ospite?';
+    if (!confirm(msg)) return;
     await api.delete(`/ospiti/${id}`);
     load();
   };
@@ -166,7 +170,8 @@ export default function Ospiti() {
         (o.intolleranze || '').toLowerCase().includes(q) ||
         childrenOf(o.id).some(c =>
           (c.nome || '').toLowerCase().includes(q) ||
-          (c.cognome || '').toLowerCase().includes(q)
+          (c.cognome || '').toLowerCase().includes(q) ||
+          (c.intolleranze || '').toLowerCase().includes(q)
         )
       )
     : afterFiltri;
@@ -709,6 +714,12 @@ export default function Ospiti() {
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
+              {form.messaggio_ospite && (
+                <div>
+                  <label className="form-label">Messaggio dall'ospite <span className="font-normal text-gray-400">(da sito)</span></label>
+                  <textarea className="form-input text-gray-500 italic" rows={2} value={form.messaggio_ospite} onChange={e => setForm({ ...form, messaggio_ospite: e.target.value })} />
+                </div>
+              )}
 
               {/* Partner e figli — visibili anche in edit, solo per ospiti master */}
               {!form.parent_id && (
