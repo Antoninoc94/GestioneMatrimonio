@@ -258,20 +258,48 @@ export default function Tavoli() {
         y += rowH + ROW_GAP;
       }
 
-      // Senza Tavolo
+      // Senza Tavolo — raggruppati per nucleo familiare
       if (senzaTavolo.length > 0) {
-        const sectionH = 14 + Math.ceil(senzaTavolo.length / 3) * 5;
+        const senzaLines = buildGuestLines(senzaTavolo);
+        // Aggiungi orfani (figlio/partner il cui genitore è già stato assegnato)
+        const senzaIds = new Set(senzaTavolo.map(o => o.id));
+        senzaTavolo.filter(o => o.parent_id && !senzaIds.has(o.parent_id))
+          .forEach(o => senzaLines.push({ o, indent: true }));
+
+        const LINE_H = 5.5;
+        const HALF = Math.ceil(senzaLines.length / 2);
+        const sectionH = 12 + HALF * LINE_H + 4;
+
         if (y + sectionH > PAGE_H - FOOTER_H) { doc.addPage(); y = 14; }
+
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...rose);
-        doc.text(`OSPITI SENZA TAVOLO (${senzaTavolo.length})`, 14, y + 5);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(55, 65, 81);
-        senzaTavolo.forEach((o, i) => {
+        doc.text(`OSPITI SENZA TAVOLO (${senzaTavolo.length})`, LEFT, y + 6);
+        y += 12;
+
+        const COL2_X = LEFT + COL_W + GAP;  // 111
+        const MAX_W = COL_W;
+
+        senzaLines.forEach(({ o, indent }, i) => {
+          const isRight = i >= HALF;
+          const row = isRight ? i - HALF : i;
+          const cx = isRight ? COL2_X : LEFT;
+          const cy = y + row * LINE_H;
           const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
-          doc.text(`• ${name}`, 14 + (i % 3) * 61, y + 11 + Math.floor(i / 3) * 5);
+
+          if (indent) {
+            const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'italic');
+            doc.setTextColor(120, 130, 140);
+            doc.text(doc.splitTextToSize(`  > ${name} [${rel}]`, MAX_W - 4)[0], cx + 4, cy);
+          } else {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(55, 65, 81);
+            doc.text(doc.splitTextToSize(`- ${name}`, MAX_W)[0], cx, cy);
+          }
         });
       }
 
