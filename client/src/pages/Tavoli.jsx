@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import api from '../api';
 
@@ -55,6 +55,13 @@ export default function Tavoli() {
     const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
     return pn ? `${base} (${rel} di ${pn})` : base;
   };
+  const [collapsedTavoli, setCollapsedTavoli] = useState(new Set());
+  const toggleCollapse = id => setCollapsedTavoli(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
   const [exporting, setExporting] = useState(false);
   const [exportingCards, setExportingCards] = useState(false);
   const [vistaCompatta, setVistaCompatta] = useState(false);
@@ -534,14 +541,25 @@ export default function Tavoli() {
         {tavoli.map(t => {
           const pct = Math.round((t.ospiti.length / t.capienza) * 100);
           const pieno = t.ospiti.length >= t.capienza;
+          const collapsed = collapsedTavoli.has(t.id);
           return (
             <div key={t.id} className={`card ${pieno ? 'border-orange-200' : ''}`}>
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-bold text-gray-900">{t.nome}</h3>
+              {/* Header — cliccabile per collapse */}
+              <div
+                className="flex items-center gap-2 mb-2 cursor-pointer select-none"
+                onClick={() => toggleCollapse(t.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
+                    {t.nome}
+                    <ChevronDown
+                      size={14}
+                      className={`text-gray-400 transition-transform duration-200 flex-shrink-0 ${collapsed ? '-rotate-90' : ''}`}
+                    />
+                  </h3>
                   <div className="text-xs text-gray-400">Capienza: {t.capienza} posti</div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(t)}><Pencil size={13} /></button>
                   <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(t.id)}><Trash2 size={13} /></button>
                 </div>
@@ -554,9 +572,9 @@ export default function Tavoli() {
                 <span className={`text-xs font-bold ${pieno ? 'text-orange-500' : 'text-gray-500'}`}>{t.ospiti.length}/{t.capienza}</span>
               </div>
 
-              {t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
+              {!collapsed && t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
 
-              <div className="space-y-1.5">
+              {!collapsed && <div className="space-y-1.5">
                 {(() => {
                   const mainGuests = t.ospiti.filter(o => !o.parent_id);
                   const getFamily = id => t.ospiti.filter(o => o.parent_id === id);
@@ -615,7 +633,7 @@ export default function Tavoli() {
                     {senzaTavolo.map(o => <option key={o.id} value={o.id}>{guestLabel(o)}</option>)}
                   </select>
                 )}
-              </div>
+              </div>}
             </div>
           );
         })}
