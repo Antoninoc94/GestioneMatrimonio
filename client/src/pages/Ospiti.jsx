@@ -193,6 +193,9 @@ export default function Ospiti() {
     for (const id of selected) {
       const o = items.find(i => i.id === id);
       if (o) await api.put(`/ospiti/${id}`, { ...o, rsvp });
+      for (const c of items.filter(i => i.parent_id === id)) {
+        await api.put(`/ospiti/${c.id}`, { ...c, rsvp });
+      }
     }
     setSelected(new Set());
     load();
