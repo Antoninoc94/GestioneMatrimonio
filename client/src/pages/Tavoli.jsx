@@ -339,7 +339,7 @@ export default function Tavoli() {
             <div className="relative flex-1 min-w-40">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               <input
-                className="form-input pl-8 py-1.5 text-sm"
+                className="form-input pl-9 py-1.5 text-sm"
                 placeholder="Cerca ospite…"
                 value={searchSenza}
                 onChange={e => setSearchSenza(e.target.value)}
