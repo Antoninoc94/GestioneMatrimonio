@@ -153,16 +153,24 @@ export default function Tavoli() {
       const ROW_GAP = 4;
 
       // Build ordered guest lines per table (main guests + their children/partners indented)
-      const buildGuestLines = ospiti => {
-        const lines = [];
-        const mains = ospiti.filter(o => !o.parent_id);
+      // tableOspiti = guests of this table; ospiti (closure) = all guests for parent lookup
+      const buildGuestLines = tableOspiti => {
+        const ospIds = new Set(tableOspiti.map(o => o.id));
+        // Mains: no parent, OR parent is in another table (orphan)
+        const mains = tableOspiti.filter(o => !o.parent_id || !ospIds.has(o.parent_id));
         const byParent = {};
-        ospiti.filter(o => o.parent_id).forEach(o => {
+        tableOspiti.filter(o => o.parent_id && ospIds.has(o.parent_id)).forEach(o => {
           (byParent[o.parent_id] = byParent[o.parent_id] || []).push(o);
         });
+        const lines = [];
         for (const o of mains) {
-          lines.push({ o, indent: false });
-          for (const c of byParent[o.id] || []) lines.push({ o: c, indent: true });
+          let parentNote = null;
+          if (o.parent_id) {
+            const p = ospiti.find(p => p.id === o.parent_id);
+            if (p) parentNote = p.cognome ? `${p.cognome} ${p.nome}` : p.nome;
+          }
+          lines.push({ o, indent: false, parentNote });
+          for (const c of byParent[o.id] || []) lines.push({ o: c, indent: true, parentNote: null });
         }
         return lines;
       };
@@ -210,7 +218,7 @@ export default function Tavoli() {
           doc.text('Nessun ospite assegnato', cx + CARD_PAD, cy + CARD_HEAD + CARD_PAD);
         } else {
           const lines = buildGuestLines(t.ospiti);
-          lines.forEach(({ o, indent }, idx) => {
+          lines.forEach(({ o, indent, parentNote }, idx) => {
             const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
             const prefix = indent ? '  > ' : '- ';
             const gy = cy + CARD_HEAD + idx * GUEST_ROW;
@@ -223,8 +231,10 @@ export default function Tavoli() {
               doc.setFont('helvetica', 'normal');
               doc.setTextColor(55, 65, 81);
             }
-            const label = o.intolleranze ? `${prefix}${name}  (${o.intolleranze})` : `${prefix}${name}`;
-            doc.text(label, cx + CARD_PAD, gy);
+            let label = `${prefix}${name}`;
+            if (o.intolleranze) label += `  (${o.intolleranze})`;
+            if (parentNote) label += `  [di ${parentNote}]`;
+            doc.text(doc.splitTextToSize(label, COL_W - 2 * CARD_PAD)[0], cx + CARD_PAD, gy);
           });
         }
       };
@@ -261,10 +271,6 @@ export default function Tavoli() {
       // Senza Tavolo — raggruppati per nucleo familiare
       if (senzaTavolo.length > 0) {
         const senzaLines = buildGuestLines(senzaTavolo);
-        // Aggiungi orfani (figlio/partner il cui genitore è già stato assegnato)
-        const senzaIds = new Set(senzaTavolo.map(o => o.id));
-        senzaTavolo.filter(o => o.parent_id && !senzaIds.has(o.parent_id))
-          .forEach(o => senzaLines.push({ o, indent: true }));
 
         const LINE_H = 5.5;
         const HALF = Math.ceil(senzaLines.length / 2);
@@ -281,7 +287,7 @@ export default function Tavoli() {
         const COL2_X = LEFT + COL_W + GAP;  // 111
         const MAX_W = COL_W;
 
-        senzaLines.forEach(({ o, indent }, i) => {
+        senzaLines.forEach(({ o, indent, parentNote }, i) => {
           const isRight = i >= HALF;
           const row = isRight ? i - HALF : i;
           const cx = isRight ? COL2_X : LEFT;
@@ -298,7 +304,9 @@ export default function Tavoli() {
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(55, 65, 81);
-            doc.text(doc.splitTextToSize(`- ${name}`, MAX_W)[0], cx, cy);
+            let label = `- ${name}`;
+            if (parentNote) label += ` [di ${parentNote}]`;
+            doc.text(doc.splitTextToSize(label, MAX_W)[0], cx, cy);
           }
         });
       }
