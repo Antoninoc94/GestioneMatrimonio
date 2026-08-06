@@ -36,7 +36,7 @@ export default function Ospiti() {
 
   const resetExtra = () => {
     setConPartner(false);
-    setPartnerForm({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
+    setPartnerForm({ nome: '', cognome: '', rsvp: 'attesa', intolleranze: '' });
     setConFigli(false);
     setFigli([{ nome: '', eta: '', intolleranze: '' }]);
   };
@@ -473,7 +473,10 @@ export default function Ospiti() {
                 </div>
                 <div>
                   <label className="form-label">RSVP</label>
-                  <select className="form-input" value={form.rsvp} onChange={e => setForm({ ...form, rsvp: e.target.value })}>
+                  <select className="form-input" value={form.rsvp} onChange={e => {
+                    setForm({ ...form, rsvp: e.target.value });
+                    if (conPartner) setPartnerForm(p => ({ ...p, rsvp: e.target.value }));
+                  }}>
                     {RSVP.map(r => <option key={r} value={r}>{rsvpLabel[r]}</option>)}
                   </select>
                 </div>
@@ -508,7 +511,10 @@ export default function Ospiti() {
                 <div className="border-t border-gray-100 pt-3 space-y-3">
                   {/* Partner */}
                   <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" className="rounded" checked={conPartner} onChange={e => setConPartner(e.target.checked)} />
+                    <input type="checkbox" className="rounded" checked={conPartner} onChange={e => {
+                      setConPartner(e.target.checked);
+                      if (e.target.checked) setPartnerForm(p => ({ ...p, rsvp: form.rsvp }));
+                    }} />
                     <Heart size={14} className="text-rose-400" />
                     <span className="text-sm font-medium text-gray-700">Aggiungi partner / coniuge</span>
                   </label>
