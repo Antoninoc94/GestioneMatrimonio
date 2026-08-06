@@ -42,14 +42,14 @@ router.get('/trova', checkAbilitata, (req, res) => {
 
     // Carica il partner (adulto collegato tramite parent_id)
     const partner = db.prepare(`
-      SELECT id, nome, cognome, intolleranze FROM ospiti
+      SELECT id, nome, cognome, intolleranze, rsvp FROM ospiti
       WHERE parent_id = ? AND tipo != 'bambino'
       LIMIT 1
     `).get(principale.id);
 
     // Carica i figli (bambini collegati tramite parent_id)
     const figli = db.prepare(`
-      SELECT id, nome, eta, intolleranze FROM ospiti
+      SELECT id, nome, eta, intolleranze, rsvp FROM ospiti
       WHERE parent_id = ? AND tipo = 'bambino'
       ORDER BY id ASC
     `).all(principale.id);
@@ -112,9 +112,10 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
     db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND tipo = 'bambino'").run(mainId);
     for (const f of figli) {
       if (!f.nome?.trim()) continue;
+      const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
       db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id)
-                  VALUES (?, 'confermato', 'bambino', ?, ?, 'sito', ?)`)
-        .run(f.nome.trim(), f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainId);
+                  VALUES (?, ?, 'bambino', ?, ?, 'sito', ?)`)
+        .run(f.nome.trim(), fRsvp, f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainId);
     }
   }
 

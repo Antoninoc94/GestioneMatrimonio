@@ -11,7 +11,7 @@ const formatData = d => {
   return `${parseInt(g)} ${mesi[parseInt(m)-1]} ${y}`;
 };
 
-const emptyFiglio = () => ({ nome: '', eta: '', intolleranze: '' });
+const emptyFiglio = () => ({ nome: '', eta: '', intolleranze: '', rsvp: null });
 
 const BtnRsvp = ({ value, current, onChange }) => (
   <button type="button" onClick={() => onChange(value)}
@@ -40,6 +40,7 @@ export default function Conferma() {
 
   // Partner
   const [conPartner, setConPartner] = useState(false);
+  const [partnerRsvp, setPartnerRsvp] = useState(null);
   const [partnerNome, setPartnerNome] = useState('');
   const [partnerCognome, setPartnerCognome] = useState('');
   const [partnerIntolleranze, setPartnerIntolleranze] = useState('');
@@ -75,17 +76,18 @@ export default function Conferma() {
       // Pre-carica partner esistente se presente
       if (o.partner) {
         setConPartner(true);
+        setPartnerRsvp(o.partner.rsvp === 'confermato' || o.partner.rsvp === 'declinato' ? o.partner.rsvp : null);
         setPartnerNome(o.partner.nome || '');
         setPartnerCognome(o.partner.cognome || '');
         setPartnerIntolleranze(o.partner.intolleranze || '');
       } else {
-        setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
+        setConPartner(false); setPartnerRsvp(null); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
       }
 
       // Pre-carica figli esistenti se presenti
       if (o.figli && o.figli.length > 0) {
         setConFigli(true);
-        setFigli(o.figli.map(f => ({ nome: f.nome || '', eta: f.eta != null ? String(f.eta) : '', intolleranze: f.intolleranze || '' })));
+        setFigli(o.figli.map(f => ({ nome: f.nome || '', eta: f.eta != null ? String(f.eta) : '', intolleranze: f.intolleranze || '', rsvp: f.rsvp === 'confermato' || f.rsvp === 'declinato' ? f.rsvp : null })));
       } else {
         setConFigli(false); setFigli([emptyFiglio()]);
       }
@@ -104,7 +106,9 @@ export default function Conferma() {
   const rimuoviFiglio = i => setFigli(f => f.filter((_, idx) => idx !== i));
   const updateFiglio = (i, field, val) => setFigli(f => f.map((fig, idx) => idx === i ? { ...fig, [field]: val } : fig));
 
-  const canSubmit = rsvp && (!conFigli || figli.every(f => f.nome.trim()));
+  const canSubmit = rsvp
+    && (!conPartner || (partnerRsvp !== null && partnerNome.trim()))
+    && (!conFigli || figli.every(f => !f.nome.trim() || f.rsvp !== null));
 
   const invia = async () => {
     if (!canSubmit) return;
@@ -117,8 +121,8 @@ export default function Conferma() {
         rsvp,
         intolleranze,
         messaggio_ospite: messaggio,
-        partner: conPartner ? { nome: partnerNome, cognome: partnerCognome, rsvp: 'confermato', intolleranze: partnerIntolleranze } : null,
-        figli: conFigli ? figli.filter(f => f.nome.trim()) : [],
+        partner: conPartner && partnerNome.trim() ? { nome: partnerNome, cognome: partnerCognome, rsvp: partnerRsvp, intolleranze: partnerRsvp === 'confermato' ? partnerIntolleranze : '' } : null,
+        figli: conFigli ? figli.filter(f => f.nome.trim()).map(f => ({ ...f, intolleranze: f.rsvp === 'confermato' ? f.intolleranze : '' })) : [],
       });
       setInviato(true);
     } finally {
@@ -129,7 +133,7 @@ export default function Conferma() {
   const reset = () => {
     setOspite(null); setRsvp(null); setIntolleranze(''); setMessaggio('');
     setNome(''); setCognome(''); setErrore(''); setInviato(false);
-    setConPartner(false); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
+    setConPartner(false); setPartnerRsvp(null); setPartnerNome(''); setPartnerCognome(''); setPartnerIntolleranze('');
     setConFigli(false); setFigli([emptyFiglio()]);
   };
 
@@ -169,7 +173,7 @@ export default function Conferma() {
               <p className="text-gray-500 text-sm mb-1">{ospite.cognome ? `${ospite.cognome} ${ospite.nome}` : ospite.nome}</p>
               {conPartner && partnerNome && (
                 <p className="text-gray-400 text-xs mt-1">
-                  {partnerNome} {partnerCognome}: presente
+                  {partnerNome} {partnerCognome}: {partnerRsvp === 'confermato' ? 'presente' : 'non presente'}
                 </p>
               )}
               {conFigli && figli.filter(f => f.nome).length > 0 && (
@@ -238,6 +242,13 @@ export default function Conferma() {
                 </button>
                 {conPartner && (
                   <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">La sua risposta</p>
+                      <div className="flex gap-3">
+                        <BtnRsvp value="confermato" current={partnerRsvp} onChange={setPartnerRsvp} />
+                        <BtnRsvp value="declinato" current={partnerRsvp} onChange={setPartnerRsvp} />
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
@@ -252,12 +263,14 @@ export default function Conferma() {
                           value={partnerCognome} onChange={e => setPartnerCognome(e.target.value)} />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
-                      <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                        placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
-                        value={partnerIntolleranze} onChange={e => setPartnerIntolleranze(e.target.value)} />
-                    </div>
+                    {partnerRsvp === 'confermato' && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
+                        <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                          placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
+                          value={partnerIntolleranze} onChange={e => setPartnerIntolleranze(e.target.value)} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -287,6 +300,10 @@ export default function Conferma() {
                             </button>
                           )}
                         </div>
+                        <div className="flex gap-2">
+                          <BtnRsvp value="confermato" current={f.rsvp} onChange={v => updateFiglio(i, 'rsvp', v)} />
+                          <BtnRsvp value="declinato" current={f.rsvp} onChange={v => updateFiglio(i, 'rsvp', v)} />
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
                           <div className="col-span-2">
                             <label className="block text-xs text-gray-500 mb-1">Nome *</label>
@@ -302,12 +319,14 @@ export default function Conferma() {
                               value={f.eta} onChange={e => updateFiglio(i, 'eta', e.target.value)} />
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Allergie o intolleranze</label>
-                          <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
-                            placeholder="Es: lattosio (lascia vuoto se nessuna)"
-                            value={f.intolleranze} onChange={e => updateFiglio(i, 'intolleranze', e.target.value)} />
-                        </div>
+                        {f.rsvp === 'confermato' && (
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Allergie o intolleranze</label>
+                            <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
+                              placeholder="Es: lattosio (lascia vuoto se nessuna)"
+                              value={f.intolleranze} onChange={e => updateFiglio(i, 'intolleranze', e.target.value)} />
+                          </div>
+                        )}
                       </div>
                     ))}
                     <button type="button" onClick={aggFiglio}
