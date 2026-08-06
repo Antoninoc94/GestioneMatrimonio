@@ -210,14 +210,12 @@ export default function Conferma() {
                   <BtnRsvp value="confermato" current={rsvp} onChange={setRsvp} />
                   <BtnRsvp value="declinato" current={rsvp} onChange={setRsvp} />
                 </div>
-                {rsvp === 'confermato' && (
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
-                    <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                      placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
-                      value={intolleranze} onChange={e => setIntolleranze(e.target.value)} />
-                  </div>
-                )}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
+                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
+                    value={intolleranze} onChange={e => setIntolleranze(e.target.value)} />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Messaggio per gli sposi <span className="text-gray-400 font-normal">(opzionale)</span>
@@ -263,14 +261,12 @@ export default function Conferma() {
                           value={partnerCognome} onChange={e => setPartnerCognome(e.target.value)} />
                       </div>
                     </div>
-                    {partnerRsvp === 'confermato' && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
-                        <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                          placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
-                          value={partnerIntolleranze} onChange={e => setPartnerIntolleranze(e.target.value)} />
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Allergie o intolleranze</label>
+                      <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                        placeholder="Es: celiaco, lattosio... (lascia vuoto se nessuna)"
+                        value={partnerIntolleranze} onChange={e => setPartnerIntolleranze(e.target.value)} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -319,14 +315,12 @@ export default function Conferma() {
                               value={f.eta} onChange={e => updateFiglio(i, 'eta', e.target.value)} />
                           </div>
                         </div>
-                        {f.rsvp === 'confermato' && (
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">Allergie o intolleranze</label>
-                            <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
-                              placeholder="Es: lattosio (lascia vuoto se nessuna)"
-                              value={f.intolleranze} onChange={e => updateFiglio(i, 'intolleranze', e.target.value)} />
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Allergie o intolleranze</label>
+                          <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
+                            placeholder="Es: lattosio (lascia vuoto se nessuna)"
+                            value={f.intolleranze} onChange={e => updateFiglio(i, 'intolleranze', e.target.value)} />
+                        </div>
                       </div>
                     ))}
                     <button type="button" onClick={aggFiglio}
