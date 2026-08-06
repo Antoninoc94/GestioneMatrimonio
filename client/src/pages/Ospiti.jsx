@@ -419,8 +419,9 @@ export default function Ospiti() {
                               : <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>}
                           </td>
                           <td>
-                            <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-green-100 text-green-700'}`}>
-                              <Check size={10} />{rsvpLabel[c.rsvp] || 'Confermato'}
+                            <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-yellow-100 text-yellow-700'}`}>
+                              {(() => { const I = rsvpIcon[c.rsvp] || Clock; return <I size={10} />; })()}
+                              {rsvpLabel[c.rsvp] || 'In attesa'}
                             </span>
                           </td>
                           <td className="text-gray-400 text-xs">—</td>
