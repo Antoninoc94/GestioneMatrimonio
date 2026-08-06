@@ -65,7 +65,7 @@ export default function Ospiti() {
     setConPartner(false);
     setPartnerForm({ id: null, nome: '', cognome: '', rsvp: 'attesa', intolleranze: '' });
     setConFigli(false);
-    setFigli([{ id: null, nome: '', eta: '', intolleranze: '' }]);
+    setFigli([{ id: null, nome: '', eta: '', intolleranze: '', rsvp: 'attesa' }]);
   };
 
   const openNew = () => { setForm(empty); setEditId(null); resetExtra(); setModal(true); };
@@ -86,8 +86,8 @@ export default function Ospiti() {
 
     setConFigli(children.length > 0);
     setFigli(children.length > 0
-      ? children.map(c => ({ id: c.id, nome: c.nome || '', eta: c.eta != null ? String(c.eta) : '', intolleranze: c.intolleranze || '' }))
-      : [{ id: null, nome: '', eta: '', intolleranze: '' }]
+      ? children.map(c => ({ id: c.id, nome: c.nome || '', eta: c.eta != null ? String(c.eta) : '', intolleranze: c.intolleranze || '', rsvp: c.rsvp || 'attesa' }))
+      : [{ id: null, nome: '', eta: '', intolleranze: '', rsvp: 'attesa' }]
     );
 
     setModal(true);
@@ -111,7 +111,7 @@ export default function Ospiti() {
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          const fp = { nome: f.nome.trim(), tipo: 'bambino', rsvp: 'confermato', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
+          const fp = { nome: f.nome.trim(), tipo: 'bambino', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
           if (f.id) await api.put(`/ospiti/${f.id}`, fp);
           else await api.post('/ospiti', fp);
         }
@@ -125,7 +125,7 @@ export default function Ospiti() {
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          await api.post('/ospiti', { nome: f.nome.trim(), tipo: 'bambino', rsvp: 'confermato', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
+          await api.post('/ospiti', { nome: f.nome.trim(), tipo: 'bambino', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
         }
       }
     }
@@ -784,6 +784,12 @@ export default function Ospiti() {
                                 <input type="number" min="0" className="form-input" value={f.eta} onChange={e => setFigli(fs => fs.map((x, j) => j === i ? { ...x, eta: e.target.value } : x))} />
                               </div>
                             </div>
+                            <div>
+                              <label className="form-label">RSVP</label>
+                              <select className="form-input" value={f.rsvp} onChange={e => setFigli(fs => fs.map((x, j) => j === i ? { ...x, rsvp: e.target.value } : x))}>
+                                {RSVP.map(r => <option key={r} value={r}>{rsvpLabel[r]}</option>)}
+                              </select>
+                            </div>
                             <div className="flex gap-2 items-end">
                               <div className="flex-1">
                                 <label className="form-label">Intolleranze</label>
@@ -808,7 +814,7 @@ export default function Ospiti() {
                             </div>
                           </div>
                         ))}
-                        <button type="button" className="text-sm text-purple-600 font-medium flex items-center gap-1 hover:text-purple-800" onClick={() => setFigli(fs => [...fs, { id: null, nome: '', eta: '', intolleranze: '' }])}>
+                        <button type="button" className="text-sm text-purple-600 font-medium flex items-center gap-1 hover:text-purple-800" onClick={() => setFigli(fs => [...fs, { id: null, nome: '', eta: '', intolleranze: '', rsvp: 'attesa' }])}>
                           <Plus size={13} /> Aggiungi figlio
                         </button>
                       </div>
