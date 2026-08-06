@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
 /* ── Cursor reset globale ───────────────────────────────────────
-   Il browser mostra il cursore testo (I-beam) su qualsiasi nodo
-   di testo selezionabile. Forziamo il cursore freccia su tutto
-   e lo ripristiniamo solo sugli elementi interattivi.
+   Unlayered + !important: vince su tutto, utilities comprese.
 ──────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -22,289 +20,297 @@ a, button, [role="button"], summary,
 }
 
 /* ── Base ───────────────────────────────────────────────────── */
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #fafafa;
-  color: #1a1a1a;
-  margin: 0;
-}
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #fafafa;
+    color: #1a1a1a;
+    margin: 0;
+  }
 
-#root {
-  width: 100%;
-  text-align: left;
-}
-
-/* ── Sidebar ────────────────────────────────────────────────── */
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #6b7280;
-  transition: all 0.15s;
-  text-decoration: none;
-}
-
-.sidebar-link:hover {
-  background-color: #fff1f2;
-  color: #e11d48;
-}
-
-.sidebar-link.active {
-  background-color: #fff1f2;
-  color: #e11d48;
-}
-
-/* ── Card ───────────────────────────────────────────────────── */
-.card {
-  background: white;
-  border-radius: 0.75rem;
-  border: 1px solid #f3f4f6;
-  padding: 1rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
-}
-
-@media (min-width: 640px) {
-  .card {
-    padding: 1.5rem;
+  #root {
+    width: 100%;
+    text-align: left;
   }
 }
 
-/* ── Buttons ────────────────────────────────────────────────── */
-.btn-primary {
-  background: #e11d48;
-  color: white;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: none;
-  transition: background 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+/* ── Components — dentro @layer così le utilities Tailwind
+   (pl-9, text-sm, ecc.) possono sovrascrivere senza problemi ── */
+@layer components {
 
-.btn-primary:hover {
-  background: #be123c;
-}
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #6b7280;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
 
-.btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: none;
-  transition: background 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+  .sidebar-link:hover {
+    background-color: #fff1f2;
+    color: #e11d48;
+  }
 
-.btn-secondary:hover {
-  background: #e5e7eb;
-}
+  .sidebar-link.active {
+    background-color: #fff1f2;
+    color: #e11d48;
+  }
 
-.btn-danger {
-  background: #fef2f2;
-  color: #dc2626;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: none;
-  transition: background 0.15s;
-}
+  /* ── Card ─────────────────────────────────────────────────── */
+  .card {
+    background: white;
+    border-radius: 0.75rem;
+    border: 1px solid #f3f4f6;
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+  }
 
-.btn-danger:hover {
-  background: #fee2e2;
-}
+  @media (min-width: 640px) {
+    .card {
+      padding: 1.5rem;
+    }
+  }
 
-/* ── Form ───────────────────────────────────────────────────── */
-.form-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  font-size: 1rem; /* 16px — sotto soglia iOS fa auto-zoom indesiderato */
-  background: white;
-  transition: border-color 0.15s;
-  outline: none;
-}
+  /* ── Buttons ──────────────────────────────────────────────── */
+  .btn-primary {
+    background: #e11d48;
+    color: white;
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
-@media (min-width: 640px) {
+  .btn-primary:hover {
+    background: #be123c;
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .btn-danger {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    transition: background 0.15s;
+  }
+
+  .btn-danger:hover {
+    background: #fee2e2;
+  }
+
+  /* ── Form ─────────────────────────────────────────────────── */
   .form-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 1rem; /* 16px — sotto soglia iOS fa auto-zoom indesiderato */
+    background: white;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  @media (min-width: 640px) {
+    .form-input {
+      font-size: 0.875rem;
+    }
+  }
+
+  .form-input:focus {
+    border-color: #e11d48;
+    box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.1);
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.25rem;
+  }
+
+  /* ── Badge ────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* ── Modal ────────────────────────────────────────────────── */
+
+  /* Mobile: bottom sheet */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .modal {
+    background: white;
+    border-radius: 1rem 1rem 0 0;
+    padding: 0.25rem 1rem 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.12);
+  }
+
+  /* Drag handle visivo su mobile */
+  .modal::before {
+    content: '';
+    display: block;
+    width: 2.5rem;
+    height: 0.25rem;
+    background: #d1d5db;
+    border-radius: 9999px;
+    margin: 0.75rem auto 1rem;
+  }
+
+  /* Su schermi più grandi: overlay centrato, modal classica */
+  @media (min-width: 640px) {
+    .modal-overlay {
+      align-items: center;
+      padding: 1rem;
+    }
+    .modal {
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      max-width: 600px;
+      max-height: 90vh;
+    }
+    .modal::before {
+      display: none;
+    }
+  }
+
+  /* Grid a 2+ colonne dentro modal: su mobile collassa a 1 colonna */
+  @media (max-width: 639px) {
+    .modal .grid-cols-2,
+    .modal .grid-cols-3 {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── Table ────────────────────────────────────────────────── */
+  .table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 65vh;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 0.875rem;
   }
-}
 
-.form-input:focus {
-  border-color: #e11d48;
-  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.1);
-}
-
-.form-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.25rem;
-}
-
-/* ── Badge ──────────────────────────────────────────────────── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.6rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* ── Modal ──────────────────────────────────────────────────── */
-
-/* Mobile: bottom sheet */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal {
-  background: white;
-  border-radius: 1rem 1rem 0 0;
-  padding: 0.25rem 1rem 1.5rem;
-  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
-  width: 100%;
-  max-width: 100%;
-  max-height: 88vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  box-shadow: 0 -8px 40px rgba(0,0,0,0.12);
-}
-
-/* Drag handle visivo su mobile */
-.modal::before {
-  content: '';
-  display: block;
-  width: 2.5rem;
-  height: 0.25rem;
-  background: #d1d5db;
-  border-radius: 9999px;
-  margin: 0.75rem auto 1rem;
-}
-
-/* Su schermi più grandi: overlay centrato, modal classica */
-@media (min-width: 640px) {
-  .modal-overlay {
-    align-items: center;
-    padding: 1rem;
+  thead th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fafafa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
-  .modal {
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    max-width: 600px;
-    max-height: 90vh;
+
+  tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f9fafb;
+    color: #374151;
   }
-  .modal::before {
-    display: none;
+
+  tbody tr:hover td {
+    background: #fafafa;
   }
-}
 
-/* Grid a 2+ colonne dentro modal: su mobile collassa a 1 colonna */
-@media (max-width: 639px) {
-  .modal .grid-cols-2,
-  .modal .grid-cols-3 {
-    grid-template-columns: 1fr;
+  /* ── Prima colonna pinned ─────────────────────────────────── */
+  .table-pin-first th:first-child,
+  .table-pin-first td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: white;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.04);
   }
-}
 
-/* ── Table ──────────────────────────────────────────────────── */
-.table-wrapper {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 65vh;
-}
+  .table-pin-first thead th:first-child {
+    z-index: 15;
+    background: #fafafa;
+  }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
+  .table-pin-first tbody tr:hover td:first-child {
+    background: #fafafa;
+  }
 
-thead th {
-  text-align: left;
-  padding: 0.75rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid #f3f4f6;
-  background: #fafafa;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
+  /* ── Page header ──────────────────────────────────────────── */
+  .page-header {
+    margin-bottom: 1.5rem;
+  }
 
-tbody td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f9fafb;
-  color: #374151;
-}
-
-tbody tr:hover td {
-  background: #fafafa;
-}
-
-/* ── Prima colonna pinned ───────────────────────────────────── */
-.table-pin-first th:first-child,
-.table-pin-first td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  background: white;
-  box-shadow: 2px 0 4px rgba(0,0,0,0.04);
-}
-
-.table-pin-first thead th:first-child {
-  z-index: 15;
-  background: #fafafa;
-}
-
-.table-pin-first tbody tr:hover td:first-child {
-  background: #fafafa;
-}
-
-/* ── Page header ────────────────────────────────────────────── */
-.page-header {
-  margin-bottom: 1.5rem;
-}
-
-.page-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #111827;
-}
-
-@media (min-width: 640px) {
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
   }
-}
 
-.page-subtitle {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
-}
+  @media (min-width: 640px) {
+    .page-title {
+      font-size: 1.5rem;
+    }
+  }
+
+  .page-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+} /* end @layer components */
