@@ -153,9 +153,8 @@ export default function Ospiti() {
 
   const afterFiltri = mainGuests.filter(o => {
     const rsvpMatch = !filtroRsvp || o.rsvp === filtroRsvp || childrenOf(o.id).some(c => c.rsvp === filtroRsvp);
-    return rsvpMatch &&
-      (!filtroLato || o.lato === filtroLato) &&
-      (!filtroSito || o.fonte === 'sito');
+    const sitoMatch = !filtroSito || o.fonte === 'sito' || childrenOf(o.id).some(c => c.fonte === 'sito');
+    return rsvpMatch && sitoMatch && (!filtroLato || o.lato === filtroLato);
   });
 
   const q = search.toLowerCase().trim();
