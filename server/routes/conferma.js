@@ -109,13 +109,14 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
 
   // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione)
   if (Array.isArray(figli)) {
+    const mainFonte = db.prepare('SELECT fonte FROM ospiti WHERE id = ?').get(mainId)?.fonte || 'sito';
     db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND tipo = 'bambino'").run(mainId);
     for (const f of figli) {
       if (!f.nome?.trim()) continue;
       const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
       db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id)
-                  VALUES (?, ?, 'bambino', ?, ?, 'sito', ?)`)
-        .run(f.nome.trim(), fRsvp, f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainId);
+                  VALUES (?, ?, 'bambino', ?, ?, ?, ?)`)
+        .run(f.nome.trim(), fRsvp, f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainFonte, mainId);
     }
   }
 
