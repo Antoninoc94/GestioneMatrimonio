@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
-const { sendEmail } = require('../email');
+const { sendEmail, getDestinatari } = require('../email');
 
 router.get('/', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM note_veloci ORDER BY created_at DESC LIMIT 20').all());
@@ -19,8 +19,7 @@ router.post('/', auth, (req, res) => {
   const appCfg = db.prepare('SELECT app_name FROM config LIMIT 1').get();
   const appName = appCfg?.app_name || 'Il Nostro Matrimonio';
   const data = new Date(nota.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const emailCfg = db.prepare('SELECT from_email, smtp_user FROM email_config WHERE id = 1').get();
-  const dest = emailCfg?.from_email || emailCfg?.smtp_user;
+  const dest = getDestinatari();
   sendEmail({
     to: dest,
     subject: `📝 Nuova nota — ${appName}`,

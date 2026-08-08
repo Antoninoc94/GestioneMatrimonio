@@ -6,6 +6,19 @@ function getConfig() {
   return db.prepare('SELECT * FROM email_config WHERE id = 1').get();
 }
 
+// Raccoglie tutte le email degli utenti registrati.
+// Se nessun utente ha un'email, usa l'indirizzo SMTP configurato come fallback.
+function getDestinatari(cfg) {
+  if (!cfg) cfg = getConfig();
+  const utenti = db.prepare("SELECT email FROM users WHERE email IS NOT NULL AND email != ''").all();
+  const emails = utenti.map(u => u.email);
+  if (emails.length === 0) {
+    const fallback = cfg?.from_email || cfg?.smtp_user;
+    if (fallback) emails.push(fallback);
+  }
+  return emails.join(', ') || null;
+}
+
 function getTransporter(cfg) {
   if (!cfg) cfg = getConfig();
   if (!cfg?.enabled || !cfg.smtp_user || !cfg.smtp_password) return null;
@@ -43,7 +56,7 @@ async function sendTestEmail() {
   const transporter = getTransporter(cfg);
   if (!transporter) throw new Error('Email non configurata o disabilitata');
 
-  const dest = cfg.from_email || cfg.smtp_user;
+  const dest = getDestinatari(cfg);
   const appCfg = db.prepare('SELECT app_name FROM config LIMIT 1').get();
   const appName = appCfg?.app_name || 'Il Nostro Matrimonio';
 
@@ -82,7 +95,7 @@ async function sendScadenzeReminder(giorni = 14) {
     !s.completata && s.data_scadenza && s.data_scadenza < oggi
   );
 
-  const dest = cfg.from_email || cfg.smtp_user;
+  const dest = getDestinatari(cfg);
 
   const prioritaLabel = { alta: '🔴 Alta', media: '🟡 Media', bassa: '🟢 Bassa' };
 
@@ -145,4 +158,4 @@ async function sendScadenzeReminder(giorni = 14) {
   return { dest, imminenti: scadenze.length, scadute: scaduteGia.length };
 }
 
-module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder };
+module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder, getDestinatari };
