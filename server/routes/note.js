@@ -20,6 +20,7 @@ router.post('/', auth, (req, res) => {
   const appName = appCfg?.app_name || 'Il Nostro Matrimonio';
   const data = new Date(nota.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const dest = getDestinatari();
+  console.log(`[nota email] autore="${autore}" dest="${dest}"`);
   sendEmail({
     to: dest,
     subject: `📝 Nuova nota — ${appName}`,
@@ -31,7 +32,8 @@ router.post('/', auth, (req, res) => {
         <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
         <p style="color:#9ca3af;font-size:12px;">Inviato da ${appName}</p>
       </div>`,
-  }).catch(err => console.error('[nota email]', err.message));
+  }).then(() => console.log(`[nota email] inviata OK a "${dest}"`))
+    .catch(err => console.error(`[nota email] ERRORE:`, err.message));
 });
 
 router.delete('/:id', auth, (req, res) => {
