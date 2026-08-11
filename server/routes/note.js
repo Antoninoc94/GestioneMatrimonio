@@ -31,7 +31,7 @@ router.post('/', auth, (req, res) => {
         <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
         <p style="color:#9ca3af;font-size:12px;">Inviato da ${appName}</p>
       </div>`,
-  }).catch(() => {});
+  }).catch(err => console.error('[nota email]', err.message));
 });
 
 router.delete('/:id', auth, (req, res) => {
