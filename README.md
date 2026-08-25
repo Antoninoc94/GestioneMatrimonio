@@ -7,7 +7,7 @@ Progetto personale di Vale e Nino, pensato per essere installato ed eseguito sul
 ## Funzionalità
 
 ### Ospiti & logistica
-- **Lista ospiti** con nucleo familiare: ogni invitato principale può avere un partner e dei figli collegati, ciascuno con la propria risposta RSVP e le proprie intolleranze/allergie. Filtri, ricerca, azioni multiple (cambio RSVP, assegnazione tavolo, eliminazione), export PDF.
+- **Lista ospiti** con nucleo familiare: ogni invitato principale può avere un partner e dei figli collegati, ciascuno con la propria risposta RSVP e le proprie intolleranze/allergie. Un figlio maggiorenne resta "figlio" nella parentela ma viene contato come adulto nei conteggi e nei PDF, in base a una soglia d'età configurabile dalle Impostazioni. Filtri, ricerca, azioni multiple (cambio RSVP, assegnazione tavolo, eliminazione), export PDF.
 - **Tavoli**: gestione capienza/occupazione, assegnazione ospiti, vista "senza tavolo", export PDF del piano tavoli e dei segnaposti stampabili.
 - **Inviti**: generatore di inviti stampabili con 4 temi grafici, esportati in PDF (formato A5), interamente lato client.
 
@@ -106,4 +106,4 @@ I dati (database SQLite e file caricati) sono persistiti in volumi Docker (`matr
 
 ## Configurazione
 
-Tutta la configurazione applicativa (nome app, emoji, data del matrimonio, budget, temi della landing page, SMTP, promemoria) si gestisce dall'interno dell'app, sezione **Impostazioni** — non richiede di toccare file o variabili d'ambiente oltre al `JWT_SECRET` iniziale.
+Tutta la configurazione applicativa (nome app, emoji, data del matrimonio, budget, soglia d'età per contare un figlio come adulto, temi della landing page, SMTP, promemoria) si gestisce dall'interno dell'app, sezione **Impostazioni** — non richiede di toccare file o variabili d'ambiente oltre al `JWT_SECRET` iniziale.
