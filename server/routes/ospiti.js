@@ -13,21 +13,21 @@ router.get('/', auth, (req, res) => {
 });
 
 router.post('/', auth, (req, res) => {
-  const { nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta } = req.body;
+  const { nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta, relazione } = req.body;
   const r = db.prepare(
-    'INSERT INTO ospiti (nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+    'INSERT INTO ospiti (nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta, relazione) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).run(nome, cognome || null, lato || 'comune', tipo || 'adulto', rsvp || 'attesa',
     tavolo_id || null, email || null, telefono || null, intolleranze || null, note || null,
-    parent_id || null, eta || null);
+    parent_id || null, eta || null, relazione || null);
   res.json(db.prepare('SELECT o.*, t.nome as tavolo_nome FROM ospiti o LEFT JOIN tavoli t ON o.tavolo_id = t.id WHERE o.id = ?').get(r.lastInsertRowid));
 });
 
 router.put('/:id', auth, (req, res) => {
-  const { nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta, messaggio_ospite } = req.body;
+  const { nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta, messaggio_ospite, relazione } = req.body;
   db.prepare(
-    'UPDATE ospiti SET nome=?, cognome=?, lato=?, tipo=?, rsvp=?, tavolo_id=?, email=?, telefono=?, intolleranze=?, note=?, parent_id=?, eta=?, messaggio_ospite=? WHERE id=?'
+    'UPDATE ospiti SET nome=?, cognome=?, lato=?, tipo=?, rsvp=?, tavolo_id=?, email=?, telefono=?, intolleranze=?, note=?, parent_id=?, eta=?, messaggio_ospite=?, relazione=? WHERE id=?'
   ).run(nome, cognome || null, lato, tipo, rsvp, tavolo_id || null, email || null, telefono || null,
-    intolleranze || null, note || null, parent_id || null, eta || null, messaggio_ospite || null, req.params.id);
+    intolleranze || null, note || null, parent_id || null, eta || null, messaggio_ospite || null, relazione || null, req.params.id);
   res.json(db.prepare('SELECT o.*, t.nome as tavolo_nome FROM ospiti o LEFT JOIN tavoli t ON o.tavolo_id = t.id WHERE o.id = ?').get(req.params.id));
 });
 

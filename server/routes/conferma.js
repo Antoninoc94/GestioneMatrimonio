@@ -47,17 +47,17 @@ router.get('/trova', checkAbilitata, (req, res) => {
       if (parent) principale = parent;
     }
 
-    // Carica il partner (adulto collegato tramite parent_id)
+    // Carica il partner collegato tramite parent_id
     const partner = db.prepare(`
       SELECT id, nome, cognome, intolleranze, rsvp FROM ospiti
-      WHERE parent_id = ? AND tipo != 'bambino'
+      WHERE parent_id = ? AND relazione = 'partner'
       LIMIT 1
     `).get(principale.id);
 
-    // Carica i figli (bambini collegati tramite parent_id)
+    // Carica i figli (a prescindere dall'età) collegati tramite parent_id
     const figli = db.prepare(`
       SELECT id, nome, eta, intolleranze, rsvp FROM ospiti
-      WHERE parent_id = ? AND tipo = 'bambino'
+      WHERE parent_id = ? AND relazione = 'figlio'
       ORDER BY id ASC
     `).all(principale.id);
 
@@ -67,7 +67,9 @@ router.get('/trova', checkAbilitata, (req, res) => {
   }
 });
 
-function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, parent_id }) {
+// Usato solo per il partner: la relazione è sempre 'partner', il tipo è sempre 'adulto'
+// (un partner di età minore non rientra nella logica "figlio/bambino" del form pubblico).
+function upsertPartner({ nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id }) {
   const candidati = db.prepare(`
     SELECT id FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
@@ -78,13 +80,12 @@ function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tip
   // a caso: meglio creare un nuovo ospite piuttosto che rischiare di sovrascrivere
   // la risposta di qualcun altro.
   if (candidati.length === 1) {
-    db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=?, parent_id=? WHERE id=?')
-      .run(rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null, candidati[0].id);
+    db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=?, parent_id=?, relazione=? WHERE id=?')
+      .run(rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null, 'partner', candidati[0].id);
   } else {
-    db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, fonte, parent_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'sito', ?)`)
-      .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null,
-        tipo || 'adulto', eta || null, parent_id || null);
+    db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, fonte, parent_id, relazione)
+                VALUES (?, ?, ?, ?, ?, 'adulto', 'sito', ?, 'partner')`)
+      .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null);
   }
 }
 
@@ -113,19 +114,25 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
   if (partner?.nome?.trim() && partner?.rsvp) {
     if (!['confermato', 'declinato'].includes(partner.rsvp))
       return res.status(400).json({ error: 'Stato partner non valido' });
-    upsertOspite({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
+    upsertPartner({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
   }
 
-  // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione)
+  // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione).
+  // Il tipo (adulto/bambino) si deduce dall'età rispetto alla soglia configurata — un figlio
+  // maggiorenne non deve essere trattato come bambino nei conteggi/menu, ma resta comunque
+  // un "figlio" a livello di parentela (relazione), a prescindere dall'età.
   if (Array.isArray(figli)) {
     const mainFonte = db.prepare('SELECT fonte FROM ospiti WHERE id = ?').get(mainId)?.fonte || 'sito';
-    db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND tipo = 'bambino'").run(mainId);
+    const soglia = db.prepare('SELECT soglia_eta_bambino FROM config LIMIT 1').get()?.soglia_eta_bambino || 12;
+    db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND relazione = 'figlio'").run(mainId);
     for (const f of figli) {
       if (!f.nome?.trim()) continue;
       const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
-      db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id)
-                  VALUES (?, ?, 'bambino', ?, ?, ?, ?)`)
-        .run(f.nome.trim(), fRsvp, f.intolleranze?.trim() || null, parseInt(f.eta) || null, mainFonte, mainId);
+      const fEta = parseInt(f.eta) || null;
+      const fTipo = fEta != null && fEta >= soglia ? 'adulto' : 'bambino';
+      db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id, relazione)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, 'figlio')`)
+        .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, mainFonte, mainId);
     }
   }
 

@@ -54,12 +54,21 @@ export default function Ospiti() {
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(new Set());
+  const [soglia, setSoglia] = useState(12);
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
     api.get('/tavoli').then(r => setTavoli(r.data));
+    api.get('/config').then(r => setSoglia(r.data.soglia_eta_bambino || 12));
   };
   useEffect(() => { load(); }, []);
+
+  // Un figlio resta "figlio" (relazione) a qualsiasi età; conta come bambino
+  // (tipo, per menu/conteggi) solo se sotto la soglia configurata.
+  const tipoFiglio = eta => {
+    const n = parseInt(eta);
+    return !isNaN(n) && n >= soglia ? 'adulto' : 'bambino';
+  };
 
   const resetExtra = () => {
     setConPartner(false);
@@ -84,8 +93,8 @@ export default function Ospiti() {
     setEditId(o.id);
 
     // Carica partner e figli esistenti (solo per ospiti master)
-    const partner = items.find(i => i.parent_id === o.id && i.tipo !== 'bambino');
-    const children = items.filter(i => i.parent_id === o.id && i.tipo === 'bambino');
+    const partner = items.find(i => i.parent_id === o.id && i.relazione === 'partner');
+    const children = items.filter(i => i.parent_id === o.id && i.relazione === 'figlio');
 
     setConPartner(!!partner);
     setPartnerForm(partner
@@ -104,23 +113,29 @@ export default function Ospiti() {
 
   const save = async e => {
     e.preventDefault();
-    const payload = { ...form, tavolo_id: form.tavolo_id || null, eta: form.tipo === 'bambino' ? (parseInt(form.eta) || null) : null };
+    const isFiglio = form.relazione === 'figlio';
+    const payload = {
+      ...form,
+      tavolo_id: form.tavolo_id || null,
+      eta: isFiglio ? (parseInt(form.eta) || null) : (form.tipo === 'bambino' ? (parseInt(form.eta) || null) : null),
+      tipo: isFiglio ? tipoFiglio(form.eta) : form.tipo,
+    };
 
     if (editId) {
       await api.put(`/ospiti/${editId}`, payload);
 
       // Aggiorna o crea partner
       if (conPartner && partnerForm.nome.trim()) {
-        const pp = { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', parent_id: editId };
+        const pp = { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', relazione: 'partner', parent_id: editId };
         if (partnerForm.id) await api.put(`/ospiti/${partnerForm.id}`, pp);
         else await api.post('/ospiti', pp);
       }
 
-      // Aggiorna o crea figli
+      // Aggiorna o crea figli — il tipo (adulto/bambino) si deduce dall'età, la relazione resta sempre "figlio"
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          const fp = { nome: f.nome.trim(), tipo: 'bambino', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
+          const fp = { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
           if (f.id) await api.put(`/ospiti/${f.id}`, fp);
           else await api.post('/ospiti', fp);
         }
@@ -129,12 +144,12 @@ export default function Ospiti() {
       const r = await api.post('/ospiti', payload);
       const mainId = r.data.id;
       if (conPartner && partnerForm.nome.trim()) {
-        await api.post('/ospiti', { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', parent_id: mainId });
+        await api.post('/ospiti', { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', relazione: 'partner', parent_id: mainId });
       }
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          await api.post('/ospiti', { nome: f.nome.trim(), tipo: 'bambino', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
+          await api.post('/ospiti', { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
         }
       }
     }
@@ -306,7 +321,7 @@ export default function Ospiti() {
           rows.push([
             `  > ${c.cognome ? `${c.cognome} ${c.nome}` : c.nome}`,
             latoLabel[c.lato] || '-',
-            c.tipo === 'bambino' ? 'Bambino' : 'Partner',
+            c.relazione === 'figlio' ? 'Figlio' : 'Partner',
             rsvpText[c.rsvp] || c.rsvp,
             c.tavolo_nome || '-',
             c.intolleranze || '-',
@@ -502,7 +517,7 @@ export default function Ospiti() {
                 </div>
               </div>
               {childrenOf(o.id).map(c => {
-                const isPartner = c.tipo !== 'bambino';
+                const isPartner = c.relazione === 'partner';
                 return (
                   <div key={c.id} className={`ml-4 border-l-2 pl-3 ${isPartner ? 'border-rose-200' : 'border-purple-200'}`}>
                     <div className={`card p-2.5 ${isPartner ? 'border-rose-100' : 'border-purple-100'}`}>
@@ -512,7 +527,7 @@ export default function Ospiti() {
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta ? ` (${c.eta}a)` : ''}</span>}
                             {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
                           </div>
                         </div>
@@ -596,7 +611,7 @@ export default function Ospiti() {
                       </td>
                     </tr>
                     {childrenOf(o.id).map(c => {
-                      const isPartner = c.tipo !== 'bambino';
+                      const isPartner = c.relazione === 'partner';
                       return (
                         <tr key={c.id} className={isPartner ? 'bg-rose-50/40' : 'bg-purple-50/40'}>
                           <td />
@@ -610,7 +625,7 @@ export default function Ospiti() {
                           <td>
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1 w-fit"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta ? ` (${c.eta}a)` : ''}</span>}
                           </td>
                           <td>
                             <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-yellow-100 text-yellow-700'}`}>
@@ -686,10 +701,16 @@ export default function Ospiti() {
                 </div>
                 <div>
                   <label className="form-label">Tipo</label>
-                  <select className="form-input" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
-                    <option value="adulto">Adulto</option>
-                    <option value="bambino">Bambino</option>
-                  </select>
+                  {form.relazione === 'figlio' ? (
+                    <div className="form-input bg-gray-50 text-gray-500 cursor-not-allowed">
+                      {tipoFiglio(form.eta) === 'bambino' ? 'Bambino' : 'Adulto'}
+                    </div>
+                  ) : (
+                    <select className="form-input" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
+                      <option value="adulto">Adulto</option>
+                      <option value="bambino">Bambino</option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="form-label">RSVP</label>
@@ -701,11 +722,14 @@ export default function Ospiti() {
                   </select>
                 </div>
               </div>
-              {form.tipo === 'bambino' && (
+              {(form.tipo === 'bambino' || form.relazione === 'figlio') && (
                 <div>
                   <label className="form-label">Età</label>
-                  <input type="number" min="0" max="17" inputMode="numeric" className="form-input" value={form.eta || ''}
+                  <input type="number" min="0" inputMode="numeric" className="form-input" value={form.eta || ''}
                     onChange={e => setForm({ ...form, eta: e.target.value })} placeholder="anni" />
+                  {form.relazione === 'figlio' && (
+                    <p className="text-xs text-gray-400 mt-1">Il tipo (adulto/bambino) si calcola automaticamente dall'età — soglia impostabile in Impostazioni</p>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

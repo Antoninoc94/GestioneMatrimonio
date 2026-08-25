@@ -52,7 +52,7 @@ export default function Tavoli() {
     const base = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
     if (!o.parent_id) return base;
     const pn = parentName(o.parent_id);
-    const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
+    const rel = o.relazione === 'figlio' ? 'figlio' : 'partner';
     return pn ? `${base} (${rel} di ${pn})` : base;
   };
   const [collapsedTavoli, setCollapsedTavoli] = useState(new Set());
@@ -308,7 +308,7 @@ export default function Tavoli() {
             const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
 
             if (indent) {
-              const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
+              const rel = o.relazione === 'figlio' ? 'figlio' : 'partner';
               doc.setFontSize(7);
               doc.setFont('helvetica', 'italic');
               doc.setTextColor(120, 130, 140);
@@ -461,7 +461,7 @@ export default function Tavoli() {
               return (
                 <div className="bg-white rounded-lg border border-gray-100 divide-y divide-gray-50 overflow-hidden">
                   {flat.map(o => {
-                    const isChild = o.tipo === 'bambino';
+                    const isChild = o.relazione === 'figlio';
                     const isPartner = !!o.parent_id && !isChild;
                     const parent = o.parent_id ? ospiti.find(p => p.id === o.parent_id) : null;
                     return (
@@ -508,7 +508,7 @@ export default function Tavoli() {
                       {family.length > 0 && (
                         <div className="border-t border-gray-50 divide-y divide-gray-50">
                           {family.map(f => {
-                            const isChild = f.tipo === 'bambino';
+                            const isChild = f.relazione === 'figlio';
                             return (
                               <div key={f.id} className={`flex items-center gap-3 pl-5 pr-3 py-2 ${isChild ? 'bg-purple-50/50' : 'bg-rose-50/50'}`}>
                                 <span className={`text-xs flex-shrink-0 ${isChild ? 'text-purple-300' : 'text-rose-300'}`}>
@@ -528,7 +528,7 @@ export default function Tavoli() {
                   );
                 })}
                 {orphans.map(o => {
-                  const isChild = o.tipo === 'bambino';
+                  const isChild = o.relazione === 'figlio';
                   return (
                     <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${isChild ? 'border-purple-100' : 'border-rose-100'}`}>
                       <div className="flex-1 min-w-0">
@@ -536,7 +536,7 @@ export default function Tavoli() {
                           {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5">
-                          <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Bambino' : '♥ Partner'}</span>
+                          <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Figlio' : '♥ Partner'}</span>
                           {' '}di {parentName(o.parent_id)}
                         </div>
                       </div>
@@ -594,7 +594,7 @@ export default function Tavoli() {
                   const orphans = t.ospiti.filter(o => o.parent_id && !t.ospiti.find(mg => mg.id === o.parent_id));
 
                   const rowJsx = (o, showParentHint = false) => {
-                    const isChild = o.tipo === 'bambino';
+                    const isChild = o.relazione === 'figlio';
                     const isPartner = !!o.parent_id && !isChild;
                     const pName = showParentHint && o.parent_id ? parentName(o.parent_id) : null;
                     return (

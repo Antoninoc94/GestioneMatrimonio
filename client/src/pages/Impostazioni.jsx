@@ -22,7 +22,7 @@ export default function Impostazioni() {
   const { updateAppConfig } = useAppConfig();
 
   // Config matrimonio + aspetto
-  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '', app_name: 'Il Nostro Matrimonio', app_emoji: '💍', login_subtitle: '', conferma_abilitata: true });
+  const [config, setConfig] = useState({ data_matrimonio: '', budget_totale: '', nome_sposo1: '', nome_sposo2: '', app_name: 'Il Nostro Matrimonio', app_emoji: '💍', login_subtitle: '', conferma_abilitata: true, soglia_eta_bambino: 12 });
   const [configSaved, setConfigSaved] = useState(false);
   const [aspettoSaved, setAspettoSaved] = useState(false);
 
@@ -43,14 +43,14 @@ export default function Impostazioni() {
   const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
-    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '', conferma_abilitata: r.data.conferma_abilitata !== 0 }));
+    api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '', conferma_abilitata: r.data.conferma_abilitata !== 0, soglia_eta_bambino: r.data.soglia_eta_bambino || 12 }));
     api.get('/profilo/me').then(r => setProfilo({ nome: r.data.nome || '', username: r.data.username || '', email: r.data.email || '' }));
     api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled, reminder_abilitato: !!r.data.reminder_abilitato }));
   }, []);
 
   const saveConfig = async e => {
     e.preventDefault();
-    await api.put('/config', { ...config, budget_totale: parseFloat(config.budget_totale) || 0 });
+    await api.put('/config', { ...config, budget_totale: parseFloat(config.budget_totale) || 0, soglia_eta_bambino: parseInt(config.soglia_eta_bambino) || 12 });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 2500);
   };
@@ -224,6 +224,11 @@ export default function Impostazioni() {
             <div>
               <label className="form-label">Budget Totale (€)</label>
               <input type="number" min="0" step="100" className="form-input" value={config.budget_totale} onChange={e => setConfig({ ...config, budget_totale: e.target.value })} placeholder="es. 25000" />
+            </div>
+            <div>
+              <label className="form-label">Soglia età "bambino"</label>
+              <input type="number" min="0" max="17" className="form-input" value={config.soglia_eta_bambino} onChange={e => setConfig({ ...config, soglia_eta_bambino: e.target.value })} placeholder="es. 12" />
+              <p className="text-xs text-gray-400 mt-1">Un figlio con età pari o superiore conta come adulto (menu, conteggi) — resta comunque "figlio" nelle etichette di parentela</p>
             </div>
             <button type="submit" className="btn-primary">
               <Save size={15} /> {configSaved ? 'Salvato!' : 'Salva'}

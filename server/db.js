@@ -243,6 +243,9 @@ if (!configCols.find(c => c.name === 'landing_foto')) {
 if (!configCols.find(c => c.name === 'landing_foto_posizione')) {
   db.prepare("ALTER TABLE config ADD COLUMN landing_foto_posizione TEXT DEFAULT 'center top'").run();
 }
+if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
+  db.prepare('ALTER TABLE config ADD COLUMN soglia_eta_bambino INTEGER DEFAULT 12').run();
+}
 
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();
@@ -298,6 +301,17 @@ if (!ospCols.includes('eta')) {
 if (!ospCols.includes('parent_id')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN parent_id INTEGER REFERENCES ospiti(id) ON DELETE CASCADE').run();
 }
+if (!ospCols.includes('relazione')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN relazione TEXT').run();
+}
+// Deduce la relazione (partner/figlio) dal vecchio tipo per i familiari già esistenti:
+// finora 'tipo' era usato sia per l'età che per la parentela, quindi era sempre coerente
+// (figli sempre 'bambino', partner sempre 'adulto'). Da qui in avanti le due cose sono
+// indipendenti: 'relazione' resta fissa, 'tipo' viene ricalcolato dall'età.
+db.prepare(`
+  UPDATE ospiti SET relazione = CASE WHEN tipo = 'bambino' THEN 'figlio' ELSE 'partner' END
+  WHERE parent_id IS NOT NULL AND relazione IS NULL
+`).run();
 
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);

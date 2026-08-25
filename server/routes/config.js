@@ -34,6 +34,7 @@ router.put('/', auth, (req, res) => {
     landing_info_pratiche=COALESCE(?,landing_info_pratiche),
     landing_tema=COALESCE(?,landing_tema),
     landing_foto_posizione=COALESCE(?,landing_foto_posizione),
+    soglia_eta_bambino=COALESCE(?,soglia_eta_bambino),
     updated_at=datetime('now')`)
     .run(
       p('data_matrimonio', v => v || null),
@@ -49,7 +50,8 @@ router.put('/', auth, (req, res) => {
       p('landing_dress_code', v => v ?? ''),
       p('landing_info_pratiche', v => v ?? ''),
       p('landing_tema', v => v || 'rose'),
-      p('landing_foto_posizione', v => v || 'center top')
+      p('landing_foto_posizione', v => v || 'center top'),
+      p('soglia_eta_bambino', v => parseInt(v) || 12)
     );
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });

@@ -56,5 +56,7 @@ Guest-facing pages (`Conferma.jsx`, `Landing.jsx`) are routed outside the `Priva
 
 **File uploads**: `multer`-based, written under `server/uploads/`, served statically at `/uploads`.
 
+**`ospiti.tipo` vs. `ospiti.relazione`**: these look redundant but encode different things and must not be conflated. `tipo` (`adulto`/`bambino`) is a pure age category, derived from `eta` against the configurable `config.soglia_eta_bambino` threshold (default 12) — used for catering/menu counts. `relazione` (`partner`/`figlio`/`NULL`) is family relationship to the `parent_id` guest, fixed regardless of age — used everywhere a UI needs to know "is this the partner or a child of the main guest" (icons, "figlio di X"/"partner di X" labels, PDF exports). A grown-up child is `relazione='figlio'` + `tipo='adulto'` simultaneously. `tipo` for a `figlio` row is recomputed from `eta` at every save (client: `tipoFiglio()` in `Ospiti.jsx`; server: inline in `conferma.js`'s `/rispondi` handler) — never hardcoded. When adding a new place that reads one of these fields, ask which question you're actually answering (age or kinship) before picking one.
+
 **Production serving**: in production, `server/index.js` serves the built client (`client/dist`) as static files and falls back to `index.html` for client-side routing, so the Express server is the single deployed process (see `Dockerfile`, multi-stage: builds client, then copies `dist/` into the server image next to `server/`).
 
