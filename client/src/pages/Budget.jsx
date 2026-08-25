@@ -164,7 +164,7 @@ export default function Budget() {
         [formatEuro(totalePagato), 'Pagato', [34, 197, 94]],
       ].forEach(([val, label, color], i) => {
         const x = 14 + i * 62;
-        doc.setFillColor(248, 250, 252);
+        doc.setFillColor(255, 245, 247);
         doc.roundedRect(x, statsY, 58, 16, 2, 2, 'F');
         doc.setTextColor(...color);
         doc.setFontSize(13);

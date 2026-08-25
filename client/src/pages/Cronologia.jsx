@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Clock, Download } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 
 const TIPI = ['cerimonia', 'ricevimento', 'foto', 'viaggio', 'preparativi', 'altro'];
 const tipoColor = {
@@ -17,6 +17,11 @@ const tipoLabel = {
   cerimonia: '💍 Cerimonia', ricevimento: '🥂 Ricevimento', foto: '📷 Foto',
   viaggio: '🚗 Viaggio', preparativi: '💄 Preparativi', altro: '📌 Altro',
 };
+// jsPDF/helvetica non rende le emoji — versione solo testo per il PDF
+const tipoLabelPdf = {
+  cerimonia: 'Cerimonia', ricevimento: 'Ricevimento', foto: 'Foto',
+  viaggio: 'Viaggio', preparativi: 'Preparativi', altro: 'Altro',
+};
 
 const empty = { ora: '', titolo: '', descrizione: '', luogo: '', durata: '', tipo: 'altro' };
 
@@ -26,7 +31,6 @@ export default function Cronologia() {
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [exporting, setExporting] = useState(false);
-  const printRef = useRef();
 
   const load = () => api.get('/cronologia').then(r => setItems(r.data));
   useEffect(() => { load(); }, []);
@@ -49,21 +53,67 @@ export default function Cronologia() {
     load();
   };
 
-  const exportPDF = async () => {
+  const exportPDF = () => {
+    if (items.length === 0) return alert('Nessun evento da esportare.');
     setExporting(true);
-    await new Promise(r => setTimeout(r, 100));
-    const canvas = await html2canvas(printRef.current, { scale: 2 });
-    const img = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const w = 210, h = (canvas.height * w) / canvas.width;
-    let y = 0;
-    while (y < h) {
-      if (y > 0) pdf.addPage();
-      pdf.addImage(img, 'PNG', 0, -y, w, h);
-      y += 297;
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+      const gray = [107, 114, 128];
+
+      // Header
+      doc.setFillColor(...rose);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Cronologia del Giorno', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${items.length} eventi · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
+
+      const sorted = [...items].sort((a, b) => (a.ora || '').localeCompare(b.ora || ''));
+
+      autoTable(doc, {
+        startY: 34,
+        head: [['Ora', 'Evento', 'Tipo', 'Durata']],
+        body: sorted.map(ev => {
+          const lines = [ev.titolo];
+          if (ev.luogo) lines.push(`Luogo: ${ev.luogo}`);
+          if (ev.descrizione) lines.push(ev.descrizione);
+          return [
+            ev.ora || '-',
+            lines.join('\n'),
+            tipoLabelPdf[ev.tipo] || ev.tipo,
+            ev.durata ? `${ev.durata} min` : '-',
+          ];
+        }),
+        headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8.5, textColor: [55, 65, 81] },
+        alternateRowStyles: { fillColor: [255, 251, 252] },
+        columnStyles: {
+          0: { cellWidth: 20, fontStyle: 'bold' },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 32 },
+          3: { cellWidth: 24, halign: 'center' },
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
+        doc.text(`Cronologia del Giorno - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+      }
+
+      doc.save('cronologia-matrimonio.pdf');
+    } finally {
+      setExporting(false);
     }
-    pdf.save('cronologia-matrimonio.pdf');
-    setExporting(false);
   };
 
   return (
@@ -81,7 +131,7 @@ export default function Cronologia() {
         </div>
       </div>
 
-      <div ref={printRef} className="relative">
+      <div className="relative">
         {items.length === 0 ? (
           <div className="card text-center py-12 text-gray-400">
             <Clock size={40} className="mx-auto mb-2 opacity-30" />
@@ -108,12 +158,10 @@ export default function Cronologia() {
                         {ev.luogo && <p className="text-sm text-gray-500 mt-0.5">📍 {ev.luogo}</p>}
                         {ev.descrizione && <p className="text-sm text-gray-500 mt-1">{ev.descrizione}</p>}
                       </div>
-                      {!exporting && (
-                        <div className="flex gap-1 ml-2">
-                          <button className="p-1.5 rounded hover:bg-white/60" onClick={() => openEdit(ev)}><Pencil size={13} className="text-gray-400" /></button>
-                          <button className="p-1.5 rounded hover:bg-white/60" onClick={() => del(ev.id)}><Trash2 size={13} className="text-red-400" /></button>
-                        </div>
-                      )}
+                      <div className="flex gap-1 ml-2">
+                        <button className="p-1.5 rounded hover:bg-white/60" onClick={() => openEdit(ev)}><Pencil size={13} className="text-gray-400" /></button>
+                        <button className="p-1.5 rounded hover:bg-white/60" onClick={() => del(ev.id)}><Trash2 size={13} className="text-red-400" /></button>
+                      </div>
                     </div>
                   </div>
                 </div>

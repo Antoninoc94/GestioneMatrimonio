@@ -310,7 +310,7 @@ export default function Ospiti() {
         rows.push([
           o.cognome ? `${o.cognome} ${o.nome}` : o.nome,
           latoLabel[o.lato] || o.lato,
-          'Adulto',
+          o.tipo === 'bambino' ? 'Bambino' : 'Adulto',
           rsvpText[o.rsvp] || o.rsvp,
           o.tavolo_nome || '-',
           o.intolleranze || '-',
