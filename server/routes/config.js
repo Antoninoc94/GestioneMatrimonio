@@ -53,6 +53,19 @@ router.put('/', auth, (req, res) => {
       p('landing_foto_posizione', v => v || 'center top'),
       p('soglia_eta_bambino', v => parseInt(v) || 12)
     );
+
+  // Se la soglia è cambiata, riallinea subito il tipo dei figli già esistenti
+  // (senza aspettare che vengano riaperti e risalvati a mano).
+  if ('soglia_eta_bambino' in b) {
+    db.prepare(`
+      UPDATE ospiti SET tipo = CASE
+        WHEN eta >= (SELECT soglia_eta_bambino FROM config LIMIT 1) THEN 'adulto'
+        ELSE 'bambino'
+      END
+      WHERE relazione = 'figlio' AND eta IS NOT NULL
+    `).run();
+  }
+
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });
 

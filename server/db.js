@@ -312,6 +312,16 @@ db.prepare(`
   UPDATE ospiti SET relazione = CASE WHEN tipo = 'bambino' THEN 'figlio' ELSE 'partner' END
   WHERE parent_id IS NOT NULL AND relazione IS NULL
 `).run();
+// Ricalcola tipo per i figli già esistenti in base all'età già salvata e alla soglia
+// corrente: senza questo, un figlio maggiorenne inserito prima di questa modifica
+// resterebbe 'bambino' finché qualcuno non lo riapre e risalva a mano.
+db.prepare(`
+  UPDATE ospiti SET tipo = CASE
+    WHEN eta >= (SELECT soglia_eta_bambino FROM config LIMIT 1) THEN 'adulto'
+    ELSE 'bambino'
+  END
+  WHERE relazione = 'figlio' AND eta IS NOT NULL
+`).run();
 
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
