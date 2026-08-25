@@ -11,7 +11,7 @@ const rsvpLabel = { confermato: 'Confermato', declinato: 'Declinato', attesa: 'I
 const rsvpIcon = { confermato: Check, declinato: X, attesa: Clock };
 const latoLabel = { sposo1: 'Sposo', sposo2: 'Sposa', comune: 'Comune' };
 
-const empty = { nome: '', cognome: '', lato: 'comune', tipo: 'adulto', rsvp: 'attesa', tavolo_id: '', email: '', telefono: '', intolleranze: '', note: '' };
+const empty = { nome: '', cognome: '', lato: 'comune', tipo: 'adulto', rsvp: 'attesa', tavolo_id: '', email: '', telefono: '', intolleranze: '', note: '', eta: '' };
 
 function SortTh({ label, col, sortKey, sortDir, onSort, className = '' }) {
   const active = sortKey === col;
@@ -71,7 +71,16 @@ export default function Ospiti() {
   const openNew = () => { setForm(empty); setEditId(null); resetExtra(); setModal(true); };
 
   const openEdit = o => {
-    setForm({ ...o, tavolo_id: o.tavolo_id || '' });
+    setForm({
+      ...o,
+      tavolo_id: o.tavolo_id || '',
+      eta: o.eta != null ? String(o.eta) : '',
+      cognome: o.cognome || '',
+      telefono: o.telefono || '',
+      email: o.email || '',
+      intolleranze: o.intolleranze || '',
+      note: o.note || '',
+    });
     setEditId(o.id);
 
     // Carica partner e figli esistenti (solo per ospiti master)
@@ -95,7 +104,7 @@ export default function Ospiti() {
 
   const save = async e => {
     e.preventDefault();
-    const payload = { ...form, tavolo_id: form.tavolo_id || null };
+    const payload = { ...form, tavolo_id: form.tavolo_id || null, eta: form.tipo === 'bambino' ? (parseInt(form.eta) || null) : null };
 
     if (editId) {
       await api.put(`/ospiti/${editId}`, payload);
@@ -692,6 +701,13 @@ export default function Ospiti() {
                   </select>
                 </div>
               </div>
+              {form.tipo === 'bambino' && (
+                <div>
+                  <label className="form-label">Età</label>
+                  <input type="number" min="0" max="17" inputMode="numeric" className="form-input" value={form.eta || ''}
+                    onChange={e => setForm({ ...form, eta: e.target.value })} placeholder="anni" />
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">Telefono</label>
