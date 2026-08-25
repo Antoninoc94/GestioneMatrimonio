@@ -21,13 +21,20 @@ router.get('/trova', checkAbilitata, (req, res) => {
   const cognome = (req.query.cognome || '').trim();
   if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
 
-  const ospite = db.prepare(`
+  const candidati = db.prepare(`
     SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id
     FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
        OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
-    LIMIT 1
-  `).get(nome, cognome, cognome, nome);
+  `).all(nome, cognome, cognome, nome);
+
+  // Più invitati con lo stesso nome+cognome: non possiamo scegliere per loro,
+  // altrimenti rischiamo di far confermare/declinare la presenza al posto sbagliato.
+  if (candidati.length > 1) {
+    return res.json({ trovato: false, ambiguo: true, nome, cognome, rsvp: 'attesa', intolleranze: '', partner: null, figli: [] });
+  }
+
+  const ospite = candidati[0];
 
   if (ospite) {
     // Se l'ospite trovato è un partner (ha parent_id), carica invece l'ospite principale
@@ -61,16 +68,18 @@ router.get('/trova', checkAbilitata, (req, res) => {
 });
 
 function upsertOspite({ nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, parent_id }) {
-  const existing = db.prepare(`
+  const candidati = db.prepare(`
     SELECT id FROM ospiti
     WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
        OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
-    LIMIT 1
-  `).get(nome, cognome || '', cognome || '', nome);
+  `).all(nome, cognome || '', cognome || '', nome);
 
-  if (existing) {
+  // Se il nome+cognome è ambiguo (più ospiti omonimi), non aggiorniamo un record
+  // a caso: meglio creare un nuovo ospite piuttosto che rischiare di sovrascrivere
+  // la risposta di qualcun altro.
+  if (candidati.length === 1) {
     db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=?, parent_id=? WHERE id=?')
-      .run(rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null, existing.id);
+      .run(rsvp, intolleranze || null, messaggio_ospite || null, parent_id || null, candidati[0].id);
   } else {
     db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, tipo, eta, fonte, parent_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'sito', ?)`)

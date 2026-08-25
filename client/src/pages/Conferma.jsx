@@ -68,6 +68,12 @@ export default function Conferma() {
     try {
       const r = await api.get('/conferma/trova', { params: { nome: nome.trim(), cognome: cognome.trim() } });
       const o = r.data;
+
+      if (o.ambiguo) {
+        setErrore('Ci sono più invitati con questo nome. Contatta gli sposi per confermare la tua presenza.');
+        return;
+      }
+
       setOspite(o);
       setRsvp(o.rsvp === 'confermato' || o.rsvp === 'declinato' ? o.rsvp : null);
       setIntolleranze(o.intolleranze || '');
