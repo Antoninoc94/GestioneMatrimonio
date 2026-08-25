@@ -14,8 +14,11 @@ const TEMI = {
   oro:     { primary: '#b45309', light: '#fffbeb', border: '#fcd34d', text: '#92400e', mid: '#f59e0b', dark: '#78350f' },
 };
 
+// Chiavi minuscole: i tipi location/cronologia sono confrontati case-insensitive
+// perché Location.jsx salva 'Chiesa'/'Ricevimento' (maiuscolo) mentre qui serve
+// solo distinguere le categorie, non riprodurre esattamente il valore in DB.
 const TIPO_LABEL = { chiesa: 'Cerimonia', ricevimento: 'Ricevimento', altro: 'Location' };
-const TIPO_EMOJI = { cerimonia: '⛪', ricevimento: '🥂', aperitivo: '🍾', cena: '🍽️', ballo: '💃', altro: '✨' };
+const TIPO_EMOJI = { cerimonia: '💍', ricevimento: '🥂', foto: '📷', viaggio: '🚗', preparativi: '💄', altro: '📌' };
 
 // SVG ornamento floreale per divisori
 function BotanicalDivider({ color, small = false }) {
@@ -97,9 +100,9 @@ export default function Landing() {
   const dataMatrimonio = config.data_matrimonio ? parseISO(toUtc(config.data_matrimonio + 'T00:00:00Z')) : null;
   const giorniMancanti = dataMatrimonio ? differenceInDays(dataMatrimonio, new Date()) : null;
 
-  const chiesa = locations.find(l => l.tipo === 'chiesa');
-  const ricevimento = locations.find(l => l.tipo === 'ricevimento');
-  const altreLocation = locations.filter(l => l.tipo !== 'chiesa' && l.tipo !== 'ricevimento');
+  const chiesa = locations.find(l => l.tipo?.toLowerCase() === 'chiesa');
+  const ricevimento = locations.find(l => l.tipo?.toLowerCase() === 'ricevimento');
+  const altreLocation = locations.filter(l => l.tipo?.toLowerCase() !== 'chiesa' && l.tipo?.toLowerCase() !== 'ricevimento');
   const hasLocation = chiesa || ricevimento || altreLocation.length > 0;
 
   const hasDressCode = !!config.landing_dress_code;
@@ -358,7 +361,7 @@ function Section({ title, children, tema }) {
 }
 
 function LocationCard({ loc, tema }) {
-  const tipo = TIPO_LABEL[loc.tipo] || loc.tipo;
+  const tipo = TIPO_LABEL[loc.tipo?.toLowerCase()] || loc.tipo;
   return (
     <div style={{
       background: '#fff',
