@@ -9,7 +9,7 @@ info()    { echo -e "${BLUE}[INFO]${NC}  $1"; }
 success() { echo -e "${GREEN}[OK]${NC}    $1"; }
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-BRANCH="claude/wedding-management-app-szun2g"
+BRANCH="main"
 
 [[ $EUID -ne 0 ]] && { echo "Eseguire come root: sudo bash update.sh"; exit 1; }
 

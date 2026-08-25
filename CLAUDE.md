@@ -58,6 +58,3 @@ Guest-facing pages (`Conferma.jsx`, `Landing.jsx`) are routed outside the `Priva
 
 **Production serving**: in production, `server/index.js` serves the built client (`client/dist`) as static files and falls back to `index.html` for client-side routing, so the Express server is the single deployed process (see `Dockerfile`, multi-stage: builds client, then copies `dist/` into the server image next to `server/`).
 
-## Deployment note
-
-`install.sh` and `update.sh` hardcode `BRANCH="claude/wedding-management-app-szun2g"` and `git pull`/`clone` that branch specifically, not `main`. That branch has since been fast-forward merged into `main` (same history), but if it is ever deleted or diverges, these scripts need updating to target `main` instead.

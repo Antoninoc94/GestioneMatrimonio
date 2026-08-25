@@ -17,7 +17,7 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 # CONFIGURAZIONE
 # ============================================================
 REPO_URL="https://github.com/Antoninoc94/GestioneMatrimonio.git"
-BRANCH="claude/wedding-management-app-szun2g"
+BRANCH="main"
 APP_DIR="/opt/matrimonio"
 PORT=80
 
