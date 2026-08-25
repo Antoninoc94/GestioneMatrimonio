@@ -151,6 +151,7 @@ export default function Ospiti() {
   const declinati = items.filter(i => i.rsvp === 'declinato').length;
   const adulti = items.filter(i => i.tipo === 'adulto' && i.rsvp === 'confermato').length;
   const bambini = items.filter(i => i.tipo === 'bambino' && i.rsvp === 'confermato').length;
+  const bambiniTotale = items.filter(i => i.tipo === 'bambino').length;
 
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
@@ -376,12 +377,13 @@ export default function Ospiti() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
         {[
           { label: 'Totale invitati', value: totale, color: 'text-gray-700' },
           { label: 'Confermati', value: confermati, color: 'text-green-600' },
           { label: 'In attesa', value: items.filter(i => i.rsvp === 'attesa').length, color: 'text-yellow-600' },
           { label: 'Declinati', value: declinati, color: 'text-red-500' },
+          { label: 'Bambini', value: bambiniTotale, color: 'text-purple-600' },
         ].map(s => (
           <div key={s.label} className="card text-center py-3">
             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
@@ -473,6 +475,7 @@ export default function Ospiti() {
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
                       <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
+                      {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{o.eta ? ` (${o.eta}a)` : ''}</span>}
                       {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
                     </div>
                   </div>
@@ -558,7 +561,7 @@ export default function Ospiti() {
                       </td>
                       <td className="font-medium text-gray-900">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</td>
                       <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
-                      <td className="text-gray-500 text-sm capitalize">Adulto</td>
+                      <td className="text-gray-500 text-sm capitalize">{o.tipo === 'bambino' ? 'Bambino' : 'Adulto'}</td>
                       <td>
                         <div className="flex flex-col gap-1">
                           <span className={`badge flex items-center gap-1 w-fit ${rsvpColor[o.rsvp]}`}>
