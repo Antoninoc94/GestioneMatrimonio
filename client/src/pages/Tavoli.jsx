@@ -275,47 +275,60 @@ export default function Tavoli() {
         y += rowH + ROW_GAP;
       }
 
-      // Senza Tavolo — raggruppati per nucleo familiare
+      // Senza Tavolo — raggruppati per nucleo familiare, su più pagine se necessario
       if (senzaTavolo.length > 0) {
         const senzaLines = buildGuestLines(senzaTavolo);
-
         const LINE_H = 5.5;
-        const HALF = Math.ceil(senzaLines.length / 2);
-        const sectionH = 12 + HALF * LINE_H + 4;
-
-        if (y + sectionH > PAGE_H - FOOTER_H) { doc.addPage(); y = 14; }
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...rose);
-        doc.text(`OSPITI SENZA TAVOLO (${senzaTavolo.length})`, LEFT, y + 6);
-        y += 12;
-
         const COL2_X = LEFT + COL_W + GAP;  // 111
         const MAX_W = COL_W;
 
-        senzaLines.forEach(({ o, indent, parentNote }, i) => {
-          const isRight = i >= HALF;
-          const row = isRight ? i - HALF : i;
-          const cx = isRight ? COL2_X : LEFT;
-          const cy = y + row * LINE_H;
-          const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+        let idx = 0;
+        let continua = false;
+        while (idx < senzaLines.length) {
+          // Serve spazio almeno per il titolo + una riga, altrimenti pagina nuova
+          if (y + 12 + LINE_H > PAGE_H - FOOTER_H) { doc.addPage(); y = 14; }
 
-          if (indent) {
-            const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
-            doc.setFontSize(7);
-            doc.setFont('helvetica', 'italic');
-            doc.setTextColor(120, 130, 140);
-            doc.text(doc.splitTextToSize(`  > ${name} [${rel}]`, MAX_W - 4)[0], cx + 4, cy);
-          } else {
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(55, 65, 81);
-            let label = `- ${name}`;
-            if (parentNote) label += ` [di ${parentNote}]`;
-            doc.text(doc.splitTextToSize(label, MAX_W)[0], cx, cy);
-          }
-        });
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...rose);
+          doc.text(continua ? 'OSPITI SENZA TAVOLO (segue)' : `OSPITI SENZA TAVOLO (${senzaTavolo.length})`, LEFT, y + 6);
+          y += 12;
+
+          // Quante righe per colonna entrano nello spazio rimasto su questa pagina
+          const maxRowsCol = Math.max(1, Math.floor((PAGE_H - FOOTER_H - y) / LINE_H));
+          const remaining = senzaLines.length - idx;
+          const half = Math.min(maxRowsCol, Math.ceil(remaining / 2));
+          const chunk = senzaLines.slice(idx, idx + half * 2);
+
+          chunk.forEach(({ o, indent, parentNote }, i) => {
+            const isRight = i >= half;
+            const row = isRight ? i - half : i;
+            const cx = isRight ? COL2_X : LEFT;
+            const cy = y + row * LINE_H;
+            const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
+
+            if (indent) {
+              const rel = o.tipo === 'bambino' ? 'figlio' : 'partner';
+              doc.setFontSize(7);
+              doc.setFont('helvetica', 'italic');
+              doc.setTextColor(120, 130, 140);
+              doc.text(doc.splitTextToSize(`  > ${name} [${rel}]`, MAX_W - 4)[0], cx + 4, cy);
+            } else {
+              doc.setFontSize(8);
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(55, 65, 81);
+              let label = `- ${name}`;
+              if (parentNote) label += ` [di ${parentNote}]`;
+              doc.text(doc.splitTextToSize(label, MAX_W)[0], cx, cy);
+            }
+          });
+
+          y += half * LINE_H;
+          idx += chunk.length;
+          continua = true;
+
+          if (idx < senzaLines.length) { doc.addPage(); y = 14; }
+        }
       }
 
       // Footer
