@@ -31,6 +31,10 @@ function getTransporter(cfg) {
   });
 }
 
+function isConfigured() {
+  return getTransporter() !== null;
+}
+
 async function sendEmail({ to, subject, html }) {
   const cfg = getConfig();
   const transporter = getTransporter(cfg);
@@ -158,4 +162,4 @@ async function sendScadenzeReminder(giorni = 14) {
   return { dest, imminenti: scadenze.length, scadute: scaduteGia.length };
 }
 
-module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder, getDestinatari };
+module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder, getDestinatari, isConfigured };

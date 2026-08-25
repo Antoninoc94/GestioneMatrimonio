@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
-const { sendEmail, getDestinatari } = require('../email');
+const { sendEmail, getDestinatari, isConfigured } = require('../email');
 
 router.get('/', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM note_veloci ORDER BY created_at DESC LIMIT 20').all());
@@ -16,11 +16,12 @@ router.post('/', auth, (req, res) => {
   const nota = db.prepare('SELECT * FROM note_veloci WHERE id = ?').get(r.lastInsertRowid);
   res.json(nota);
 
+  if (!isConfigured()) return; // notifiche email non attive: niente da segnalare
+
   const appCfg = db.prepare('SELECT app_name FROM config LIMIT 1').get();
   const appName = appCfg?.app_name || 'Il Nostro Matrimonio';
   const data = new Date(nota.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const dest = getDestinatari();
-  console.log(`[nota email] autore="${autore}" dest="${dest}"`);
   sendEmail({
     to: dest,
     subject: `📝 Nuova nota — ${appName}`,
@@ -32,8 +33,12 @@ router.post('/', auth, (req, res) => {
         <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
         <p style="color:#9ca3af;font-size:12px;">Inviato da ${appName}</p>
       </div>`,
-  }).then(() => console.log(`[nota email] inviata OK a "${dest}"`))
-    .catch(err => console.error(`[nota email] ERRORE:`, err.message));
+  }).then(() => {
+    db.prepare('UPDATE note_veloci SET email_stato = ? WHERE id = ?').run('inviata', nota.id);
+  }).catch(err => {
+    console.error(`[nota email] ERRORE per nota #${nota.id}:`, err.message);
+    db.prepare('UPDATE note_veloci SET email_stato = ?, email_errore = ? WHERE id = ?').run('errore', err.message, nota.id);
+  });
 });
 
 router.delete('/:id', auth, (req, res) => {

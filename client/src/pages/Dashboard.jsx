@@ -50,6 +50,11 @@ export default function Dashboard() {
       const r = await api.post('/note', { testo: newNota.trim() });
       setNoteList(prev => [r.data, ...prev]);
       setNewNota('');
+      // L'invio email della nota è asincrono lato server: ricontrolliamo
+      // lo stato dopo qualche secondo per segnalare eventuali errori di invio.
+      setTimeout(() => {
+        api.get('/note').then(res => setNoteList(res.data)).catch(() => {});
+      }, 3000);
     } catch {}
     setSavingNota(false);
   };
@@ -488,9 +493,13 @@ export default function Dashboard() {
                   <div key={n.id} className="flex items-start gap-2 bg-rose-50/40 border border-rose-100 rounded-lg p-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{n.testo}</p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                         {n.autore && <span className="font-medium text-rose-400 mr-1">{n.autore}</span>}
                         {fmtDateTime(n.created_at)}
+                        {n.email_stato === 'errore' && (
+                          <AlertTriangle size={12} className="text-amber-500 flex-shrink-0"
+                            title={`Notifica email non inviata: ${n.email_errore || 'errore sconosciuto'}`} />
+                        )}
                       </p>
                     </div>
                     <button onClick={() => eliminaNota(n.id)}

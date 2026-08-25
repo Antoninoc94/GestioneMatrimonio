@@ -299,6 +299,15 @@ if (!ospCols.includes('parent_id')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN parent_id INTEGER REFERENCES ospiti(id) ON DELETE CASCADE').run();
 }
 
+// Migrazione: traccia l'esito dell'invio email per le note veloci
+const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
+if (!noteCols.includes('email_stato')) {
+  db.prepare('ALTER TABLE note_veloci ADD COLUMN email_stato TEXT').run();
+}
+if (!noteCols.includes('email_errore')) {
+  db.prepare('ALTER TABLE note_veloci ADD COLUMN email_errore TEXT').run();
+}
+
 // Seed checklist predefinita
 const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();
 if (!checklistExists) {
