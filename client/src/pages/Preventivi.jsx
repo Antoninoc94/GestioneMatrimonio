@@ -329,7 +329,7 @@ export default function Preventivi() {
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-3 -mx-4 sm:-mx-6 px-4 sm:px-6 sticky bottom-0 bg-white border-t border-gray-100">
                 <button type="submit" className="btn-primary">Salva</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>
               </div>
