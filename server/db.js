@@ -332,6 +332,18 @@ if (!noteCols.includes('email_errore')) {
   db.prepare('ALTER TABLE note_veloci ADD COLUMN email_errore TEXT').run();
 }
 
+// Migrazione: allegato (es. PDF del preventivo) sui preventivi
+const preventiviCols = db.prepare('PRAGMA table_info(preventivi)').all().map(c => c.name);
+if (!preventiviCols.includes('nome_file')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN nome_file TEXT').run();
+}
+if (!preventiviCols.includes('percorso_file')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN percorso_file TEXT').run();
+}
+if (!preventiviCols.includes('dimensione_file')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN dimensione_file INTEGER').run();
+}
+
 // Seed checklist predefinita
 const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();
 if (!checklistExists) {

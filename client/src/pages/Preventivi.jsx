@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Paperclip, Eye, X, Download } from 'lucide-react';
 import api from '../api';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -8,6 +8,7 @@ const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 
 const STATI = ['in_attesa', 'in_valutazione', 'accettato', 'rifiutato'];
 const statoColor = { in_attesa: 'bg-gray-100 text-gray-600', in_valutazione: 'bg-yellow-100 text-yellow-700', accettato: 'bg-green-100 text-green-700', rifiutato: 'bg-red-100 text-red-600' };
 const statoLabel = { in_attesa: 'In attesa', in_valutazione: 'In valutazione', accettato: 'Accettato', rifiutato: 'Rifiutato' };
+const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 const empty = { fornitore_id: '', fornitore_nome: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '' };
 
@@ -20,6 +21,10 @@ export default function Preventivi() {
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [filtroStato, setFiltroStato] = useState('');
+  const [file, setFile] = useState(null);
+  const [rimuoviAllegato, setRimuoviAllegato] = useState(false);
+  const [preview, setPreview] = useState(null); // { item, url, ext }
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const load = () => {
     api.get('/preventivi').then(r => setItems(r.data));
@@ -27,14 +32,24 @@ export default function Preventivi() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
-  const openEdit = p => { setForm({ ...p, importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '' }); setEditId(p.id); setModal(true); };
+  const openNew = () => { setForm(empty); setEditId(null); setFile(null); setRimuoviAllegato(false); setModal(true); };
+  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
-    const payload = { ...form, importo: parseFloat(form.importo) };
-    if (editId) await api.put(`/preventivi/${editId}`, payload);
-    else await api.post('/preventivi', payload);
+    const fd = new FormData();
+    fd.append('fornitore_id', form.fornitore_id || '');
+    fd.append('fornitore_nome', form.fornitore_nome || '');
+    fd.append('categoria', form.categoria);
+    fd.append('descrizione', form.descrizione || '');
+    fd.append('importo', form.importo);
+    fd.append('stato', form.stato);
+    fd.append('data_scadenza', form.data_scadenza || '');
+    fd.append('note', form.note || '');
+    if (file) fd.append('allegato', file);
+    else if (rimuoviAllegato) fd.append('rimuovi_allegato', 'true');
+    if (editId) await api.put(`/preventivi/${editId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    else await api.post('/preventivi', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     setModal(false);
     load();
   };
@@ -43,6 +58,33 @@ export default function Preventivi() {
     if (!confirm('Eliminare questo preventivo?')) return;
     await api.delete(`/preventivi/${id}`);
     load();
+  };
+
+  const scaricaAllegato = async p => {
+    const response = await api.get(`/preventivi/download/${p.id}`, { responseType: 'blob' });
+    const url = URL.createObjectURL(response.data);
+    const a = document.createElement('a');
+    a.href = url; a.download = p.nome_file; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPreview = async p => {
+    const ext = p.nome_file.split('.').pop().toLowerCase();
+    if (!PREVIEWABLE.includes(ext)) { setPreview({ item: p, url: null, ext }); return; }
+    setLoadingPreview(true);
+    try {
+      const response = await api.get(`/preventivi/download/${p.id}`, { responseType: 'blob' });
+      const mime = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      const blob = new Blob([response.data], { type: mime });
+      setPreview({ item: p, url: URL.createObjectURL(blob), ext });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url);
+    setPreview(null);
   };
 
   const filtered = filtroStato ? items.filter(i => i.stato === filtroStato) : items;
@@ -91,6 +133,7 @@ export default function Preventivi() {
               <div className="text-xs text-gray-400 mb-2">Scade il {format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it })}</div>
             )}
             <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+              {p.nome_file && <button className="p-1.5 rounded hover:bg-blue-50 text-gray-500 hover:text-blue-600" onClick={() => openPreview(p)} title="Visualizza allegato"><Paperclip size={14} /></button>}
               <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(p)}><Pencil size={14} /></button>
               <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(p.id)}><Trash2 size={14} /></button>
             </div>
@@ -127,6 +170,7 @@ export default function Preventivi() {
                   <td className="text-gray-500 text-sm">{p.data_scadenza ? format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it }) : '—'}</td>
                   <td>
                     <div className="flex gap-1">
+                      {p.nome_file && <button className="p-1.5 rounded hover:bg-blue-50 text-gray-500 hover:text-blue-600" onClick={() => openPreview(p)} title="Visualizza allegato"><Paperclip size={14} /></button>}
                       <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700" onClick={() => openEdit(p)}><Pencil size={14} /></button>
                       <button className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600" onClick={() => del(p.id)}><Trash2 size={14} /></button>
                     </div>
@@ -137,6 +181,54 @@ export default function Preventivi() {
           </table>
         </div>
       </div>
+
+      {/* Modal anteprima allegato */}
+      {(preview || loadingPreview) && (
+        <div className="modal-overlay" onClick={closePreview}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            style={{ width: '90vw', maxWidth: '900px', maxHeight: '90vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800 truncate">{preview?.item?.fornitore_nome || 'Allegato'}</p>
+                <p className="text-xs text-gray-400 truncate">{preview?.item?.nome_file}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {preview?.item && (
+                  <button className="btn-secondary py-1 px-3 text-sm flex items-center gap-1" onClick={() => scaricaAllegato(preview.item)}>
+                    <Download size={13} /> Scarica
+                  </button>
+                )}
+                <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" onClick={closePreview}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 p-4" style={{ minHeight: '300px' }}>
+              {loadingPreview && !preview && (
+                <p className="text-gray-400 text-sm">Caricamento anteprima…</p>
+              )}
+              {preview?.url && preview.ext === 'pdf' && (
+                <iframe src={preview.url} title={preview.item.nome_file} className="w-full rounded" style={{ height: '75vh', border: 'none' }} />
+              )}
+              {preview?.url && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(preview.ext) && (
+                <img src={preview.url} alt={preview.item.nome_file} className="max-w-full max-h-full object-contain rounded shadow" style={{ maxHeight: '75vh' }} />
+              )}
+              {preview && !preview.url && !loadingPreview && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 font-medium mb-1">{preview.item.nome_file}</p>
+                  <p className="text-gray-400 text-sm mb-5">Anteprima non disponibile per i file .{preview.ext}</p>
+                  <button className="btn-primary" onClick={() => scaricaAllegato(preview.item)}>
+                    <Download size={14} /> Scarica il file
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
@@ -196,6 +288,22 @@ export default function Preventivi() {
               <div>
                 <label className="form-label">Scadenza preventivo</label>
                 <input type="date" className="form-input" value={form.data_scadenza} onChange={e => setForm({ ...form, data_scadenza: e.target.value })} />
+              </div>
+              <div>
+                <label className="form-label">Allegato (es. PDF del preventivo)</label>
+                {form.nome_file && !rimuoviAllegato && !file ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                    <Paperclip size={14} className="text-gray-400 flex-shrink-0" />
+                    <span className="truncate flex-1">{form.nome_file}</span>
+                    <button type="button" className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-blue-500" onClick={() => openPreview(form)} title="Visualizza"><Eye size={14} /></button>
+                    <button type="button" className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500" onClick={() => setRimuoviAllegato(true)} title="Rimuovi"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <div>
+                    <input type="file" accept="application/pdf,image/*" className="form-input" onChange={e => { setFile(e.target.files[0]); setRimuoviAllegato(false); }} />
+                    {rimuoviAllegato && !file && <p className="text-xs text-gray-400 mt-1">L'allegato verrà rimosso al salvataggio.</p>}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">Note</label>
