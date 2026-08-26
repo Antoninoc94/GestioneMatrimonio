@@ -343,6 +343,12 @@ if (!preventiviCols.includes('percorso_file')) {
 if (!preventiviCols.includes('dimensione_file')) {
   db.prepare('ALTER TABLE preventivi ADD COLUMN dimensione_file INTEGER').run();
 }
+if (!preventiviCols.includes('anticipo')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN anticipo REAL').run();
+}
+if (!preventiviCols.includes('data_anticipo')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN data_anticipo TEXT').run();
+}
 
 // Seed checklist predefinita
 const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();

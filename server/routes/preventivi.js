@@ -30,15 +30,15 @@ router.get('/', auth, (req, res) => {
 });
 
 router.post('/', auth, upload.single('allegato'), (req, res) => {
-  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note } = req.body;
+  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, anticipo, data_anticipo } = req.body;
   const file = req.file ? { nome_file: req.file.originalname, percorso_file: req.file.filename, dimensione_file: req.file.size } : { nome_file: null, percorso_file: null, dimensione_file: null };
-  const r = db.prepare('INSERT INTO preventivi (fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, nome_file, percorso_file, dimensione_file) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato || 'in_attesa', data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file);
+  const r = db.prepare('INSERT INTO preventivi (fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, nome_file, percorso_file, dimensione_file, anticipo, data_anticipo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato || 'in_attesa', data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, anticipo ? parseFloat(anticipo) : null, data_anticipo || null);
   res.json(db.prepare('SELECT * FROM preventivi WHERE id = ?').get(r.lastInsertRowid));
 });
 
 router.put('/:id', auth, upload.single('allegato'), (req, res) => {
-  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, rimuovi_allegato } = req.body;
+  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, rimuovi_allegato, anticipo, data_anticipo } = req.body;
   const existing = db.prepare('SELECT nome_file, percorso_file FROM preventivi WHERE id = ?').get(req.params.id);
 
   let file = { nome_file: existing?.nome_file, percorso_file: existing?.percorso_file, dimensione_file: existing?.dimensione_file };
@@ -50,8 +50,8 @@ router.put('/:id', auth, upload.single('allegato'), (req, res) => {
     file = { nome_file: null, percorso_file: null, dimensione_file: null };
   }
 
-  db.prepare('UPDATE preventivi SET fornitore_id=?, fornitore_nome=?, categoria=?, descrizione=?, importo=?, stato=?, data_scadenza=?, note=?, nome_file=?, percorso_file=?, dimensione_file=? WHERE id=?')
-    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato, data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, req.params.id);
+  db.prepare('UPDATE preventivi SET fornitore_id=?, fornitore_nome=?, categoria=?, descrizione=?, importo=?, stato=?, data_scadenza=?, note=?, nome_file=?, percorso_file=?, dimensione_file=?, anticipo=?, data_anticipo=? WHERE id=?')
+    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato, data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, anticipo ? parseFloat(anticipo) : null, data_anticipo || null, req.params.id);
   res.json(db.prepare('SELECT * FROM preventivi WHERE id = ?').get(req.params.id));
 });
 

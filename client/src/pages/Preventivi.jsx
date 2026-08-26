@@ -4,13 +4,13 @@ import api from '../api';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Location', 'Chiesa', 'Viaggio di nozze', 'Altro'];
+const CATEGORIE = ['Fotografo', 'Videomaker', 'Catering', 'Fiorista', 'Musica', 'Animazione', 'Auto', 'Abito sposa', 'Abito sposo', 'Parrucchiere', 'Makeup', 'Pasticceria', 'Location', 'Chiesa', 'Viaggio di nozze', 'Inviti', 'Bomboniere', 'Decorazioni', 'Altro'];
 const STATI = ['in_attesa', 'in_valutazione', 'accettato', 'rifiutato'];
 const statoColor = { in_attesa: 'bg-gray-100 text-gray-600', in_valutazione: 'bg-yellow-100 text-yellow-700', accettato: 'bg-green-100 text-green-700', rifiutato: 'bg-red-100 text-red-600' };
 const statoLabel = { in_attesa: 'In attesa', in_valutazione: 'In valutazione', accettato: 'Accettato', rifiutato: 'Rifiutato' };
 const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-const empty = { fornitore_id: '', fornitore_nome: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '' };
+const empty = { fornitore_id: '', fornitore_nome: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '', anticipo: '', data_anticipo: '' };
 
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
 
@@ -33,7 +33,7 @@ export default function Preventivi() {
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setForm(empty); setEditId(null); setFile(null); setRimuoviAllegato(false); setModal(true); };
-  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setModal(true); };
+  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '', anticipo: p.anticipo != null ? p.anticipo.toString() : '', data_anticipo: p.data_anticipo || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
@@ -46,6 +46,8 @@ export default function Preventivi() {
     fd.append('stato', form.stato);
     fd.append('data_scadenza', form.data_scadenza || '');
     fd.append('note', form.note || '');
+    fd.append('anticipo', form.anticipo || '');
+    fd.append('data_anticipo', form.data_anticipo || '');
     if (file) fd.append('allegato', file);
     else if (rimuoviAllegato) fd.append('rimuovi_allegato', 'true');
     if (editId) await api.put(`/preventivi/${editId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -126,7 +128,10 @@ export default function Preventivi() {
                   <span className={`badge text-xs ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span>
                 </div>
               </div>
-              <div className="font-bold text-gray-900 text-sm flex-shrink-0">{formatEuro(p.importo)}</div>
+              <div className="text-right flex-shrink-0">
+                <div className="font-bold text-gray-900 text-sm">{formatEuro(p.importo)}</div>
+                {p.anticipo > 0 && <div className="text-xs text-gray-400">Anticipo {formatEuro(p.anticipo)}</div>}
+              </div>
             </div>
             {p.descrizione && <div className="text-xs text-gray-500 mb-2 truncate">{p.descrizione}</div>}
             {p.data_scadenza && (
@@ -165,7 +170,10 @@ export default function Preventivi() {
                   <td className="font-medium text-gray-900">{p.fornitore_nome || '—'}</td>
                   <td className="text-gray-500">{p.categoria}</td>
                   <td className="text-gray-600 max-w-xs truncate">{p.descrizione || '—'}</td>
-                  <td className="font-bold text-gray-900">{formatEuro(p.importo)}</td>
+                  <td className="font-bold text-gray-900">
+                    {formatEuro(p.importo)}
+                    {p.anticipo > 0 && <div className="text-xs font-normal text-gray-400">Anticipo {formatEuro(p.anticipo)}</div>}
+                  </td>
                   <td><span className={`badge ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span></td>
                   <td className="text-gray-500 text-sm">{p.data_scadenza ? format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it }) : '—'}</td>
                   <td>
@@ -288,6 +296,19 @@ export default function Preventivi() {
               <div>
                 <label className="form-label">Scadenza preventivo</label>
                 <input type="date" className="form-input" value={form.data_scadenza} onChange={e => setForm({ ...form, data_scadenza: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Anticipo versato (€)</label>
+                  <input type="number" step="0.01" min="0" className="form-input" value={form.anticipo} onChange={e => setForm({ ...form, anticipo: e.target.value })} />
+                  {form.anticipo && form.importo && (
+                    <p className="text-xs text-gray-400 mt-1">Saldo residuo: {formatEuro(parseFloat(form.importo) - parseFloat(form.anticipo))}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Data anticipo</label>
+                  <input type="date" className="form-input" value={form.data_anticipo} onChange={e => setForm({ ...form, data_anticipo: e.target.value })} />
+                </div>
               </div>
               <div>
                 <label className="form-label">Allegato (es. PDF del preventivo)</label>
