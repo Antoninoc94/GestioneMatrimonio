@@ -194,35 +194,34 @@ export default function Preventivi() {
       {(preview || loadingPreview) && (
         <div className="modal-overlay" onClick={closePreview}>
           <div
-            className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-            style={{ width: '90vw', maxWidth: '900px', maxHeight: '90vh' }}
+            className="modal-preview bg-white shadow-2xl flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-800 truncate">{preview?.item?.fornitore_nome || 'Allegato'}</p>
                 <p className="text-xs text-gray-400 truncate">{preview?.item?.nome_file}</p>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-1 flex-shrink-0">
                 {preview?.item && (
-                  <button className="btn-secondary py-1 px-3 text-sm flex items-center gap-1" onClick={() => scaricaAllegato(preview.item)}>
-                    <Download size={13} /> Scarica
+                  <button className="p-2 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600" onClick={() => scaricaAllegato(preview.item)} title="Scarica">
+                    <Download size={18} />
                   </button>
                 )}
-                <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" onClick={closePreview}>
+                <button className="p-2 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700" onClick={closePreview} title="Chiudi">
                   <X size={18} />
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 p-4" style={{ minHeight: '300px' }}>
+            <div className="flex-1 min-h-0 overflow-auto flex items-center justify-center bg-gray-50 p-4">
               {loadingPreview && !preview && (
                 <p className="text-gray-400 text-sm">Caricamento anteprima…</p>
               )}
               {preview?.url && preview.ext === 'pdf' && (
-                <iframe src={preview.url} title={preview.item.nome_file} className="w-full rounded" style={{ height: '75vh', border: 'none' }} />
+                <iframe src={preview.url} title={preview.item.nome_file} className="w-full h-full rounded" style={{ border: 'none' }} />
               )}
               {preview?.url && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(preview.ext) && (
-                <img src={preview.url} alt={preview.item.nome_file} className="max-w-full max-h-full object-contain rounded shadow" style={{ maxHeight: '75vh' }} />
+                <img src={preview.url} alt={preview.item.nome_file} className="max-w-full max-h-full object-contain rounded shadow" />
               )}
               {preview && !preview.url && !loadingPreview && (
                 <div className="text-center py-12">
