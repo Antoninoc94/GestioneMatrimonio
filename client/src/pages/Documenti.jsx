@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Upload, Trash2, Download, FolderOpen, X, Eye } from 'lucide-react';
 import api from '../api';
+import PdfViewer from '../components/PdfViewer';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -198,21 +199,7 @@ export default function Documenti() {
                 <p className="text-gray-400 text-sm">Caricamento anteprima…</p>
               )}
               {preview?.url && preview.ext === 'pdf' && (
-                <>
-                  <iframe
-                    src={preview.url}
-                    title={preview.doc.titolo}
-                    className="hidden sm:block w-full h-full rounded"
-                    style={{ border: 'none' }}
-                  />
-                  <div className="sm:hidden text-center py-12">
-                    <p className="text-gray-500 font-medium mb-1">{preview.doc.titolo}</p>
-                    <p className="text-gray-400 text-sm mb-5">Il browser del telefono non può scorrere l'anteprima PDF: aprilo a schermo intero</p>
-                    <a href={preview.url} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex items-center gap-1.5">
-                      <Download size={14} /> Apri il PDF
-                    </a>
-                  </div>
-                </>
+                <PdfViewer url={preview.url} />
               )}
               {preview?.url && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(preview.ext) && (
                 <img
