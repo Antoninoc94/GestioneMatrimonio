@@ -13,14 +13,14 @@ export default function PdfViewer({ url }) {
 
   useEffect(() => {
     let cancelled = false;
-    let pdfDoc = null;
+    const loadingTask = pdfjsLib.getDocument({ url });
     const container = containerRef.current;
     container.innerHTML = '';
     setError(null);
 
     (async () => {
       try {
-        pdfDoc = await pdfjsLib.getDocument({ url }).promise;
+        const pdfDoc = await loadingTask.promise;
         const dpr = window.devicePixelRatio || 1;
         for (let i = 1; i <= pdfDoc.numPages; i++) {
           if (cancelled) return;
@@ -44,14 +44,16 @@ export default function PdfViewer({ url }) {
           await page.render({ canvasContext: ctx, viewport }).promise;
         }
       } catch (e) {
-        console.error('PdfViewer error:', e);
-        if (!cancelled) setError(e);
+        if (!cancelled) {
+          console.error('PdfViewer error:', e);
+          setError(e);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
-      pdfDoc?.destroy();
+      loadingTask.destroy().catch(() => {});
     };
   }, [url]);
 
