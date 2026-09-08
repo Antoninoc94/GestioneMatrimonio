@@ -39,7 +39,9 @@ router.post('/', auth, upload.single('allegato'), (req, res) => {
 
 router.put('/:id', auth, upload.single('allegato'), (req, res) => {
   const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, rimuovi_allegato, anticipo, data_anticipo } = req.body;
-  const existing = db.prepare('SELECT nome_file, percorso_file FROM preventivi WHERE id = ?').get(req.params.id);
+  // dimensione_file va riletta insieme alle altre: se manca dalla SELECT, il ramo
+  // "allegato invariato" la riscrive come NULL a ogni modifica del preventivo.
+  const existing = db.prepare('SELECT nome_file, percorso_file, dimensione_file FROM preventivi WHERE id = ?').get(req.params.id);
 
   let file = { nome_file: existing?.nome_file, percorso_file: existing?.percorso_file, dimensione_file: existing?.dimensione_file };
   if (req.file) {

@@ -26,6 +26,7 @@ export default function Preventivi() {
   const [rimuoviAllegato, setRimuoviAllegato] = useState(false);
   const [preview, setPreview] = useState(null); // { item, url, ext }
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [errore, setErrore] = useState('');
 
   const load = () => {
     api.get('/preventivi').then(r => setItems(r.data));
@@ -33,11 +34,12 @@ export default function Preventivi() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setForm(empty); setEditId(null); setFile(null); setRimuoviAllegato(false); setModal(true); };
-  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '', anticipo: p.anticipo != null ? p.anticipo.toString() : '', data_anticipo: p.data_anticipo || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setModal(true); };
+  const openNew = () => { setForm(empty); setEditId(null); setFile(null); setRimuoviAllegato(false); setErrore(''); setModal(true); };
+  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '', anticipo: p.anticipo != null ? p.anticipo.toString() : '', data_anticipo: p.data_anticipo || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setErrore(''); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
+    setErrore('');
     const fd = new FormData();
     fd.append('fornitore_id', form.fornitore_id || '');
     fd.append('fornitore_nome', form.fornitore_nome || '');
@@ -51,8 +53,15 @@ export default function Preventivi() {
     fd.append('data_anticipo', form.data_anticipo || '');
     if (file) fd.append('allegato', file);
     else if (rimuoviAllegato) fd.append('rimuovi_allegato', 'true');
-    if (editId) await api.put(`/preventivi/${editId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-    else await api.post('/preventivi', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    try {
+      if (editId) await api.put(`/preventivi/${editId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      else await api.post('/preventivi', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    } catch (err) {
+      // Senza catch il modale resterebbe aperto senza spiegazioni e l'errore
+      // finirebbe solo in console (es. allegato oltre i 10 MB).
+      setErrore(err.response?.data?.error || 'Salvataggio fallito. Riprova.');
+      return;
+    }
     setModal(false);
     load();
   };
@@ -330,6 +339,7 @@ export default function Preventivi() {
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
+              {errore && <p className="text-sm text-red-500">{errore}</p>}
               <div className="flex gap-2 pt-3 -mx-4 sm:-mx-6 px-4 sm:px-6 sticky bottom-0 bg-white border-t border-gray-100">
                 <button type="submit" className="btn-primary">Salva</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>

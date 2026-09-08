@@ -31,9 +31,15 @@ router.put('/:id', auth, (req, res) => {
   res.json(db.prepare('SELECT o.*, t.nome as tavolo_nome FROM ospiti o LEFT JOIN tavoli t ON o.tavolo_id = t.id WHERE o.id = ?').get(req.params.id));
 });
 
+// Familiari e ospite principale vanno eliminati insieme: un'interruzione tra i
+// due statement lascerebbe partner e figli in lista senza il loro invitato.
+const eliminaConFamiliari = db.transaction(id => {
+  db.prepare('DELETE FROM ospiti WHERE parent_id = ?').run(id);
+  db.prepare('DELETE FROM ospiti WHERE id = ?').run(id);
+});
+
 router.delete('/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM ospiti WHERE parent_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM ospiti WHERE id = ?').run(req.params.id);
+  eliminaConFamiliari(req.params.id);
   res.json({ ok: true });
 });
 

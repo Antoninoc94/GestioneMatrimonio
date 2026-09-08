@@ -35,6 +35,7 @@ export default function Documenti() {
   const [form, setForm] = useState(empty);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [errore, setErrore] = useState('');
   const [filtro, setFiltro] = useState('');
   const [preview, setPreview] = useState(null); // { doc, url, ext }
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -46,12 +47,13 @@ export default function Documenti() {
   };
   useEffect(() => { load(); }, []);
 
-  const openUpload = () => { setForm(empty); setFile(null); setModal(true); };
+  const openUpload = () => { setForm(empty); setFile(null); setErrore(''); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
     if (!file) return alert('Seleziona un file');
     setUploading(true);
+    setErrore('');
     try {
       const fd = new FormData();
       fd.append('file', file);
@@ -62,6 +64,10 @@ export default function Documenti() {
       await api.post('/documenti', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setModal(false);
       load();
+    } catch (err) {
+      // Senza questo il modale resta aperto senza spiegazioni: il messaggio del
+      // server (es. "File troppo grande") non arriverebbe mai all'utente.
+      setErrore(err.response?.data?.error || 'Caricamento fallito. Riprova.');
     } finally {
       setUploading(false);
     }
@@ -265,6 +271,7 @@ export default function Documenti() {
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
+              {errore && <p className="text-sm text-red-500">{errore}</p>}
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="btn-primary" disabled={uploading}>{uploading ? 'Caricamento...' : 'Carica'}</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>

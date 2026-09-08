@@ -96,46 +96,57 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
   if (!['confermato', 'declinato', 'attesa'].includes(rsvp))
     return res.status(400).json({ error: 'Stato non valido' });
 
-  // Ospite principale
-  let mainId = id;
-  if (id) {
-    const ospite = db.prepare('SELECT id FROM ospiti WHERE id = ?').get(id);
-    if (!ospite) return res.status(404).json({ error: 'Ospite non trovato' });
-    db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=? WHERE id=?')
-      .run(rsvp, intolleranze || null, messaggio_ospite || null, id);
-  } else {
-    const r = db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, fonte)
-                VALUES (?, ?, ?, ?, ?, 'sito')`)
-      .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null);
-    mainId = r.lastInsertRowid;
-  }
+  // Validazioni prima della transazione: dentro non si può rispondere al client
+  // e uscire a metà, andrebbe in rollback un lavoro già iniziato.
+  const conPartner = !!(partner?.nome?.trim() && partner?.rsvp);
+  if (conPartner && !['confermato', 'declinato'].includes(partner.rsvp))
+    return res.status(400).json({ error: 'Stato partner non valido' });
 
-  // Partner (opzionale)
-  if (partner?.nome?.trim() && partner?.rsvp) {
-    if (!['confermato', 'declinato'].includes(partner.rsvp))
-      return res.status(400).json({ error: 'Stato partner non valido' });
-    upsertPartner({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
-  }
+  if (id && !db.prepare('SELECT id FROM ospiti WHERE id = ?').get(id))
+    return res.status(404).json({ error: 'Ospite non trovato' });
 
-  // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione).
-  // Il tipo (adulto/bambino) si deduce dall'età rispetto alla soglia configurata — un figlio
-  // maggiorenne non deve essere trattato come bambino nei conteggi/menu, ma resta comunque
-  // un "figlio" a livello di parentela (relazione), a prescindere dall'età.
-  if (Array.isArray(figli)) {
-    const mainFonte = db.prepare('SELECT fonte FROM ospiti WHERE id = ?').get(mainId)?.fonte || 'sito';
-    const soglia = db.prepare('SELECT soglia_eta_bambino FROM config LIMIT 1').get()?.soglia_eta_bambino || 12;
-    db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND relazione = 'figlio'").run(mainId);
-    for (const f of figli) {
-      if (!f.nome?.trim()) continue;
-      const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
-      const fEta = parseInt(f.eta) || null;
-      const fTipo = fEta != null && fEta >= soglia ? 'adulto' : 'bambino';
-      db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id, relazione)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, 'figlio')`)
-        .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, mainFonte, mainId);
+  // Ospite principale, partner e figli si salvano tutti o nessuno: il blocco figli
+  // cancella prima di reinserire, quindi un errore a metà lascerebbe l'invitato
+  // senza i familiari che aveva appena confermato — dato non ricostruibile.
+  const salvaRisposta = db.transaction(() => {
+    // Ospite principale
+    let mainId = id;
+    if (id) {
+      db.prepare('UPDATE ospiti SET rsvp=?, intolleranze=?, messaggio_ospite=? WHERE id=?')
+        .run(rsvp, intolleranze || null, messaggio_ospite || null, id);
+    } else {
+      const r = db.prepare(`INSERT INTO ospiti (nome, cognome, rsvp, intolleranze, messaggio_ospite, fonte)
+                  VALUES (?, ?, ?, ?, ?, 'sito')`)
+        .run(nome, cognome || null, rsvp, intolleranze || null, messaggio_ospite || null);
+      mainId = r.lastInsertRowid;
     }
-  }
 
+    // Partner (opzionale)
+    if (conPartner) {
+      upsertPartner({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
+    }
+
+    // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione).
+    // Il tipo (adulto/bambino) si deduce dall'età rispetto alla soglia configurata — un figlio
+    // maggiorenne non deve essere trattato come bambino nei conteggi/menu, ma resta comunque
+    // un "figlio" a livello di parentela (relazione), a prescindere dall'età.
+    if (Array.isArray(figli)) {
+      const mainFonte = db.prepare('SELECT fonte FROM ospiti WHERE id = ?').get(mainId)?.fonte || 'sito';
+      const soglia = db.prepare('SELECT soglia_eta_bambino FROM config LIMIT 1').get()?.soglia_eta_bambino || 12;
+      db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND relazione = 'figlio'").run(mainId);
+      for (const f of figli) {
+        if (!f.nome?.trim()) continue;
+        const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
+        const fEta = parseInt(f.eta) || null;
+        const fTipo = fEta != null && fEta >= soglia ? 'adulto' : 'bambino';
+        db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id, relazione)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'figlio')`)
+          .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, mainFonte, mainId);
+      }
+    }
+  });
+
+  salvaRisposta();
   res.json({ ok: true });
 });
 
