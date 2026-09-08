@@ -104,6 +104,41 @@ docker compose up -d
 
 I dati (database SQLite e file caricati) sono persistiti in volumi Docker (`matrimonio_db`, `matrimonio_uploads`) e sopravvivono a rebuild/aggiornamenti del container.
 
+## Backup e ripristino
+
+`install.sh` configura un backup automatico giornaliero alle 03:00 in `/var/backups/matrimonio`, con 14 giorni di storico. `update.sh` esegue inoltre uno snapshot **prima** di ogni aggiornamento, così un rebuild andato male è reversibile.
+
+Backup manuale:
+
+```bash
+cd /opt/matrimonio && sudo bash backup.sh          # database + allegati
+BACKUP_DIR=/mnt/nas sudo bash backup.sh            # destinazione alternativa
+RETENTION_DAYS=30 sudo bash backup.sh              # storico più lungo
+bash backup.sh --local                             # in sviluppo, senza Docker
+```
+
+Il database **non** va copiato con `cp` o `tar`: gira in modalità WAL, quindi le ultime transazioni stanno nel file `-wal` affiancato e una copia grezza le perde. `backup.sh` usa `VACUUM INTO` (tramite `server/backup-db.js`), che produce un singolo file consistente e compattato anche a server acceso, e ne verifica l'integrità con `PRAGMA integrity_check` prima di considerarlo valido.
+
+> I backup restano sullo stesso server: copiali periodicamente altrove (`rsync`, `rclone` verso NAS o cloud), altrimenti un guasto al disco li porta via insieme ai dati.
+
+### Ripristino
+
+```bash
+cd /opt/matrimonio
+docker compose down
+
+# database
+gunzip -c /var/backups/matrimonio/matrimonio-<data>.db.gz > /tmp/restore.db
+docker run --rm -v matrimonio_db:/data -v /tmp:/in alpine   sh -c "rm -f /data/matrimonio.db-wal /data/matrimonio.db-shm && cp /in/restore.db /data/matrimonio.db"
+
+# allegati (opzionale)
+docker run --rm -v matrimonio_uploads:/data -v /var/backups/matrimonio:/in alpine   sh -c "rm -rf /data/* && tar -xzf /in/uploads-<data>.tar.gz -C /tmp && cp -r /tmp/uploads/. /data/"
+
+docker compose up -d
+```
+
+La rimozione dei file `-wal`/`-shm` è necessaria: sono residui della sessione precedente e, lasciati accanto a un database ripristinato, lo corromperebbero.
+
 ## Configurazione
 
 Tutta la configurazione applicativa (nome app, emoji, data del matrimonio, budget, soglia d'età per contare un figlio come adulto, temi della landing page, SMTP, promemoria) si gestisce dall'interno dell'app, sezione **Impostazioni** — non richiede di toccare file o variabili d'ambiente oltre al `JWT_SECRET` iniziale.

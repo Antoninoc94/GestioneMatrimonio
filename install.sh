@@ -130,6 +130,18 @@ done
 echo ""
 
 # ============================================================
+# 8. BACKUP AUTOMATICO
+# ============================================================
+info "Configurazione backup automatico giornaliero..."
+CRON_LINE="0 3 * * * cd $APP_DIR && bash backup.sh >> /var/log/matrimonio-backup.log 2>&1"
+if crontab -l 2>/dev/null | grep -qF "matrimonio-backup.log"; then
+    success "Cron di backup gia' presente, non duplicato"
+else
+    (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
+    success "Backup giornaliero alle 03:00 in /var/backups/matrimonio (14 giorni di storico)"
+fi
+
+# ============================================================
 # RIEPILOGO
 # ============================================================
 IP=$(hostname -I | awk '{print $1}')
@@ -155,6 +167,10 @@ echo "    Aggiorna:      cd $APP_DIR && bash update.sh"
 echo "    Stop:          cd $APP_DIR && docker compose down"
 echo ""
 echo -e "  ${BLUE}Backup dati:${NC}"
-echo "    docker run --rm -v matrimonio_db:/data -v \$(pwd):/backup alpine"
-echo "      tar czf /backup/db-backup-\$(date +%Y%m%d).tar.gz /data"
+echo "    Automatico:    ogni notte alle 03:00 -> /var/backups/matrimonio"
+echo "    Manuale:       cd $APP_DIR && sudo bash backup.sh"
+echo "    Log:           tail -f /var/log/matrimonio-backup.log"
+echo ""
+echo -e "  ${YELLOW}I backup restano su QUESTO server: copiali su un NAS o cloud${NC}"
+echo -e "  ${YELLOW}(rsync/rclone) per essere davvero al riparo da un guasto disco.${NC}"
 echo ""
