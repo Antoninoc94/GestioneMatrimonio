@@ -12,11 +12,16 @@
 #  Cron giornaliero alle 3:00 (crontab -e come root):
 #    0 3 * * * cd /opt/matrimonio && bash backup.sh >> /var/log/matrimonio-backup.log 2>&1
 #
-#  RIPRISTINO (vedi README):
+#  RIPRISTINO (procedura completa nel README):
 #    docker compose down
 #    gunzip -c matrimonio-<data>.db.gz > /tmp/restore.db
-#    docker compose run --rm -v /tmp:/restore app cp /restore/restore.db /app/data/matrimonio.db
+#    docker run --rm -v matrimonio_db:/data -v /tmp:/in alpine \
+#      sh -c "rm -f /data/matrimonio.db-wal /data/matrimonio.db-shm && \
+#             cp /in/restore.db /data/matrimonio.db"
 #    docker compose up -d
+#
+#  I file -wal/-shm vanno rimossi prima di copiare: sono residui della sessione
+#  precedente e, lasciati accanto a un database ripristinato, lo corrompono.
 # ============================================================
 
 set -euo pipefail
