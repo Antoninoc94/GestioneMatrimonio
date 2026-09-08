@@ -59,10 +59,14 @@ else
     # Lo script viene copiato dal checkout invece di essere invocato dall'immagine:
     # update.sh esegue il backup PRIMA del rebuild, quindi l'immagine in esecuzione
     # puo' non contenerlo ancora (o contenerne una versione vecchia).
-    docker compose cp server/backup-db.js "$SERVICE:/tmp/backup-db.js"
-    docker compose exec -T "$SERVICE" node /tmp/backup-db.js         "/tmp/matrimonio-$STAMP.db" "${DB_IN_CONTAINER:-/app/data/matrimonio.db}"
+    #
+    # Va copiato dentro /app/server, non in /tmp: Node risolve le dipendenze
+    # risalendo dalla cartella dello script, e better-sqlite3 sta in
+    # /app/server/node_modules.
+    docker compose cp server/backup-db.js "$SERVICE:/app/server/.backup-db-tmp.js"
+    docker compose exec -T "$SERVICE" node /app/server/.backup-db-tmp.js "/tmp/matrimonio-$STAMP.db" "${DB_IN_CONTAINER:-/app/data/matrimonio.db}"
     docker compose cp "$SERVICE:/tmp/matrimonio-$STAMP.db" "$DB_OUT"
-    docker compose exec -T "$SERVICE" rm -f "/tmp/matrimonio-$STAMP.db" /tmp/backup-db.js
+    docker compose exec -T "$SERVICE" rm -f "/tmp/matrimonio-$STAMP.db" /app/server/.backup-db-tmp.js
 
     info "Backup allegati (documenti, preventivi, foto landing)..."
     docker compose exec -T "$SERVICE" tar -czf - -C /app/server uploads > "$UPLOADS_OUT"
