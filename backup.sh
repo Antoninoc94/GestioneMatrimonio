@@ -55,9 +55,14 @@ else
     info "Backup database (VACUUM INTO dentro al container)..."
     # Lo snapshot viene creato dentro al container e poi estratto: cosi' SQLite
     # consolida il WAL prima che il file venga toccato dall'esterno.
-    docker compose exec -T "$SERVICE" node server/backup-db.js "/tmp/matrimonio-$STAMP.db"
+    #
+    # Lo script viene copiato dal checkout invece di essere invocato dall'immagine:
+    # update.sh esegue il backup PRIMA del rebuild, quindi l'immagine in esecuzione
+    # puo' non contenerlo ancora (o contenerne una versione vecchia).
+    docker compose cp server/backup-db.js "$SERVICE:/tmp/backup-db.js"
+    docker compose exec -T "$SERVICE" node /tmp/backup-db.js         "/tmp/matrimonio-$STAMP.db" "${DB_IN_CONTAINER:-/app/data/matrimonio.db}"
     docker compose cp "$SERVICE:/tmp/matrimonio-$STAMP.db" "$DB_OUT"
-    docker compose exec -T "$SERVICE" rm -f "/tmp/matrimonio-$STAMP.db"
+    docker compose exec -T "$SERVICE" rm -f "/tmp/matrimonio-$STAMP.db" /tmp/backup-db.js
 
     info "Backup allegati (documenti, preventivi, foto landing)..."
     docker compose exec -T "$SERVICE" tar -czf - -C /app/server uploads > "$UPLOADS_OUT"

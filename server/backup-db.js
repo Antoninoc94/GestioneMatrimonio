@@ -12,7 +12,7 @@ const Database = require('better-sqlite3');
 
 const dest = process.argv[2];
 if (!dest) {
-  console.error('Uso: node backup-db.js <file-destinazione.db>');
+  console.error('Uso: node backup-db.js <file-destinazione.db> [database-sorgente.db]');
   process.exit(1);
 }
 if (fs.existsSync(dest)) {
@@ -20,7 +20,10 @@ if (fs.existsSync(dest)) {
   process.exit(1);
 }
 
-const source = process.env.DB_PATH || path.join(__dirname, 'matrimonio.db');
+// La sorgente puo' essere passata esplicitamente: quando lo script viene copiato
+// dentro al container __dirname non e' piu' /app/server, quindi il fallback su
+// __dirname non varrebbe piu'.
+const source = process.argv[3] || process.env.DB_PATH || path.join(__dirname, 'matrimonio.db');
 if (!fs.existsSync(source)) {
   console.error(`Errore: database non trovato in ${source}`);
   process.exit(1);
