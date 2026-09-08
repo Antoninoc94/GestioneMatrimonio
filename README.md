@@ -90,6 +90,8 @@ Lo script installa Docker se necessario, configura il firewall, clona il reposit
 
 Se l'app deve stare dietro un reverse proxy, aggiungi `APP_PORT` e `TRUST_PROXY` al `.env` prima di avviare — vedi la sezione dedicata.
 
+> **Nota per una nuova installazione con `APP_PORT` diverso da 80.** Il controllo finale di `install.sh` interroga `http://127.0.0.1/api/dashboard` sulla porta 80 fissa, quindi stamperebbe `[WARN] Timeout verifica` anche con l'app perfettamente avviata. È solo un avviso fuorviante, non un errore: verifica con `docker compose ps` e prosegui. Per eliminarlo basta usare `${APP_PORT:-80}` al posto della porta fissa in quella riga di `install.sh`.
+
 Per aggiornare un'installazione esistente:
 
 ```bash
