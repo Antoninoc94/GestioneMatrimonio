@@ -202,7 +202,7 @@ export default function Preventivi() {
 
       {/* Modal anteprima allegato */}
       {(preview || loadingPreview) && (
-        <div className="modal-overlay" onClick={closePreview}>
+        <div className="modal-overlay modal-overlay-top" onClick={closePreview}>
           <div
             className="modal-preview bg-white shadow-2xl flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}

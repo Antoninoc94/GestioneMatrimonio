@@ -190,6 +190,13 @@ a, button, [role="button"], summary,
     z-index: 50;
   }
 
+  /* Overlay che deve stare sopra un altro gia' aperto (es. l'anteprima di un
+     allegato lanciata dalla modal di modifica). Senza, i due overlay hanno lo
+     stesso z-index e vince l'ultimo nel DOM, che e' quello di modifica. */
+  .modal-overlay-top {
+    z-index: 60;
+  }
+
   .modal {
     background: white;
     border-radius: 1rem 1rem 0 0;
