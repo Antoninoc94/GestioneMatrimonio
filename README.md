@@ -86,13 +86,17 @@ Su una VPS Ubuntu con accesso root, installazione guidata in un comando:
 sudo bash install.sh
 ```
 
-Lo script installa Docker se necessario, configura il firewall, clona il repository, genera un `.env` con `JWT_SECRET` casuale, builda l'immagine e avvia il container. L'app sarà raggiungibile su `http://<ip-server>/`.
+Lo script installa Docker se necessario, configura il firewall, clona il repository, genera un `.env` con `JWT_SECRET` casuale, builda l'immagine, avvia il container e imposta il backup automatico giornaliero. L'app sarà raggiungibile su `http://<ip-server>/`.
+
+Se l'app deve stare dietro un reverse proxy, aggiungi `APP_PORT` e `TRUST_PROXY` al `.env` prima di avviare — vedi la sezione dedicata.
 
 Per aggiornare un'installazione esistente:
 
 ```bash
-cd /opt/matrimonio && sudo bash update.sh
+cd /opt/matrimonio && sudo ./update.sh
 ```
+
+Lo script fa tutto da sé, in ordine: backup di sicurezza, `git pull`, rebuild dell'immagine, riavvio. Non serve un `git pull` manuale prima — l'unica eccezione è quando l'aggiornamento modifica `backup.sh` stesso, perché il backup viene eseguito prima del pull e userebbe la versione precedente.
 
 In alternativa, con Docker Compose già disponibile:
 
@@ -154,4 +158,24 @@ La rimozione dei file `-wal`/`-shm` è necessaria: sono residui della sessione p
 
 ## Configurazione
 
-Tutta la configurazione applicativa (nome app, emoji, data del matrimonio, budget, soglia d'età per contare un figlio come adulto, temi della landing page, SMTP, promemoria) si gestisce dall'interno dell'app, sezione **Impostazioni** — non richiede di toccare file o variabili d'ambiente oltre al `JWT_SECRET` iniziale.
+Tutta la configurazione applicativa (nome app, emoji, data del matrimonio, budget, soglia d'età per contare un figlio come adulto, temi della landing page, SMTP, promemoria) si gestisce dall'interno dell'app, sezione **Impostazioni** — senza toccare file né variabili d'ambiente.
+
+Le sole variabili d'ambiente, nel `.env` accanto al `docker-compose.yml`:
+
+| Variabile | Obbligatoria | Default | A cosa serve |
+|---|---|---|---|
+| `JWT_SECRET` | sì | — | Firma dei token di sessione. Senza, il server non parte. |
+| `APP_PORT` | no | `80` | Porta pubblicata sull'host. Dietro un reverse proxy tipicamente `3001`. |
+| `TRUST_PROXY` | no | `0` | Numero di proxy davanti all'app. Vedi la sezione sul reverse proxy. |
+
+In sviluppo locale il file va invece in `server/.env`, perché il server viene avviato con `cd server && node index.js` e `dotenv` risolve il percorso rispetto alla cartella corrente.
+
+## Protezione della pagina pubblica
+
+RSVP e landing page sono raggiungibili senza autenticazione, quindi hanno alcune protezioni:
+
+- **Limiti di frequenza** per indirizzo IP: 20 tentativi di login falliti ogni 15 minuti (quelli riusciti non contano), 120 richieste/ora sulla pagina RSVP e 60 invii di conferma/ora — quest'ultimo perché il form può creare nuovi ospiti. Servono a fermare uno script, non a contare persone: un abuso automatico farebbe migliaia di richieste.
+- **Interruttore** `conferma_abilitata` da Impostazioni: a inviti chiusi, conviene spegnere la pagina RSVP.
+- **Allegati privati**: contratti e preventivi si scaricano solo da utenti autenticati; l'unica risorsa servita pubblicamente è la foto della landing page.
+
+Se l'app sta dietro un proxy, `TRUST_PROXY` va impostato o i limiti si applicheranno a tutti gli ospiti insieme.
