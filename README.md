@@ -104,6 +104,19 @@ docker compose up -d
 
 I dati (database SQLite e file caricati) sono persistiti in volumi Docker (`matrimonio_db`, `matrimonio_uploads`) e sopravvivono a rebuild/aggiornamenti del container.
 
+## Dietro un reverse proxy
+
+Se l'app sta dietro nginx, Traefik o un CDN, due valori vanno impostati nel `.env` accanto al `docker-compose.yml`:
+
+```bash
+APP_PORT=3001     # porta pubblicata sull'host, invece della 80
+TRUST_PROXY=1     # numero di proxy attraversati (2 se c'e' anche Cloudflare)
+```
+
+`TRUST_PROXY` non e' un dettaglio: senza, il container vede la connessione arrivare dal proxy e non dal visitatore, quindi **tutti gli ospiti condividono lo stesso contatore di rate limit** e si bloccano a vicenda sulla pagina RSVP. Il valore e' il numero di hop fidati e non va mai gonfiato: dichiararne piu' del reale permetterebbe a chiunque di falsificare `X-Forwarded-For` e aggirare i limiti.
+
+Il proxy deve inoltrare l'IP originale (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` in nginx; Nginx Proxy Manager e Traefik lo fanno da soli).
+
 ## Backup e ripristino
 
 `install.sh` configura un backup automatico giornaliero alle 03:00 in `/var/backups/matrimonio`, con 14 giorni di storico. `update.sh` esegue inoltre uno snapshot **prima** di ogni aggiornamento, così un rebuild andato male è reversibile.

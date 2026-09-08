@@ -19,6 +19,20 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 
+// ── Reverse proxy ────────────────────────────────────────────────
+// Dietro nginx/Cloudflare la connessione arriva dal proxy, non dal visitatore:
+// senza questa impostazione ogni ospite risulterebbe avere lo stesso IP e
+// finirebbe nello stesso contatore di rate limit, bloccandosi a vicenda.
+//
+// Il valore è il NUMERO di proxy fidati (1 = solo nginx, 2 = Cloudflare +
+// nginx), mai `true`: fidandosi di chiunque, un aggressore potrebbe falsificare
+// X-Forwarded-For e azzerare i limiti a ogni richiesta.
+const TRUST_PROXY = parseInt(process.env.TRUST_PROXY || '0', 10);
+if (TRUST_PROXY > 0) {
+  app.set('trust proxy', TRUST_PROXY);
+  console.log(`Reverse proxy: mi fido di ${TRUST_PROXY} hop (X-Forwarded-For)`);
+}
+
 // ── Scheduler promemoria automatici ──────────────────────────────
 const minIntervalOre = { giornaliero: 20, settimanale: 6 * 24, bisettimanale: 13 * 24, mensile: 28 * 24 };
 
@@ -78,10 +92,13 @@ const confermaLimiter = rateLimit({
   message: { error: 'Troppe richieste. Riprova tra qualche minuto.' },
 });
 
-// L'invio della risposta può creare righe in `ospiti`: qui il limite è stretto.
+// L'invio della risposta può creare righe in `ospiti`, ma il limite deve contare
+// script, non persone: con la CGNAT degli operatori mobili più invitati possono
+// presentarsi con lo stesso IP pubblico. 60/ora ferma comunque un abuso
+// automatico, che di richieste ne farebbe migliaia.
 const rispondiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 20,
+  limit: 60,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Troppe conferme inviate da questa connessione. Riprova tra un\'ora.' },

@@ -5,12 +5,14 @@ services:
     container_name: matrimonio
     restart: unless-stopped
     ports:
-      - "80:3001"
+      - "${APP_PORT:-80}:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
       DB_PATH: /app/data/matrimonio.db
       JWT_SECRET: ${JWT_SECRET}
+      # Reverse proxy davanti all'app: 0 = nessuno, 1 = nginx, 2 = CDN + nginx
+      TRUST_PROXY: ${TRUST_PROXY:-0}
     volumes:
       - matrimonio_db:/app/data
       - matrimonio_uploads:/app/server/uploads
