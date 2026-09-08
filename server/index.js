@@ -2,8 +2,20 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { sendScadenzeReminder } = require('./email');
+
+// ── Fail-fast sulla configurazione ───────────────────────────────
+// Senza JWT_SECRET il server partirebbe lo stesso, ma ogni login fallirebbe
+// con un fuorviante "credenziali non valide" (in realtà un 500 di jsonwebtoken:
+// "secretOrPrivateKey must have a value"). Meglio non partire affatto.
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET non impostato.');
+  console.error('        Sviluppo locale: crealo in server/.env (non nella root del repo).');
+  console.error('        Docker: variabile "environment" in docker-compose.yml / file .env accanto ad esso.');
+  process.exit(1);
+}
 
 const app = express();
 
@@ -38,9 +50,47 @@ setTimeout(checkAutoReminder, 60 * 1000);
 app.use(cors());
 app.use(express.json());
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Solo le foto della landing sono pubbliche per design. Contratti, preventivi e
+// documenti restano fuori dallo static: si scaricano da /api/documenti/download/:id
+// e /api/preventivi/download/:id, che passano dal middleware auth.
+app.use('/uploads/landing', express.static(path.join(__dirname, 'uploads/landing')));
 
-app.use('/api/conferma', require('./routes/conferma'));
+// ── Rate limit sulle superfici pubbliche ─────────────────────────
+// Sono gli unici endpoint raggiungibili senza token. Nota: i limiti sono per IP,
+// quindi valgono finché il container riceve l'IP reale del client (port mapping
+// diretto). Dietro un reverse proxy servirebbe app.set('trust proxy', 1).
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // solo i tentativi falliti consumano il budget
+  message: { error: 'Troppi tentativi di accesso. Riprova tra qualche minuto.' },
+});
+
+// La ricerca del proprio nome è interattiva (più tentativi sono normali),
+// quindi il limite è largo: serve solo a fermare gli script.
+const confermaLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Troppe richieste. Riprova tra qualche minuto.' },
+});
+
+// L'invio della risposta può creare righe in `ospiti`: qui il limite è stretto.
+const rispondiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Troppe conferme inviate da questa connessione. Riprova tra un\'ora.' },
+});
+
+app.post('/api/auth/login', loginLimiter);
+app.post('/api/conferma/rispondi', rispondiLimiter);
+
+app.use('/api/conferma', confermaLimiter, require('./routes/conferma'));
 app.use('/api/landing', require('./routes/landing'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/config', require('./routes/config'));
@@ -79,6 +129,29 @@ if (require('fs').existsSync(clientDist)) {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
+
+// ── Error handler globale ────────────────────────────────────────
+// Va registrato per ultimo. Senza, un upload troppo grande o un errore SQL
+// arrivano al client come 500 opaco e la causa reale resta solo nei log.
+// Il messaggio dettagliato non viene mai esposto: l'app è raggiungibile
+// pubblicamente per l'RSVP degli invitati.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error(`[ERRORE] ${req.method} ${req.originalUrl}:`, err.message);
+
+  if (err.code === 'LIMIT_FILE_SIZE')
+    return res.status(413).json({ error: 'File troppo grande: il limite è 10 MB.' });
+  if (typeof err.code === 'string' && err.code.startsWith('LIMIT_'))
+    return res.status(400).json({ error: 'Upload non valido.' });
+  if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY')
+    return res.status(400).json({ error: 'Operazione non valida: il record è collegato ad altri dati.' });
+  if (typeof err.code === 'string' && err.code.startsWith('SQLITE_'))
+    return res.status(400).json({ error: 'Operazione non valida sui dati.' });
+  if (err.type === 'entity.parse.failed')
+    return res.status(400).json({ error: 'Richiesta malformata.' });
+
+  res.status(err.status || 500).json({ error: 'Errore interno del server.' });
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server avviato su porta ${PORT}`));
