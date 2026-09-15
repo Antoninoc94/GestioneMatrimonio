@@ -50,16 +50,30 @@ export default function Tavoli() {
     }
     load();
   };
-  const assignGuest = (ospitoId, tavoloId) => assignGuests([ospitoId], tavoloId);
+  // Familiari che oggi stanno dove sta lui: chi è già stato messo altrove di
+  // proposito non va trascinato indietro.
+  const insiemeA = o =>
+    o.parent_id ? [] : ospiti.filter(f => f.parent_id === o.id && (f.tavolo_id || null) === (o.tavolo_id || null));
 
-  // Partner e figli siedono quasi sempre col loro invitato: se ne ha allo stesso
-  // tavolo, chiedi se spostare/rimuovere tutto il gruppo invece di riga per riga.
-  const moveSeated = (o, familiari, tavoloId) => {
+  // Unica strada per assegnare/spostare/togliere. Il partner segue l'invitato,
+  // i bambini restano da sistemare a parte (tavolo dei bambini). Discrimina
+  // `tipo`, cioè l'età: un figlio ormai adulto siede con i suoi come chiunque
+  // altro, mentre `relazione` resterebbe 'figlio' per sempre.
+  const assignWithFamily = (o, tavoloId) => {
+    const insieme = insiemeA(o);
+    const seguono = insieme.filter(f => f.tipo !== 'bambino');
+    const bambini = insieme.filter(f => f.tipo === 'bambino');
     const ids = [o.id];
-    if (familiari.length) {
-      const chi = familiari.length === 1 ? 'il familiare' : `i ${familiari.length} familiari`;
-      const azione = tavoloId === null ? 'Rimuovere dal tavolo' : 'Spostare';
-      if (confirm(`${azione} anche ${chi} di ${o.nome}?`)) ids.push(...familiari.map(f => f.id));
+    if (seguono.length) {
+      const chi = seguono.length > 1 ? `i ${seguono.length} familiari`
+        : seguono[0].relazione === 'partner' ? 'il partner' : 'il familiare';
+      const azione = tavoloId === null ? 'Rimuovere dal tavolo'
+        : o.tavolo_id ? 'Spostare' : 'Assegnare al tavolo';
+      // Dirlo esplicitamente, altrimenti i bambini rimasti indietro sembrano un bug.
+      const nota = bambini.length
+        ? `\n\n${bambini.length === 1 ? 'Il bambino resta' : `I ${bambini.length} bambini restano`} da assegnare a parte.`
+        : '';
+      if (confirm(`${azione} anche ${chi} di ${o.nome}?${nota}`)) ids.push(...seguono.map(f => f.id));
     }
     return assignGuests(ids, tavoloId);
   };
@@ -454,7 +468,7 @@ export default function Tavoli() {
               <select
                 className="w-24 text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
                 value=""
-                onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
+                onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}
               >
                 <option value="">Assegna…</option>
                 {tavoli.map(t => <option key={t.id} value={t.id}>{tavoloLabel(t)}</option>)}
@@ -619,12 +633,12 @@ export default function Tavoli() {
 
                   // Spostare un ospite altrove era impossibile: i menu di assegnazione
                   // elencano solo chi è ancora senza tavolo.
-                  const SpostaSelect = ({ o, familiari }) => (
+                  const SpostaSelect = ({ o }) => (
                     <select
                       className="w-20 text-xs border border-gray-200 rounded-md text-gray-500 px-1.5 py-1 bg-white cursor-pointer hover:border-rose-300 hover:text-rose-600"
                       value=""
                       title="Sposta ad un altro tavolo"
-                      onChange={e => e.target.value && moveSeated(o, familiari, parseInt(e.target.value))}
+                      onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}
                     >
                       <option value="">Sposta…</option>
                       {tavoli.filter(x => x.id !== t.id).map(x => (
@@ -637,8 +651,6 @@ export default function Tavoli() {
                     const isChild = o.relazione === 'figlio';
                     const isPartner = !!o.parent_id && !isChild;
                     const pName = showParentHint && o.parent_id ? parentName(o.parent_id) : null;
-                    // Solo un ospite principale trascina con sé i familiari.
-                    const familiari = o.parent_id ? [] : t.ospiti.filter(x => x.parent_id === o.id);
                     return (
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -655,12 +667,12 @@ export default function Tavoli() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                          {tavoli.length > 1 && <SpostaSelect o={o} familiari={familiari} />}
+                          {tavoli.length > 1 && <SpostaSelect o={o} />}
                           <button
                             className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
                             title="Togli dal tavolo"
                             aria-label={`Togli ${o.nome} dal tavolo`}
-                            onClick={() => moveSeated(o, familiari, null)}
+                            onClick={() => assignWithFamily(o, null)}
                           >
                             <X size={14} />
                           </button>
@@ -692,7 +704,10 @@ export default function Tavoli() {
                   <select
                     className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1"
                     value=""
-                    onChange={e => e.target.value && assignGuest(parseInt(e.target.value), t.id)}
+                    onChange={e => {
+                      const o = ospiti.find(x => x.id === parseInt(e.target.value));
+                      if (o) assignWithFamily(o, t.id);
+                    }}
                   >
                     <option value="">+ Aggiungi ospite…</option>
                     {senzaTavolo.map(o => <option key={o.id} value={o.id}>{guestLabel(o)}</option>)}
