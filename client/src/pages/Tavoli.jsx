@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import api from '../api';
 
@@ -37,9 +37,31 @@ export default function Tavoli() {
     load();
   };
 
-  const assignGuest = async (ospitoId, tavoloId) => {
-    await api.put(`/ospiti/${ospitoId}`, { ...ospiti.find(o => o.id === ospitoId), tavolo_id: tavoloId });
+  // tavoloId null = toglie dal tavolo. Un errore qui va mostrato: senza alert
+  // il click sembra semplicemente non fare nulla.
+  const assignGuests = async (ids, tavoloId) => {
+    try {
+      for (const id of ids) {
+        const o = ospiti.find(x => x.id === id);
+        if (o) await api.put(`/ospiti/${id}`, { ...o, tavolo_id: tavoloId });
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Errore durante l\'assegnazione del tavolo');
+    }
     load();
+  };
+  const assignGuest = (ospitoId, tavoloId) => assignGuests([ospitoId], tavoloId);
+
+  // Partner e figli siedono quasi sempre col loro invitato: se ne ha allo stesso
+  // tavolo, chiedi se spostare/rimuovere tutto il gruppo invece di riga per riga.
+  const moveSeated = (o, familiari, tavoloId) => {
+    const ids = [o.id];
+    if (familiari.length) {
+      const chi = familiari.length === 1 ? 'il familiare' : `i ${familiari.length} familiari`;
+      const azione = tavoloId === null ? 'Rimuovere dal tavolo' : 'Spostare';
+      if (confirm(`${azione} anche ${chi} di ${o.nome}?`)) ids.push(...familiari.map(f => f.id));
+    }
+    return assignGuests(ids, tavoloId);
   };
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
@@ -48,6 +70,8 @@ export default function Tavoli() {
     const p = ospiti.find(o => o.id === parentId);
     return p ? (p.cognome ? `${p.cognome} ${p.nome}` : p.nome) : null;
   };
+  // Occupazione a fianco del nome: evita di assegnare a un tavolo già pieno.
+  const tavoloLabel = t => `${t.nome} ${t.ospiti.length >= t.capienza ? '(pieno)' : `(${t.ospiti.length}/${t.capienza})`}`;
   const guestLabel = o => {
     const base = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
     if (!o.parent_id) return base;
@@ -428,12 +452,12 @@ export default function Tavoli() {
 
             const AssegnaSelect = ({ o }) => (
               <select
-                className="text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
+                className="w-24 text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
                 value=""
                 onChange={e => e.target.value && assignGuest(o.id, parseInt(e.target.value))}
               >
                 <option value="">Assegna…</option>
-                {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                {tavoli.map(t => <option key={t.id} value={t.id}>{tavoloLabel(t)}</option>)}
               </select>
             );
 
@@ -593,10 +617,28 @@ export default function Tavoli() {
                   const getFamily = id => t.ospiti.filter(o => o.parent_id === id);
                   const orphans = t.ospiti.filter(o => o.parent_id && !t.ospiti.find(mg => mg.id === o.parent_id));
 
+                  // Spostare un ospite altrove era impossibile: i menu di assegnazione
+                  // elencano solo chi è ancora senza tavolo.
+                  const SpostaSelect = ({ o, familiari }) => (
+                    <select
+                      className="w-20 text-xs border border-gray-200 rounded-md text-gray-500 px-1.5 py-1 bg-white cursor-pointer hover:border-rose-300 hover:text-rose-600"
+                      value=""
+                      title="Sposta ad un altro tavolo"
+                      onChange={e => e.target.value && moveSeated(o, familiari, parseInt(e.target.value))}
+                    >
+                      <option value="">Sposta…</option>
+                      {tavoli.filter(x => x.id !== t.id).map(x => (
+                        <option key={x.id} value={x.id}>{tavoloLabel(x)}</option>
+                      ))}
+                    </select>
+                  );
+
                   const rowJsx = (o, showParentHint = false) => {
                     const isChild = o.relazione === 'figlio';
                     const isPartner = !!o.parent_id && !isChild;
                     const pName = showParentHint && o.parent_id ? parentName(o.parent_id) : null;
+                    // Solo un ospite principale trascina con sé i familiari.
+                    const familiari = o.parent_id ? [] : t.ospiti.filter(x => x.parent_id === o.id);
                     return (
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -612,7 +654,17 @@ export default function Tavoli() {
                             )}
                           </div>
                         </div>
-                        <button className="text-xs text-gray-300 hover:text-red-400 flex-shrink-0 ml-2" onClick={() => assignGuest(o.id, null)}>✕</button>
+                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                          {tavoli.length > 1 && <SpostaSelect o={o} familiari={familiari} />}
+                          <button
+                            className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
+                            title="Togli dal tavolo"
+                            aria-label={`Togli ${o.nome} dal tavolo`}
+                            onClick={() => moveSeated(o, familiari, null)}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                     );
                   };
