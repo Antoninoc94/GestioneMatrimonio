@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, RefreshCw } from 'lucide-react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { Download, Printer, RefreshCw, Save, Wand2 } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -77,25 +77,45 @@ const fmtDataItaliana = iso => {
 // A5 at ~96 dpi in pixels (148 mm × 210 mm)
 const INVITO_W = 560;
 const INVITO_H = 794;
+const PADDING_V = 45;
+const BORDO = 2;
 
 export default function Inviti() {
   const [tema, setTema] = useState('classico');
   const [campi, setCampi] = useState(defaultCampi);
   const [exporting, setExporting] = useState(false);
   const exportRef = useRef();          // full-size hidden element for capture
+  const contentRef = useRef();         // suo contenuto, per misurare se sfora l'A5
   const previewContainerRef = useRef();
   const [previewScale, setPreviewScale] = useState(0.62);
+  const [fitScale, setFitScale] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
     api.get('/config').then(r => {
-      if (r.data) {
-        setCampi(prev => ({
-          ...prev,
-          sposo1: r.data.nome_sposo1 || '',
-          sposo2: r.data.nome_sposo2 || '',
-          data: r.data.data_matrimonio || '',
-        }));
-      }
+      const d = r.data;
+      if (!d) return;
+      // `??` e non `||`: una colonna NULL significa "mai compilato" e prende il
+      // testo predefinito, mentre una stringa vuota è una scelta da rispettare.
+      const salvato = (col, fallback = '') => d[col] ?? fallback;
+      setCampi({
+        sposo1: d.nome_sposo1 || '',
+        sposo2: d.nome_sposo2 || '',
+        data: d.data_matrimonio || '',
+        ora_cerimonia: salvato('invito_ora_cerimonia'),
+        luogo_cerimonia: salvato('invito_luogo_cerimonia'),
+        indirizzo_cerimonia: salvato('invito_indirizzo_cerimonia'),
+        ora_ricevimento: salvato('invito_ora_ricevimento'),
+        luogo_ricevimento: salvato('invito_luogo_ricevimento'),
+        indirizzo_ricevimento: salvato('invito_indirizzo_ricevimento'),
+        rsvp_entro: salvato('invito_rsvp_entro'),
+        rsvp_telefono: salvato('invito_rsvp_telefono'),
+        messaggio_apertura: salvato('invito_messaggio_apertura', defaultCampi.messaggio_apertura),
+        messaggio_chiusura: salvato('invito_messaggio_chiusura', defaultCampi.messaggio_chiusura),
+      });
+      setTema(d.invito_tema || 'classico');
     }).catch(() => {});
   }, []);
 
@@ -111,25 +131,104 @@ export default function Inviti() {
     return () => obs.disconnect();
   }, []);
 
+  // Il cartoncino è fisso ad A5: se il contenuto lo supera viene rimpicciolito
+  // quanto basta, invece di scendere fuori pagina e farsi tagliare dalla cattura.
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const disponibile = INVITO_H - PADDING_V * 2 - BORDO * 2;
+    const naturale = el.scrollHeight;
+    setFitScale(naturale > disponibile ? disponibile / naturale : 1);
+  }, [campi, tema]);
+
   const t = TEMI[tema];
   const campo = (k, v) => setCampi(prev => ({ ...prev, [k]: v }));
 
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put('/config', {
+        invito_tema: tema,
+        invito_ora_cerimonia: campi.ora_cerimonia,
+        invito_luogo_cerimonia: campi.luogo_cerimonia,
+        invito_indirizzo_cerimonia: campi.indirizzo_cerimonia,
+        invito_ora_ricevimento: campi.ora_ricevimento,
+        invito_luogo_ricevimento: campi.luogo_ricevimento,
+        invito_indirizzo_ricevimento: campi.indirizzo_ricevimento,
+        invito_rsvp_entro: campi.rsvp_entro,
+        invito_rsvp_telefono: campi.rsvp_telefono,
+        invito_messaggio_apertura: campi.messaggio_apertura,
+        invito_messaggio_chiusura: campi.messaggio_chiusura,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setMsg(err.response?.data?.error || 'Errore durante il salvataggio');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Luoghi e orari sono già in Location & Chiesa e in Cronologia: riprenderli
+  // da lì evita di riscriverli e di lasciarli indietro se cambiano.
+  const TIPI_CERIMONIA = ['Chiesa', 'Municipio', 'Cerimonia civile'];
+  const precompila = async () => {
+    setMsg('');
+    try {
+      const [loc, cron] = await Promise.all([api.get('/location'), api.get('/cronologia')]);
+      const confermate = loc.data.filter(l => l.stato === 'confermato');
+      const cerimonia = confermate.find(l => TIPI_CERIMONIA.includes(l.tipo));
+      const ricevimento = confermate.find(l => l.tipo === 'Ricevimento');
+      const primaOra = tipo => cron.data.filter(e => e.tipo === tipo && e.ora).map(e => e.ora).sort()[0];
+
+      const trovati = {
+        luogo_cerimonia: cerimonia?.nome,
+        indirizzo_cerimonia: cerimonia?.indirizzo,
+        ora_cerimonia: primaOra('cerimonia'),
+        luogo_ricevimento: ricevimento?.nome,
+        indirizzo_ricevimento: ricevimento?.indirizzo,
+        ora_ricevimento: primaOra('ricevimento'),
+      };
+      const nuovi = Object.entries(trovati).filter(([, v]) => v);
+      if (!nuovi.length) {
+        setMsg('Nessun dato da riprendere: servono una location con stato “confermato” oppure orari in Cronologia.');
+        return;
+      }
+      const sovrascrive = nuovi.filter(([k, v]) => campi[k] && campi[k] !== v);
+      if (sovrascrive.length && !confirm(
+        `${sovrascrive.length === 1 ? 'Un campo già compilato verrà sostituito' : `${sovrascrive.length} campi già compilati verranno sostituiti`} con i dati del matrimonio. Procedere?`
+      )) return;
+
+      setCampi(prev => ({ ...prev, ...Object.fromEntries(nuovi) }));
+      setMsg(`Ripresi ${nuovi.length} campi da Location e Cronologia. Ricorda di salvare.`);
+    } catch (err) {
+      setMsg(err.response?.data?.error || 'Errore nel recupero dei dati del matrimonio');
+    }
+  };
+
   const exportPDF = async () => {
     setExporting(true);
-    await new Promise(r => setTimeout(r, 120));
-    const canvas = await html2canvas(exportRef.current, {
-      scale: 4,
-      useCORS: true,
-      backgroundColor: t.bg,
-      logging: false,
-      width: INVITO_W,
-      height: INVITO_H,
-    });
-    const img = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-    pdf.addImage(img, 'PNG', 0, 0, 148, 210);
-    pdf.save(`invito-${campi.sposo1}-${campi.sposo2}.pdf`.replace(/\s+/g, '-').toLowerCase());
-    setExporting(false);
+    setMsg('');
+    try {
+      await new Promise(r => setTimeout(r, 120));
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: t.bg,
+        logging: false,
+        width: INVITO_W,
+        height: INVITO_H,
+      });
+      const img = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+      pdf.addImage(img, 'PNG', 0, 0, 148, 210);
+      pdf.save(`invito-${campi.sposo1}-${campi.sposo2}.pdf`.replace(/\s+/g, '-').toLowerCase());
+    } catch {
+      setMsg('Non è stato possibile generare il PDF. Riprova.');
+    } finally {
+      // senza finally un errore lascerebbe il pulsante bloccato su "Esporto…"
+      setExporting(false);
+    }
   };
 
   const doPrint = async () => {
@@ -142,6 +241,12 @@ export default function Inviti() {
     });
     const img = canvas.toDataURL('image/png');
     const win = window.open('', '_blank');
+    // Con un popup blocker window.open torna null: senza questo controllo
+    // la stampa falliva con un errore in console e nessun segnale a schermo.
+    if (!win) {
+      setMsg('La finestra di stampa è stata bloccata dal browser: consenti i popup per questo sito.');
+      return;
+    }
     win.document.write(`<!DOCTYPE html><html><head>
       <style>@page{size:A5;margin:0}body{margin:0;padding:0}img{width:148mm;height:auto;display:block}</style>
       </head><body><img src="${img}"/></body></html>`);
@@ -151,23 +256,25 @@ export default function Inviti() {
   };
 
   const reset = () => {
+    if (!confirm('Riportare tutti i campi ai valori predefiniti? Le modifiche non salvate andranno perse.')) return;
     setCampi(defaultCampi);
     setTema('classico');
+    setMsg('');
   };
 
   // Render function (not a React component) to avoid remounting when called
   // from both the hidden export element and the visible preview.
-  const renderInvito = (ref) => (
+  const renderInvito = (ref, innerRef) => (
     <div
       ref={ref}
       style={{
         width: `${INVITO_W}px`,
-        minHeight: `${INVITO_H}px`,
+        height: `${INVITO_H}px`,
         background: t.bg,
         fontFamily: t.font,
-        padding: '45px 38px',
+        padding: `${PADDING_V}px 38px`,
         boxSizing: 'border-box',
-        border: `2px solid ${t.border}`,
+        border: `${BORDO}px solid ${t.border}`,
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
@@ -187,15 +294,21 @@ export default function Inviti() {
       }} />
 
       {/* All content sits above the decorative border */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        width: '100%',
-        flex: 1,
-      }}>
+      <div
+        ref={innerRef}
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          width: '100%',
+          flex: 1,
+          // scale uniforme: le righe restano quelle, solo più piccole
+          transform: `scale(${fitScale})`,
+          transformOrigin: 'top center',
+        }}
+      >
         {/* Top ornament */}
         <div style={{ color: t.accent, fontSize: '22px', marginBottom: '16px', letterSpacing: '12px' }}>
           {t.ornament} {t.ornament} {t.ornament}
@@ -309,7 +422,7 @@ export default function Inviti() {
     <div>
       {/* Full-size hidden element used by html2canvas for export/print */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0 }} aria-hidden="true">
-        {renderInvito(exportRef)}
+        {renderInvito(exportRef, contentRef)}
       </div>
 
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -317,14 +430,23 @@ export default function Inviti() {
           <h1 className="page-title">Generatore Inviti</h1>
           <p className="page-subtitle">Crea il tuo invito personalizzato — formato A5, pronto per la stampa</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={reset}><RefreshCw size={15} /> Reset</button>
           <button className="btn-secondary" onClick={doPrint}><Printer size={15} /> Stampa</button>
+          <button className="btn-secondary" onClick={save} disabled={saving}>
+            <Save size={15} /> {saved ? 'Salvato!' : saving ? 'Salvo…' : 'Salva'}
+          </button>
           <button className="btn-primary" onClick={exportPDF} disabled={exporting}>
             <Download size={15} /> {exporting ? 'Esporto…' : 'Scarica PDF'}
           </button>
         </div>
       </div>
+
+      {msg && (
+        <div className="mb-4 rounded-lg border border-rose-100 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+          {msg}
+        </div>
+      )}
 
       <div className="flex flex-col xl:flex-row gap-6">
         {/* ── Editor ── */}
@@ -345,6 +467,17 @@ export default function Inviti() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Dati già presenti nell'app */}
+          <div className="card">
+            <h3 className="text-sm font-bold text-gray-700 mb-1">Dati del matrimonio</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Riprende luoghi e indirizzi dalle location confermate e gli orari dalla Cronologia, invece di riscriverli.
+            </p>
+            <button type="button" className="btn-secondary w-full justify-center" onClick={precompila}>
+              <Wand2 size={15} /> Riprendi dai dati del matrimonio
+            </button>
           </div>
 
           {/* Sposi */}
@@ -440,11 +573,16 @@ export default function Inviti() {
                 borderRadius: '3px',
               }}>
                 <div style={{ transform: `scale(${previewScale})`, transformOrigin: 'top left' }}>
-                  {renderInvito(null)}
+                  {renderInvito(null, null)}
                 </div>
               </div>
             </div>
             <div className="text-center mt-4">
+              {fitScale < 1 && (
+                <p className="text-xs text-amber-600 mb-1">
+                  Testo ridotto al {Math.round(fitScale * 100)}% per farlo entrare nell'A5 — accorcia i messaggi per tenerlo alla dimensione piena.
+                </p>
+              )}
               <p className="text-xs text-gray-400">PDF esportato in alta risoluzione (4×) per stampa professionale</p>
             </div>
           </div>

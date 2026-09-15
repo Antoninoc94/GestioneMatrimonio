@@ -35,6 +35,17 @@ router.put('/', auth, (req, res) => {
     landing_tema=COALESCE(?,landing_tema),
     landing_foto_posizione=COALESCE(?,landing_foto_posizione),
     soglia_eta_bambino=COALESCE(?,soglia_eta_bambino),
+    invito_tema=COALESCE(?,invito_tema),
+    invito_ora_cerimonia=COALESCE(?,invito_ora_cerimonia),
+    invito_luogo_cerimonia=COALESCE(?,invito_luogo_cerimonia),
+    invito_indirizzo_cerimonia=COALESCE(?,invito_indirizzo_cerimonia),
+    invito_ora_ricevimento=COALESCE(?,invito_ora_ricevimento),
+    invito_luogo_ricevimento=COALESCE(?,invito_luogo_ricevimento),
+    invito_indirizzo_ricevimento=COALESCE(?,invito_indirizzo_ricevimento),
+    invito_rsvp_entro=COALESCE(?,invito_rsvp_entro),
+    invito_rsvp_telefono=COALESCE(?,invito_rsvp_telefono),
+    invito_messaggio_apertura=COALESCE(?,invito_messaggio_apertura),
+    invito_messaggio_chiusura=COALESCE(?,invito_messaggio_chiusura),
     updated_at=datetime('now')`)
     .run(
       p('data_matrimonio', v => v || null),
@@ -51,7 +62,20 @@ router.put('/', auth, (req, res) => {
       p('landing_info_pratiche', v => v ?? ''),
       p('landing_tema', v => v || 'rose'),
       p('landing_foto_posizione', v => v || 'center top'),
-      p('soglia_eta_bambino', v => parseInt(v) || 12)
+      p('soglia_eta_bambino', v => parseInt(v) || 12),
+      p('invito_tema', v => v || 'classico'),
+      // `?? ''` e non `|| ''`: un campo svuotato a mano deve restare vuoto,
+      // altrimenti COALESCE lo riporterebbe al valore precedente.
+      p('invito_ora_cerimonia', v => v ?? ''),
+      p('invito_luogo_cerimonia', v => v ?? ''),
+      p('invito_indirizzo_cerimonia', v => v ?? ''),
+      p('invito_ora_ricevimento', v => v ?? ''),
+      p('invito_luogo_ricevimento', v => v ?? ''),
+      p('invito_indirizzo_ricevimento', v => v ?? ''),
+      p('invito_rsvp_entro', v => v ?? ''),
+      p('invito_rsvp_telefono', v => v ?? ''),
+      p('invito_messaggio_apertura', v => v ?? ''),
+      p('invito_messaggio_chiusura', v => v ?? '')
     );
 
   // Se la soglia è cambiata, riallinea subito il tipo dei figli già esistenti

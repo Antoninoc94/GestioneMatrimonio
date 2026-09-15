@@ -246,6 +246,23 @@ if (!configCols.find(c => c.name === 'landing_foto_posizione')) {
 if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
   db.prepare('ALTER TABLE config ADD COLUMN soglia_eta_bambino INTEGER DEFAULT 12').run();
 }
+// Campi del generatore inviti. Restano NULL finché non si salva la prima volta:
+// così il client distingue "mai compilato" (usa i testi predefiniti) da
+// "svuotato apposta" (stringa vuota). Nomi e data non si duplicano qui —
+// l'invito legge nome_sposo1/2 e data_matrimonio.
+for (const col of [
+  'invito_ora_cerimonia', 'invito_luogo_cerimonia', 'invito_indirizzo_cerimonia',
+  'invito_ora_ricevimento', 'invito_luogo_ricevimento', 'invito_indirizzo_ricevimento',
+  'invito_rsvp_entro', 'invito_rsvp_telefono',
+  'invito_messaggio_apertura', 'invito_messaggio_chiusura',
+]) {
+  if (!configCols.find(c => c.name === col)) {
+    db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
+  }
+}
+if (!configCols.find(c => c.name === 'invito_tema')) {
+  db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
+}
 
 // Migrazione: aggiunge colonna username se non esiste (DB già esistente)
 const cols = db.prepare('PRAGMA table_info(users)').all();
