@@ -528,6 +528,7 @@ export default function Ospiti() {
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1"><Heart size={9} />Partner</span>
                               : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                            {c.tavolo_nome && <span className="badge bg-gray-100 text-gray-600 text-xs truncate max-w-32">{c.tavolo_nome}</span>}
                             {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
                           </div>
                         </div>
@@ -633,7 +634,9 @@ export default function Ospiti() {
                               {rsvpLabel[c.rsvp] || 'In attesa'}
                             </span>
                           </td>
-                          <td className="text-gray-400 text-xs">—</td>
+                          {/* Il tavolo va letto, non dato per scontato: un figlio può
+                              sedere al tavolo dei bambini, lontano dai genitori. */}
+                          <td className="text-gray-500 text-xs">{c.tavolo_nome || '—'}</td>
                           <td className="text-gray-400 text-xs">{c.intolleranze || '—'}</td>
                           <td>
                             <div className="flex gap-1">
