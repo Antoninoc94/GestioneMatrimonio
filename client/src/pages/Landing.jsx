@@ -113,9 +113,11 @@ export default function Landing() {
 
       {/* ── HERO ─────────────────────────────────── */}
       {config.landing_foto ? (
-        <div style={{ position: 'relative', width: '100%', height: '32vh', minHeight: '220px', maxHeight: '380px', background: '#111' }}>
-          {/* La foto è già ritagliata 16:9 dall'utente (vedi Impostazioni → Wedding);
-              object-fit: cover riempie il riquadro adattandosi anche a schermi più stretti/larghi. */}
+        <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', minHeight: '220px', maxHeight: '420px', background: '#111' }}>
+          {/* aspect-ratio 16/9 = stessa proporzione scelta nel ritaglio (Impostazioni → Wedding):
+              su quasi tutti gli schermi (soprattutto i cellulari) il riquadro coincide esattamente
+              con l'anteprima dell'editor. object-fit: cover interviene solo nei casi limite
+              (schermi desktop molto larghi, sotto min/maxHeight). */}
           <img
             src={`/uploads/landing/${config.landing_foto}`}
             alt="Foto matrimonio"
