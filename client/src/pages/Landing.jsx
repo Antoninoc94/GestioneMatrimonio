@@ -113,12 +113,13 @@ export default function Landing() {
 
       {/* ── HERO ─────────────────────────────────── */}
       {config.landing_foto ? (
-        <div style={{ position: 'relative', width: '100%', height: '60vh', minHeight: '320px', background: '#111' }}>
-          {/* object-fit: contain → foto intera visibile, nessun ritaglio */}
+        <div style={{ position: 'relative', width: '100%', height: '32vh', minHeight: '220px', maxHeight: '380px', background: '#111' }}>
+          {/* La foto è già ritagliata 16:9 dall'utente (vedi Impostazioni → Wedding);
+              object-fit: cover riempie il riquadro adattandosi anche a schermi più stretti/larghi. */}
           <img
             src={`/uploads/landing/${config.landing_foto}`}
             alt="Foto matrimonio"
-            style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center center' }}
+            style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }}
           />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%)' }} />
         </div>

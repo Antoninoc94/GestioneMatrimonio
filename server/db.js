@@ -243,6 +243,12 @@ if (!configCols.find(c => c.name === 'landing_foto')) {
 if (!configCols.find(c => c.name === 'landing_foto_posizione')) {
   db.prepare("ALTER TABLE config ADD COLUMN landing_foto_posizione TEXT DEFAULT 'center top'").run();
 }
+if (!configCols.find(c => c.name === 'landing_foto_originale')) {
+  db.prepare('ALTER TABLE config ADD COLUMN landing_foto_originale TEXT').run();
+}
+if (!configCols.find(c => c.name === 'landing_foto_crop')) {
+  db.prepare('ALTER TABLE config ADD COLUMN landing_foto_crop TEXT').run();
+}
 if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
   db.prepare('ALTER TABLE config ADD COLUMN soglia_eta_bambino INTEGER DEFAULT 12').run();
 }

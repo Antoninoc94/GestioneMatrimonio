@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download } from 'lucide-react';
+import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
+import PhotoCropper from '../components/PhotoCropper';
 
 const TEMI = [
   { key: 'rose',    label: 'Rosa',      primary: '#e11d48', light: '#fff1f2', border: '#fecdd3' },
@@ -22,6 +23,9 @@ const empty = {
 export default function LandingEditor() {
   const [form, setForm] = useState(empty);
   const [foto, setFoto] = useState(null);
+  const [fotoOriginale, setFotoOriginale] = useState(null);
+  const [fotoCrop, setFotoCrop] = useState(null);
+  const [cropper, setCropper] = useState(null); // { imageSrc, isNewFile, file } oppure null se chiuso
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState('');
@@ -48,6 +52,8 @@ export default function LandingEditor() {
         landing_tema: d.landing_tema || 'rose',
       });
       setFoto(d.landing_foto || null);
+      setFotoOriginale(d.landing_foto_originale || null);
+      setFotoCrop(d.landing_foto_crop ? JSON.parse(d.landing_foto_crop) : null);
     });
   }, []);
 
@@ -64,20 +70,43 @@ export default function LandingEditor() {
     await api.put('/config', { landing_abilitata: nuovoValore });
   };
 
-  const uploadFoto = async file => {
+  // Scelta di una foto nuova: si apre lo strumento di ritaglio, l'upload
+  // vero e proprio parte solo alla conferma del ritaglio (vedi confirmCrop).
+  const scegliFoto = file => {
     if (!file) return;
+    setCropper({ imageSrc: URL.createObjectURL(file), isNewFile: true, file, initialCrop: null });
+  };
+
+  // "Modifica ritaglio": riapre lo strumento sulla foto originale già salvata
+  // sul server, senza bisogno di ricaricarla.
+  const modificaRitaglio = () => {
+    if (!fotoOriginale) return;
+    setCropper({ imageSrc: `/uploads/landing/${fotoOriginale}`, isNewFile: false, file: null, initialCrop: fotoCrop });
+  };
+
+  const chiudiCropper = () => {
+    if (cropper?.isNewFile) URL.revokeObjectURL(cropper.imageSrc);
+    setCropper(null);
+  };
+
+  const confirmCrop = async (blob, cropMeta) => {
     setUploading(true);
     setMsg('');
     try {
       const fd = new FormData();
-      fd.append('foto', file);
+      fd.append('foto', blob, 'foto.jpg');
+      if (cropper.isNewFile) fd.append('originale', cropper.file);
+      fd.append('crop', JSON.stringify(cropMeta));
       const { data } = await api.post('/landing/foto', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setFoto(data.landing_foto);
-      setMsg('✓ Foto caricata');
+      setFotoOriginale(data.landing_foto_originale);
+      setFotoCrop(cropMeta);
+      setMsg('✓ Foto salvata');
     } catch {
       setMsg('✗ Errore upload');
     } finally {
       setUploading(false);
+      chiudiCropper();
       setTimeout(() => setMsg(''), 3000);
     }
   };
@@ -86,6 +115,8 @@ export default function LandingEditor() {
     if (!confirm('Rimuovere la foto?')) return;
     await api.delete('/landing/foto');
     setFoto(null);
+    setFotoOriginale(null);
+    setFotoCrop(null);
   };
 
   const tema = TEMI.find(t => t.key === form.landing_tema) || TEMI[0];
@@ -191,6 +222,11 @@ export default function LandingEditor() {
                 </div>
 
                 <div className="flex gap-2 pt-1">
+                  {fotoOriginale && (
+                    <button type="button" className="btn-secondary flex-1" onClick={modificaRitaglio} disabled={uploading}>
+                      <Crop size={15} /> Modifica ritaglio
+                    </button>
+                  )}
                   <button type="button" className="btn-secondary flex-1" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     <Image size={15} /> Sostituisci foto
                   </button>
@@ -204,7 +240,7 @@ export default function LandingEditor() {
                 className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-rose-300 transition-colors"
                 onClick={() => fileRef.current?.click()}
                 onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); uploadFoto(e.dataTransfer.files[0]); }}
+                onDrop={e => { e.preventDefault(); scegliFoto(e.dataTransfer.files[0]); }}
               >
                 <Image size={28} className="mx-auto text-gray-300 mb-2" />
                 {uploading
@@ -218,7 +254,7 @@ export default function LandingEditor() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={e => uploadFoto(e.target.files[0])}
+              onChange={e => scegliFoto(e.target.files[0])}
             />
             {msg && (
               <p className={`text-sm mt-2 font-medium ${msg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>
@@ -227,6 +263,15 @@ export default function LandingEditor() {
           </div>
 
         </div>
+
+        {cropper && (
+          <PhotoCropper
+            imageSrc={cropper.imageSrc}
+            initialCrop={cropper.initialCrop}
+            onCancel={chiudiCropper}
+            onConfirm={confirmCrop}
+          />
+        )}
 
         {/* Tema colore */}
         <div className="card">
