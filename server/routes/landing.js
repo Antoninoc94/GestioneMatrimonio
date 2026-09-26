@@ -34,7 +34,9 @@ router.get('/info', (req, res) => {
     return res.json({ config: { landing_abilitata: 0, landing_tema: config?.landing_tema || 'rose' }, locations: [], cronologia: [] });
   }
 
-  const locations = db.prepare("SELECT * FROM location WHERE stato = 'confermato' ORDER BY tipo ASC").all();
+  // Solo i campi rilevanti per un invitato: referente/telefono/email/costo/note
+  // sono dati interni per trattare con il fornitore, non vanno esposti pubblicamente.
+  const locations = db.prepare("SELECT id, tipo, nome, indirizzo FROM location WHERE stato = 'confermato' ORDER BY tipo ASC").all();
   const cronologia = db.prepare('SELECT * FROM cronologia ORDER BY ora ASC').all();
   res.json({ config, locations, cronologia });
 });

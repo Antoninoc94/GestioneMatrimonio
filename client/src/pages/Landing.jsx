@@ -395,14 +395,6 @@ function LocationCard({ loc, tema }) {
             {loc.indirizzo}
           </p>
         )}
-        {(loc.contatto || loc.telefono) && (
-          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '0.4rem' }}>
-            {[loc.contatto, loc.telefono].filter(Boolean).join(' · ')}
-          </p>
-        )}
-        {loc.note && (
-          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '0.4rem', fontStyle: 'italic' }}>{loc.note}</p>
-        )}
       </div>
     </div>
   );
