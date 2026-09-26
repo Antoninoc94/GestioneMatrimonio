@@ -113,11 +113,12 @@ export default function Landing() {
 
       {/* ── HERO ─────────────────────────────────── */}
       {config.landing_foto ? (
-        <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', minHeight: '220px', maxHeight: '420px', background: '#111' }}>
-          {/* aspect-ratio 16/9 = stessa proporzione scelta nel ritaglio (Impostazioni → Wedding):
-              su quasi tutti gli schermi (soprattutto i cellulari) il riquadro coincide esattamente
-              con l'anteprima dell'editor. object-fit: cover interviene solo nei casi limite
-              (schermi desktop molto larghi, sotto min/maxHeight). */}
+        <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#111' }}>
+          {/* Piena larghezza + aspect-ratio 16/9 (stessa proporzione del ritaglio in
+              Impostazioni → Wedding), senza alcun tetto massimo: su ogni schermo il riquadro
+              coincide esattamente con l'anteprima dell'editor. Su schermi molto larghi risulta
+              piuttosto alto - è il compromesso scelto per non ritagliare mai oltre quanto
+              deciso nell'editor. */}
           <img
             src={`/uploads/landing/${config.landing_foto}`}
             alt="Foto matrimonio"
