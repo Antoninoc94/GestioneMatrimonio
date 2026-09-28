@@ -41,6 +41,7 @@ export default function Ospiti() {
   const [filtroRsvp, setFiltroRsvp] = useState('');
   const [filtroLato, setFiltroLato] = useState('');
   const [filtroSito, setFiltroSito] = useState(false);
+  const [filtroFigli, setFiltroFigli] = useState(''); // '' | 'figli' | 'senzaEta'
   const [exporting, setExporting] = useState(false);
   const [conPartner, setConPartner] = useState(false);
   const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
@@ -187,7 +188,11 @@ export default function Ospiti() {
   const afterFiltri = mainGuests.filter(o => {
     const rsvpMatch = !filtroRsvp || o.rsvp === filtroRsvp || childrenOf(o.id).some(c => c.rsvp === filtroRsvp);
     const sitoMatch = !filtroSito || o.fonte === 'sito' || childrenOf(o.id).some(c => c.fonte === 'sito');
-    return rsvpMatch && sitoMatch && (!filtroLato || o.lato === filtroLato);
+    const figli = childrenOf(o.id).filter(c => c.relazione === 'figlio');
+    const figliMatch = !filtroFigli
+      || (filtroFigli === 'figli' && figli.length > 0)
+      || (filtroFigli === 'senzaEta' && figli.some(c => c.eta == null));
+    return rsvpMatch && sitoMatch && figliMatch && (!filtroLato || o.lato === filtroLato);
   });
 
   const q = search.toLowerCase().trim();
@@ -204,6 +209,8 @@ export default function Ospiti() {
         )
       )
     : afterFiltri;
+
+  const toggleFiltroFigli = v => { setFiltroFigli(f => f === v ? '' : v); setPage(1); setSelected(new Set()); };
 
   const onSort = col => {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -412,9 +419,11 @@ export default function Ospiti() {
           { label: 'In attesa', value: items.filter(i => i.rsvp === 'attesa').length, color: 'text-yellow-600' },
           { label: 'Declinati', value: declinati, color: 'text-red-500' },
           { label: 'Bambini', value: bambiniTotale, color: 'text-purple-600' },
-          { label: 'Figli senza età', value: figliSenzaEta, color: figliSenzaEta ? 'text-orange-500' : 'text-gray-400' },
+          { label: 'Figli senza età', value: figliSenzaEta, color: figliSenzaEta ? 'text-orange-500' : 'text-gray-400',
+            onClick: figliSenzaEta ? () => toggleFiltroFigli('senzaEta') : null, active: filtroFigli === 'senzaEta' },
         ].map(s => (
-          <div key={s.label} className="card text-center py-3">
+          <div key={s.label} onClick={s.onClick || undefined}
+            className={`card text-center py-3 ${s.onClick ? 'cursor-pointer hover:bg-orange-50' : ''} ${s.active ? 'ring-2 ring-orange-300' : ''}`}>
             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
             <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
           </div>
@@ -457,6 +466,13 @@ export default function Ospiti() {
                 <Globe size={11} /> Da sito ({countSito})
               </button>
             </>
+          )}
+          <div className="w-px bg-gray-200 mx-1" />
+          <button className={`badge px-3 py-1.5 cursor-pointer ${filtroFigli === 'figli' ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-600'}`}
+            onClick={() => toggleFiltroFigli('figli')}>Con figli</button>
+          {figliSenzaEta > 0 && (
+            <button className={`badge px-3 py-1.5 cursor-pointer ${filtroFigli === 'senzaEta' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-600'}`}
+              onClick={() => toggleFiltroFigli('senzaEta')}>Figli senza età ({figliSenzaEta})</button>
           )}
         </div>
       </div>
@@ -532,7 +548,9 @@ export default function Ospiti() {
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta != null ? ` (${c.eta}a)` : ''}</span>}
+                              : (c.eta != null
+                                ? <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio ({c.eta}a)</span>
+                                : <span className="badge bg-orange-100 text-orange-600 text-xs">Figlio · età?</span>)}
                             {c.tavolo_nome && <span className="badge bg-gray-100 text-gray-600 text-xs truncate max-w-32">{c.tavolo_nome}</span>}
                             {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
                           </div>
@@ -631,7 +649,9 @@ export default function Ospiti() {
                           <td>
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1 w-fit"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta != null ? ` (${c.eta}a)` : ''}</span>}
+                              : (c.eta != null
+                                ? <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio ({c.eta}a)</span>
+                                : <span className="badge bg-orange-100 text-orange-600 text-xs">Figlio · età?</span>)}
                           </td>
                           <td>
                             <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-yellow-100 text-yellow-700'}`}>
