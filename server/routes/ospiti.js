@@ -91,10 +91,10 @@ router.post('/bulk/elimina', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Cambia una sola colonna (rsvp oppure tavolo_id) sugli ospiti indicati, senza
-// riscrivere il resto della riga.
+// Cambia un solo campo (rsvp, tavolo_id oppure lo stato dell'invito) sugli
+// ospiti indicati, senza riscrivere il resto della riga.
 router.post('/bulk/aggiorna', auth, (req, res) => {
-  const { ids, rsvp, tavolo_id } = req.body;
+  const { ids, rsvp, tavolo_id, invito } = req.body;
   if (!idsValidi(ids)) return res.status(400).json({ error: 'Nessun ospite selezionato' });
   let stmt, valore;
   if ('rsvp' in req.body) {
@@ -105,6 +105,14 @@ router.post('/bulk/aggiorna', auth, (req, res) => {
     stmt = db.prepare('UPDATE ospiti SET tavolo_id = ? WHERE id = ?');
     valore = tavolo_id == null ? null : parseInt(tavolo_id);
     if (Number.isNaN(valore)) return res.status(400).json({ error: 'Tavolo non valido' });
+  } else if (invito) {
+    // `valore` è il canale, NULL quando si annulla. La data della prima
+    // consegna resta: segnare di nuovo non la sposta.
+    valore = invito.inviato ? (['whatsapp', 'manuale'].includes(invito.canale) ? invito.canale : 'manuale') : null;
+    const s = db.prepare(`UPDATE ospiti SET invito_canale = ?,
+      invito_inviato = CASE WHEN ? IS NULL THEN NULL ELSE COALESCE(invito_inviato, date('now', 'localtime')) END
+      WHERE id = ?`);
+    stmt = { run: (v, id) => s.run(v, v, id) };
   } else {
     return res.status(400).json({ error: 'Nessuna modifica indicata' });
   }

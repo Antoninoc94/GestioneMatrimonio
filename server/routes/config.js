@@ -36,6 +36,7 @@ router.put('/', auth, (req, res) => {
     landing_foto_posizione=COALESCE(?,landing_foto_posizione),
     soglia_eta_bambino=COALESCE(?,soglia_eta_bambino),
     url_pubblico=COALESCE(?,url_pubblico),
+    messaggio_whatsapp=COALESCE(?,messaggio_whatsapp),
     invito_tema=COALESCE(?,invito_tema),
     invito_ora_cerimonia=COALESCE(?,invito_ora_cerimonia),
     invito_luogo_cerimonia=COALESCE(?,invito_luogo_cerimonia),
@@ -65,6 +66,7 @@ router.put('/', auth, (req, res) => {
       p('landing_foto_posizione', v => v || 'center top'),
       p('soglia_eta_bambino', v => parseInt(v) || 12),
       p('url_pubblico', v => (v ?? '').trim()),
+      p('messaggio_whatsapp', v => v ?? ''),
       p('invito_tema', v => v || 'classico'),
       // `?? ''` e non `|| ''`: un campo svuotato a mano deve restare vuoto,
       // altrimenti COALESCE lo riporterebbe al valore precedente.

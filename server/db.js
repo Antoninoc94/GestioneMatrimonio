@@ -258,6 +258,10 @@ if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
 if (!configCols.find(c => c.name === 'url_pubblico')) {
   db.prepare('ALTER TABLE config ADD COLUMN url_pubblico TEXT').run();
 }
+// Testo dell'invito mandato via WhatsApp dalla Lista Ospiti. NULL = testo predefinito.
+if (!configCols.find(c => c.name === 'messaggio_whatsapp')) {
+  db.prepare('ALTER TABLE config ADD COLUMN messaggio_whatsapp TEXT').run();
+}
 // Campi del generatore inviti. Restano NULL finché non si salva la prima volta:
 // così il client distingue "mai compilato" (usa i testi predefiniti) da
 // "svuotato apposta" (stringa vuota). Nomi e data non si duplicano qui —
@@ -337,6 +341,14 @@ if (!ospCols.includes('parent_id')) {
 }
 if (!ospCols.includes('relazione')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN relazione TEXT').run();
+}
+// Invito consegnato alla famiglia (solo sull'invitato principale): data ISO, o
+// NULL se ancora da consegnare, e come ('whatsapp' / 'manuale').
+if (!ospCols.includes('invito_inviato')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN invito_inviato TEXT').run();
+}
+if (!ospCols.includes('invito_canale')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN invito_canale TEXT').run();
 }
 // Deduce la relazione (partner/figlio) dal vecchio tipo per i familiari già esistenti:
 // finora 'tipo' era usato sia per l'età che per la parentela, quindi era sempre coerente

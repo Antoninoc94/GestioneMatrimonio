@@ -3,6 +3,7 @@ import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop } from
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '../api';
 import PhotoCropper from '../components/PhotoCropper';
+import { baseUrlPubblico, MESSAGGIO_WHATSAPP_DEFAULT } from '../publicUrl';
 
 const TEMI = [
   { key: 'rose',    label: 'Rosa',      primary: '#e11d48', light: '#fff1f2', border: '#fecdd3' },
@@ -30,6 +31,7 @@ export default function LandingEditor() {
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState('');
   const [urlPubblico, setUrlPubblico] = useState('');
+  const [messaggioWa, setMessaggioWa] = useState('');
   const [urlSaved, setUrlSaved] = useState(false);
   const fileRef = useRef();
   const qrWeddingRef = useRef();
@@ -54,6 +56,7 @@ export default function LandingEditor() {
         landing_tema: d.landing_tema || 'rose',
       });
       setUrlPubblico(d.url_pubblico || '');
+      setMessaggioWa(d.messaggio_whatsapp || '');
       setFoto(d.landing_foto || null);
       setFotoOriginale(d.landing_foto_originale || null);
       setFotoCrop(d.landing_foto_crop ? JSON.parse(d.landing_foto_crop) : null);
@@ -67,19 +70,13 @@ export default function LandingEditor() {
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const saveUrlPubblico = async () => {
-    await api.put('/config', { url_pubblico: urlPubblico });
+  const saveCondivisione = async () => {
+    await api.put('/config', { url_pubblico: urlPubblico, messaggio_whatsapp: messaggioWa });
     setUrlSaved(true);
     setTimeout(() => setUrlSaved(false), 2500);
   };
 
-  // "antoninoevalentina.it/" → "https://antoninoevalentina.it". Vuoto: l'indirizzo
-  // da cui si sta usando l'app, come prima che il campo esistesse.
-  const baseQR = (() => {
-    const v = urlPubblico.trim().replace(/\/+$/, '');
-    if (!v) return window.location.origin;
-    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
-  })();
+  const baseQR = baseUrlPubblico(urlPubblico);
 
   const toggleAbilitata = async () => {
     const nuovoValore = !form.landing_abilitata;
@@ -339,14 +336,20 @@ export default function LandingEditor() {
         <p className="text-xs text-gray-400 mb-4">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine.</p>
         <div className="mb-5">
           <label className="form-label">Indirizzo pubblico del sito</label>
-          <div className="flex gap-2">
-            <input className="form-input" value={urlPubblico} onChange={e => setUrlPubblico(e.target.value)}
-              placeholder={window.location.origin} />
-            <button type="button" className="btn-primary whitespace-nowrap" onClick={saveUrlPubblico}>
-              <Save size={15} /> {urlSaved ? 'Salvato!' : 'Salva'}
-            </button>
-          </div>
+          <input className="form-input" value={urlPubblico} onChange={e => setUrlPubblico(e.target.value)}
+            placeholder={window.location.origin} />
           <p className="text-xs text-gray-400 mt-1">L'indirizzo che gli ospiti usano, es. https://antoninoevalentina.it. Se vuoto, i QR usano l'indirizzo da cui stai navigando ora.</p>
+        </div>
+        <div className="mb-5">
+          <label className="form-label">Messaggio d'invito per WhatsApp</label>
+          <textarea className="form-input" rows={5} value={messaggioWa} onChange={e => setMessaggioWa(e.target.value)}
+            placeholder={MESSAGGIO_WHATSAPP_DEFAULT} />
+          <p className="text-xs text-gray-400 mt-1">
+            Si usa dal pulsante WhatsApp nella Lista Ospiti. Segnaposto: <code>{'{nome}'}</code>, <code>{'{link_wedding}'}</code>, <code>{'{link_conferma}'}</code>. Se vuoto, si usa il testo di esempio.
+          </p>
+          <button type="button" className="btn-primary mt-2" onClick={saveCondivisione}>
+            <Save size={15} /> {urlSaved ? 'Salvato!' : 'Salva indirizzo e messaggio'}
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {[

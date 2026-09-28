@@ -1,8 +1,9 @@
 import { useEffect, useState, Fragment } from 'react';
-import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart, Search, ChevronUp, ChevronDown, ChevronsUpDown, MessageCircle, Mail } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { baseUrlPubblico, linkWhatsApp } from '../publicUrl';
 
 const LATO = ['sposo1', 'sposo2', 'comune'];
 const RSVP = ['attesa', 'confermato', 'declinato'];
@@ -42,6 +43,7 @@ export default function Ospiti() {
   const [filtroLato, setFiltroLato] = useState('');
   const [filtroSito, setFiltroSito] = useState(false);
   const [filtroFigli, setFiltroFigli] = useState(''); // '' | 'figli' | 'senzaEta'
+  const [filtroInvito, setFiltroInvito] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [conPartner, setConPartner] = useState(false);
   const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
@@ -58,11 +60,15 @@ export default function Ospiti() {
   const [soglia, setSoglia] = useState(12);
   const [saving, setSaving] = useState(false);
   const [errore, setErrore] = useState('');
+  const [condivisione, setCondivisione] = useState({ base: window.location.origin, template: '' });
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
     api.get('/tavoli').then(r => setTavoli(r.data));
-    api.get('/config').then(r => setSoglia(r.data.soglia_eta_bambino || 12));
+    api.get('/config').then(r => {
+      setSoglia(r.data.soglia_eta_bambino || 12);
+      setCondivisione({ base: baseUrlPubblico(r.data.url_pubblico), template: r.data.messaggio_whatsapp || '' });
+    });
   };
   useEffect(() => { load(); }, []);
 
@@ -161,6 +167,46 @@ export default function Ospiti() {
     load();
   };
 
+  const segnaInvito = (ids, inviato, canale = 'manuale') =>
+    esegui(() => api.post('/ospiti/bulk/aggiorna', { ids, invito: { inviato, canale } }), "Aggiornamento dell'invito non riuscito. Riprova.");
+
+  const toggleInvito = o => {
+    const chi = o.cognome ? `${o.nome} ${o.cognome}` : o.nome;
+    if (o.invito_inviato) {
+      if (confirm(`Segnare l'invito di ${chi} come ancora da consegnare?`)) segnaInvito([o.id], false);
+    } else if (confirm(`Segnare l'invito di ${chi} come consegnato?`)) {
+      segnaInvito([o.id], true);
+    }
+  };
+
+  const waLink = o => linkWhatsApp(o.telefono, { nome: o.nome, template: condivisione.template, base: condivisione.base });
+
+  // Apre WhatsApp col messaggio pronto; se poi l'ha inviato davvero non lo
+  // sappiamo, quindi lo si chiede invece di segnarlo da solo.
+  const inviaWhatsApp = o => {
+    window.open(waLink(o), '_blank', 'noopener');
+    if (!o.invito_inviato && confirm(`Hai inviato l'invito a ${o.nome} su WhatsApp? Lo segno come consegnato.`)) {
+      segnaInvito([o.id], true, 'whatsapp');
+    }
+  };
+
+  const invitoBadge = o => o.invito_inviato
+    ? <button type="button" onClick={() => toggleInvito(o)} title={`Consegnato ${o.invito_canale === 'whatsapp' ? 'su WhatsApp' : 'a mano'}: clic per annullare`}
+        className="badge bg-emerald-50 text-emerald-700 text-xs flex items-center gap-1 w-fit">
+        {o.invito_canale === 'whatsapp' ? <MessageCircle size={10} /> : <Mail size={10} />}
+        Invito {new Date(o.invito_inviato).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
+      </button>
+    : <button type="button" onClick={() => toggleInvito(o)} title="Clic quando l'hai consegnato"
+        className="badge bg-amber-50 text-amber-700 text-xs flex items-center gap-1 w-fit">
+        <Mail size={10} /> Invito da consegnare
+      </button>;
+
+  const waButton = (o, size) => waLink(o) && (
+    <button className="p-1.5 rounded hover:bg-green-50 text-green-600" title="Invia l'invito su WhatsApp" onClick={() => inviaWhatsApp(o)}>
+      <MessageCircle size={size} />
+    </button>
+  );
+
   const del = async id => {
     const deps = items.filter(i => i.parent_id === id);
     const msg = deps.length > 0
@@ -181,6 +227,8 @@ export default function Ospiti() {
   const bambiniTotale = items.filter(i => i.tipo === 'bambino').length;
   // Senza età il tipo di un figlio non viene ricalcolato al cambio di soglia.
   const figliSenzaEta = items.filter(i => i.relazione === 'figlio' && i.eta == null).length;
+  // L'invito si consegna alla famiglia: conta solo sugli invitati principali.
+  const invitiDaInviare = items.filter(i => !i.parent_id && !i.invito_inviato).length;
 
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
@@ -192,7 +240,8 @@ export default function Ospiti() {
     const figliMatch = !filtroFigli
       || (filtroFigli === 'figli' && figli.length > 0)
       || (filtroFigli === 'senzaEta' && figli.some(c => c.eta == null));
-    return rsvpMatch && sitoMatch && figliMatch && (!filtroLato || o.lato === filtroLato);
+    const invitoMatch = !filtroInvito || !o.invito_inviato;
+    return rsvpMatch && sitoMatch && figliMatch && invitoMatch && (!filtroLato || o.lato === filtroLato);
   });
 
   const q = search.toLowerCase().trim();
@@ -264,6 +313,11 @@ export default function Ospiti() {
 
   // Come nella pagina Tavoli: gli adulti della famiglia che oggi siedono con
   // l'invitato lo seguono, i bambini restano da sistemare a parte.
+  const bulkSetInvito = async inviato => {
+    await segnaInvito([...selected], inviato);
+    setSelected(new Set());
+  };
+
   const bulkSetTavolo = async val => {
     const tavolo_id = val === '' ? null : parseInt(val);
     const ids = [...selected].flatMap(id => {
@@ -470,6 +524,12 @@ export default function Ospiti() {
           <div className="w-px bg-gray-200 mx-1" />
           <button className={`badge px-3 py-1.5 cursor-pointer ${filtroFigli === 'figli' ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-600'}`}
             onClick={() => toggleFiltroFigli('figli')}>Con figli</button>
+          {invitiDaInviare > 0 && (
+            <button className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroInvito ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`}
+              onClick={() => { setFiltroInvito(v => !v); setPage(1); setSelected(new Set()); }}>
+              <Mail size={11} /> Inviti da consegnare ({invitiDaInviare})
+            </button>
+          )}
           {figliSenzaEta > 0 && (
             <button className={`badge px-3 py-1.5 cursor-pointer ${filtroFigli === 'senzaEta' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-600'}`}
               onClick={() => toggleFiltroFigli('senzaEta')}>Figli senza età ({figliSenzaEta})</button>
@@ -491,6 +551,12 @@ export default function Ospiti() {
             <option value="placeholder" disabled>Assegna tavolo…</option>
             <option value="">— Nessun tavolo —</option>
             {tavoli.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+          <select className="form-input w-auto text-sm py-1" defaultValue=""
+            onChange={e => { if (e.target.value) { bulkSetInvito(e.target.value === 'si'); e.target.value = ''; } }}>
+            <option value="" disabled>Invito…</option>
+            <option value="si">Segna consegnato</option>
+            <option value="no">Segna da consegnare</option>
           </select>
           <button className="btn-danger text-sm py-1 px-3 inline-flex items-center gap-1" onClick={bulkDelete}>
             <Trash2 size={14} /> Elimina
@@ -522,6 +588,7 @@ export default function Ospiti() {
                       <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
                       {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{o.eta != null ? ` (${o.eta}a)` : ''}</span>}
                       {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
+                      {invitoBadge(o)}
                     </div>
                   </div>
                 </div>
@@ -533,6 +600,7 @@ export default function Ospiti() {
                   <p className="text-xs text-gray-400 italic mb-2 truncate">"{o.messaggio_ospite}"</p>
                 )}
                 <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
+                  {waButton(o, 14)}
                   <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
                   <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(o.id)}><Trash2 size={14} /></button>
                 </div>
@@ -607,7 +675,10 @@ export default function Ospiti() {
                       <td className="text-center">
                         <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
                       </td>
-                      <td className="font-medium text-gray-900">{o.cognome ? `${o.cognome} ${o.nome}` : o.nome}</td>
+                      <td className="font-medium text-gray-900">
+                        {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
+                        <div className="mt-1">{invitoBadge(o)}</div>
+                      </td>
                       <td className="text-gray-500 text-sm">{latoLabel[o.lato]}</td>
                       <td className="text-gray-500 text-sm capitalize">{o.tipo === 'bambino' ? 'Bambino' : 'Adulto'}</td>
                       <td>
@@ -629,6 +700,7 @@ export default function Ospiti() {
                       </td>
                       <td>
                         <div className="flex gap-1">
+                          {waButton(o, 14)}
                           <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(o)}><Pencil size={14} /></button>
                           <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(o.id)}><Trash2 size={14} /></button>
                         </div>
