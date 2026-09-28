@@ -29,6 +29,8 @@ export default function LandingEditor() {
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState('');
+  const [urlPubblico, setUrlPubblico] = useState('');
+  const [urlSaved, setUrlSaved] = useState(false);
   const fileRef = useRef();
   const qrWeddingRef = useRef();
   const qrConfermaRef = useRef();
@@ -51,6 +53,7 @@ export default function LandingEditor() {
         landing_info_pratiche: d.landing_info_pratiche || '',
         landing_tema: d.landing_tema || 'rose',
       });
+      setUrlPubblico(d.url_pubblico || '');
       setFoto(d.landing_foto || null);
       setFotoOriginale(d.landing_foto_originale || null);
       setFotoCrop(d.landing_foto_crop ? JSON.parse(d.landing_foto_crop) : null);
@@ -63,6 +66,20 @@ export default function LandingEditor() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
+
+  const saveUrlPubblico = async () => {
+    await api.put('/config', { url_pubblico: urlPubblico });
+    setUrlSaved(true);
+    setTimeout(() => setUrlSaved(false), 2500);
+  };
+
+  // "antoninoevalentina.it/" → "https://antoninoevalentina.it". Vuoto: l'indirizzo
+  // da cui si sta usando l'app, come prima che il campo esistesse.
+  const baseQR = (() => {
+    const v = urlPubblico.trim().replace(/\/+$/, '');
+    if (!v) return window.location.origin;
+    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  })();
 
   const toggleAbilitata = async () => {
     const nuovoValore = !form.landing_abilitata;
@@ -319,13 +336,24 @@ export default function LandingEditor() {
           <QrCode size={18} className="text-rose-400" />
           <h2 className="font-bold text-gray-800">QR Code</h2>
         </div>
-        <p className="text-xs text-gray-400 mb-5">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine.</p>
+        <p className="text-xs text-gray-400 mb-4">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine.</p>
+        <div className="mb-5">
+          <label className="form-label">Indirizzo pubblico del sito</label>
+          <div className="flex gap-2">
+            <input className="form-input" value={urlPubblico} onChange={e => setUrlPubblico(e.target.value)}
+              placeholder={window.location.origin} />
+            <button type="button" className="btn-primary whitespace-nowrap" onClick={saveUrlPubblico}>
+              <Save size={15} /> {urlSaved ? 'Salvato!' : 'Salva'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">L'indirizzo che gli ospiti usano, es. https://antoninoevalentina.it. Se vuoto, i QR usano l'indirizzo da cui stai navigando ora.</p>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {[
             { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding.png' },
             { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma.png' },
           ].map(({ label, path, ref, file }) => {
-            const url = `${window.location.origin}${path}`;
+            const url = `${baseQR}${path}`;
             return (
               <div key={path} className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-sm font-semibold text-gray-700">{label}</p>

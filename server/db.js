@@ -252,6 +252,12 @@ if (!configCols.find(c => c.name === 'landing_foto_crop')) {
 if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
   db.prepare('ALTER TABLE config ADD COLUMN soglia_eta_bambino INTEGER DEFAULT 12').run();
 }
+// Indirizzo con cui gli ospiti raggiungono /wedding e /conferma, usato nei QR.
+// Serve perché la gestione si apre da un altro indirizzo (il dominio pubblico
+// lascia passare solo le due pagine per gli ospiti).
+if (!configCols.find(c => c.name === 'url_pubblico')) {
+  db.prepare('ALTER TABLE config ADD COLUMN url_pubblico TEXT').run();
+}
 // Campi del generatore inviti. Restano NULL finché non si salva la prima volta:
 // così il client distingue "mai compilato" (usa i testi predefiniti) da
 // "svuotato apposta" (stringa vuota). Nomi e data non si duplicano qui —
