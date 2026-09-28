@@ -345,7 +345,7 @@ export default function LandingEditor() {
           <textarea className="form-input" rows={5} value={messaggioWa} onChange={e => setMessaggioWa(e.target.value)}
             placeholder={MESSAGGIO_WHATSAPP_DEFAULT} />
           <p className="text-xs text-gray-400 mt-1">
-            Si usa dal pulsante WhatsApp nella Lista Ospiti. Segnaposto: <code>{'{nome}'}</code>, <code>{'{link_wedding}'}</code>, <code>{'{link_conferma}'}</code>. Se vuoto, si usa il testo di esempio.
+            Si usa dal pulsante WhatsApp nella Lista Ospiti. Segnaposto: <code>{'{nome}'}</code>, <code>{'{link_wedding}'}</code>, <code>{'{link_conferma}'}</code>. Se vuoto, si usa il testo di esempio. Evita le emoji: su WhatsApp Web e desktop possono arrivare come "�".
           </p>
           <button type="button" className="btn-primary mt-2" onClick={saveCondivisione}>
             <Save size={15} /> {urlSaved ? 'Salvato!' : 'Salva indirizzo e messaggio'}
