@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown, X, UtensilsCrossed } from 'lucide-react';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../api';
 
 const rsvpColor = { confermato: 'text-green-600', declinato: 'text-red-400', attesa: 'text-yellow-500' };
@@ -100,6 +101,7 @@ export default function Tavoli() {
 
   const [exporting, setExporting] = useState(false);
   const [exportingCards, setExportingCards] = useState(false);
+  const [exportingCatering, setExportingCatering] = useState(false);
   const [vistaCompatta, setVistaCompatta] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState('');
   const [searchSenza, setSearchSenza] = useState('');
@@ -383,6 +385,115 @@ export default function Tavoli() {
     }
   };
 
+  // Riepilogo da dare a catering e location: coperti per tavolo (adulti e
+  // bambini, per il menu) e l'elenco di intolleranze con chi e dove siede.
+  // Contano i confermati; chi è ancora in attesa è a parte, perché il numero
+  // finale può ancora cambiare. I declinati non compaiono.
+  const exportCateringPDF = () => {
+    setExportingCatering(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const rose = [225, 29, 72];
+      const gray = [107, 114, 128];
+      const oggi = new Date().toLocaleDateString('it-IT');
+      const nome = o => (o.cognome ? `${o.cognome} ${o.nome}` : o.nome);
+      const attivi = ospiti.filter(o => o.rsvp !== 'declinato');
+      const conf = attivi.filter(o => o.rsvp === 'confermato');
+      const conta = lista => ({
+        adulti: lista.filter(o => o.rsvp === 'confermato' && o.tipo !== 'bambino').length,
+        bambini: lista.filter(o => o.rsvp === 'confermato' && o.tipo === 'bambino').length,
+        attesa: lista.filter(o => o.rsvp === 'attesa').length,
+      });
+      const intolleranzeDi = lista => lista.filter(o => o.intolleranze?.trim())
+        .map(o => `${nome(o)}: ${o.intolleranze.trim()}${o.rsvp === 'attesa' ? ' (in attesa)' : ''}`).join('\n');
+
+      const gruppi = [
+        ...tavoli.map(t => ({ nome: t.nome, lista: attivi.filter(o => o.tavolo_id === t.id) })),
+        { nome: 'Senza tavolo', lista: attivi.filter(o => !o.tavolo_id) },
+      ].filter(g => g.lista.length > 0);
+
+      const tot = conta(attivi);
+
+      // Header
+      doc.setFillColor(...rose);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Riepilogo Catering', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${conf.length} confermati (${tot.adulti} adulti, ${tot.bambini} bambini) · ${tot.attesa} in attesa · ${oggi}`, 14, 20);
+
+      doc.setTextColor(...gray);
+      doc.setFontSize(9);
+      doc.text('Coperti confermati per tavolo. "In attesa" sono ospiti che non hanno ancora risposto.', 14, 36);
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Tavolo', 'Adulti', 'Bambini', 'Totale', 'In attesa', 'Intolleranze / allergie']],
+        body: gruppi.map(g => {
+          const c = conta(g.lista);
+          return [g.nome, c.adulti, c.bambini, c.adulti + c.bambini, c.attesa || '', intolleranzeDi(g.lista)];
+        }),
+        foot: [['Totale', tot.adulti, tot.bambini, tot.adulti + tot.bambini, tot.attesa || '', '']],
+        theme: 'grid',
+        styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: rose, textColor: 255 },
+        footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 32, fontStyle: 'bold' },
+          1: { cellWidth: 16, halign: 'center' },
+          2: { cellWidth: 17, halign: 'center' },
+          3: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+          4: { cellWidth: 18, halign: 'center' },
+        },
+        margin: { left: 14, right: 14, bottom: 16 },
+      });
+
+      // Elenco intolleranze: una riga per persona, per chi prepara i piatti
+      const conIntolleranze = attivi.filter(o => o.intolleranze?.trim())
+        .map(o => ({ o, tavolo: tavoli.find(t => t.id === o.tavolo_id)?.nome || 'Senza tavolo' }))
+        .sort((a, b) => a.tavolo.localeCompare(b.tavolo, 'it') || nome(a.o).localeCompare(nome(b.o), 'it'));
+
+      if (conIntolleranze.length > 0) {
+        let y = doc.lastAutoTable.finalY + 10;
+        if (y > 260) { doc.addPage(); y = 20; }
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...rose);
+        doc.text(`Intolleranze e allergie (${conIntolleranze.length})`, 14, y);
+        autoTable(doc, {
+          startY: y + 3,
+          head: [['Ospite', 'Tavolo', 'Menu', 'Intolleranza / allergia', 'Stato']],
+          body: conIntolleranze.map(({ o, tavolo }) => [
+            nome(o), tavolo, o.tipo === 'bambino' ? 'Bambino' : 'Adulto', o.intolleranze.trim(),
+            o.rsvp === 'confermato' ? 'Confermato' : 'In attesa',
+          ]),
+          theme: 'striped',
+          styles: { fontSize: 8.5, cellPadding: 2 },
+          headStyles: { fillColor: rose, textColor: 255 },
+          columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 32 }, 2: { cellWidth: 20 }, 4: { cellWidth: 22 } },
+          margin: { left: 14, right: 14, bottom: 16 },
+        });
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
+        doc.text(`Riepilogo Catering - ${oggi}`, 14, 290);
+      }
+
+      doc.save('riepilogo-catering.pdf');
+    } finally {
+      setExportingCatering(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -390,9 +501,12 @@ export default function Tavoli() {
           <h1 className="page-title">Disposizione Tavoli</h1>
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={exportSegnaposti} disabled={exportingCards}>
             <Tag size={15} /> {exportingCards ? 'Esporto…' : 'Segnaposti'}
+          </button>
+          <button className="btn-secondary" onClick={exportCateringPDF} disabled={exportingCatering}>
+            <UtensilsCrossed size={15} /> {exportingCatering ? 'Esporto…' : 'Catering'}
           </button>
           <button className="btn-secondary" onClick={exportSeatingPDF} disabled={exporting}>
             <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
