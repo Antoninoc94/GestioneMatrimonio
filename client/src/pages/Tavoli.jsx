@@ -509,7 +509,7 @@ export default function Tavoli() {
                         <div className="flex-1 min-w-0">
                           <span className={`text-sm truncate ${isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'}`}>
                             {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                            {isChild && o.eta ? <span className="ml-1 text-xs opacity-50">({o.eta}a)</span> : null}
+                            {isChild && o.eta != null ? <span className="ml-1 text-xs opacity-50">({o.eta}a)</span> : null}
                           </span>
                           {parent && (
                             <span className="text-xs text-gray-400 ml-1.5">
@@ -554,7 +554,7 @@ export default function Tavoli() {
                                 </span>
                                 <span className={`flex-1 text-xs truncate ${isChild ? 'text-purple-700' : 'text-rose-600'}`}>
                                   {f.cognome ? `${f.cognome} ${f.nome}` : f.nome}
-                                  {isChild && f.eta ? <span className="ml-1 opacity-60">({f.eta}a)</span> : null}
+                                  {isChild && f.eta != null ? <span className="ml-1 opacity-60">({f.eta}a)</span> : null}
                                 </span>
                                 <AssegnaSelect o={f} />
                               </div>
@@ -659,7 +659,7 @@ export default function Tavoli() {
                           <div className="min-w-0 flex-1">
                             <div className={`truncate ${isChild ? 'text-purple-700 text-xs' : isPartner ? 'text-rose-600 text-xs' : 'text-gray-800 font-medium'}`}>
                               {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                              {isChild && o.eta ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
+                              {isChild && o.eta != null ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
                             </div>
                             {pName && (
                               <div className="text-gray-400 text-xs">{isChild ? 'figlio' : 'partner'} di {pName}</div>

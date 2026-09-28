@@ -2,6 +2,9 @@ const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
+// Non `eta || null`: 0 è l'età valida di un neonato di pochi mesi.
+const etaOrNull = v => { const n = parseInt(v); return Number.isNaN(n) ? null : n; };
+
 router.get('/', auth, (req, res) => {
   const ospiti = db.prepare(`
     SELECT o.*, t.nome as tavolo_nome
@@ -18,7 +21,7 @@ router.post('/', auth, (req, res) => {
     'INSERT INTO ospiti (nome, cognome, lato, tipo, rsvp, tavolo_id, email, telefono, intolleranze, note, parent_id, eta, relazione) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).run(nome, cognome || null, lato || 'comune', tipo || 'adulto', rsvp || 'attesa',
     tavolo_id || null, email || null, telefono || null, intolleranze || null, note || null,
-    parent_id || null, eta || null, relazione || null);
+    parent_id || null, etaOrNull(eta), relazione || null);
   res.json(db.prepare('SELECT o.*, t.nome as tavolo_nome FROM ospiti o LEFT JOIN tavoli t ON o.tavolo_id = t.id WHERE o.id = ?').get(r.lastInsertRowid));
 });
 
@@ -27,7 +30,7 @@ router.put('/:id', auth, (req, res) => {
   db.prepare(
     'UPDATE ospiti SET nome=?, cognome=?, lato=?, tipo=?, rsvp=?, tavolo_id=?, email=?, telefono=?, intolleranze=?, note=?, parent_id=?, eta=?, messaggio_ospite=?, relazione=? WHERE id=?'
   ).run(nome, cognome || null, lato, tipo, rsvp, tavolo_id || null, email || null, telefono || null,
-    intolleranze || null, note || null, parent_id || null, eta || null, messaggio_ospite || null, relazione || null, req.params.id);
+    intolleranze || null, note || null, parent_id || null, etaOrNull(eta), messaggio_ospite || null, relazione || null, req.params.id);
   res.json(db.prepare('SELECT o.*, t.nome as tavolo_nome FROM ospiti o LEFT JOIN tavoli t ON o.tavolo_id = t.id WHERE o.id = ?').get(req.params.id));
 });
 

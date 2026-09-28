@@ -65,6 +65,8 @@ export default function Ospiti() {
 
   // Un figlio resta "figlio" (relazione) a qualsiasi età; conta come bambino
   // (tipo, per menu/conteggi) solo se sotto la soglia configurata.
+  // `|| null` scarterebbe anche 0: un neonato di pochi mesi ha età 0, non "senza età".
+  const parseEta = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
   const tipoFiglio = eta => {
     const n = parseInt(eta);
     return !isNaN(n) && n >= soglia ? 'adulto' : 'bambino';
@@ -117,7 +119,7 @@ export default function Ospiti() {
     const payload = {
       ...form,
       tavolo_id: form.tavolo_id || null,
-      eta: isFiglio ? (parseInt(form.eta) || null) : (form.tipo === 'bambino' ? (parseInt(form.eta) || null) : null),
+      eta: isFiglio || form.tipo === 'bambino' ? parseEta(form.eta) : null,
       tipo: isFiglio ? tipoFiglio(form.eta) : form.tipo,
     };
 
@@ -135,7 +137,7 @@ export default function Ospiti() {
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          const fp = { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
+          const fp = { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseEta(f.eta), intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
           if (f.id) await api.put(`/ospiti/${f.id}`, fp);
           else await api.post('/ospiti', fp);
         }
@@ -149,7 +151,7 @@ export default function Ospiti() {
       if (conFigli) {
         for (const f of figli) {
           if (!f.nome.trim()) continue;
-          await api.post('/ospiti', { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseInt(f.eta) || null, intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
+          await api.post('/ospiti', { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseEta(f.eta), intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
         }
       }
     }
@@ -176,6 +178,8 @@ export default function Ospiti() {
   const adulti = items.filter(i => i.tipo === 'adulto' && i.rsvp === 'confermato').length;
   const bambini = items.filter(i => i.tipo === 'bambino' && i.rsvp === 'confermato').length;
   const bambiniTotale = items.filter(i => i.tipo === 'bambino').length;
+  // Senza età il tipo di un figlio non viene ricalcolato al cambio di soglia.
+  const figliSenzaEta = items.filter(i => i.relazione === 'figlio' && i.eta == null).length;
 
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
@@ -401,13 +405,14 @@ export default function Ospiti() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         {[
           { label: 'Totale invitati', value: totale, color: 'text-gray-700' },
           { label: 'Confermati', value: confermati, color: 'text-green-600' },
           { label: 'In attesa', value: items.filter(i => i.rsvp === 'attesa').length, color: 'text-yellow-600' },
           { label: 'Declinati', value: declinati, color: 'text-red-500' },
           { label: 'Bambini', value: bambiniTotale, color: 'text-purple-600' },
+          { label: 'Figli senza età', value: figliSenzaEta, color: figliSenzaEta ? 'text-orange-500' : 'text-gray-400' },
         ].map(s => (
           <div key={s.label} className="card text-center py-3">
             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
@@ -499,7 +504,7 @@ export default function Ospiti() {
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className={`badge text-xs flex items-center gap-1 ${rsvpColor[o.rsvp]}`}><Icon size={11} />{rsvpLabel[o.rsvp]}</span>
                       <span className="badge bg-gray-100 text-gray-600 text-xs">{latoLabel[o.lato]}</span>
-                      {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{o.eta ? ` (${o.eta}a)` : ''}</span>}
+                      {o.tipo === 'bambino' && <span className="badge bg-purple-100 text-purple-600 text-xs">Bambino{o.eta != null ? ` (${o.eta}a)` : ''}</span>}
                       {o.fonte === 'sito' && <span className="badge bg-blue-100 text-blue-600 text-xs flex items-center gap-1"><Globe size={10} />Da sito</span>}
                     </div>
                   </div>
@@ -527,7 +532,7 @@ export default function Ospiti() {
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta != null ? ` (${c.eta}a)` : ''}</span>}
                             {c.tavolo_nome && <span className="badge bg-gray-100 text-gray-600 text-xs truncate max-w-32">{c.tavolo_nome}</span>}
                             {c.intolleranze && <span className="badge bg-orange-50 text-orange-600 text-xs truncate max-w-32">{c.intolleranze}</span>}
                           </div>
@@ -626,7 +631,7 @@ export default function Ospiti() {
                           <td>
                             {isPartner
                               ? <span className="badge bg-rose-100 text-rose-600 text-xs flex items-center gap-1 w-fit"><Heart size={9} />Partner</span>
-                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta ? ` (${c.eta}a)` : ''}</span>}
+                              : <span className="badge bg-purple-100 text-purple-600 text-xs">Figlio{c.eta != null ? ` (${c.eta}a)` : ''}</span>}
                           </td>
                           <td>
                             <span className={`badge text-xs flex items-center gap-1 w-fit ${rsvpColor[c.rsvp] || 'bg-yellow-100 text-yellow-700'}`}>

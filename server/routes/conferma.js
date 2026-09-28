@@ -137,7 +137,8 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
       for (const f of figli) {
         if (!f.nome?.trim()) continue;
         const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
-        const fEta = parseInt(f.eta) || null;
+        // Non `|| null`: 0 è l'età valida di un neonato.
+        const fEta = Number.isNaN(parseInt(f.eta)) ? null : parseInt(f.eta);
         const fTipo = fEta != null && fEta >= soglia ? 'adulto' : 'bambino';
         db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id, relazione)
                     VALUES (?, ?, ?, ?, ?, ?, ?, 'figlio')`)
