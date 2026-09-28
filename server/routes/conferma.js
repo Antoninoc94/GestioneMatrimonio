@@ -126,9 +126,8 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
   if (id && !db.prepare('SELECT id FROM ospiti WHERE id = ?').get(id))
     return res.status(404).json({ error: 'Ospite non trovato' });
 
-  // Ospite principale, partner e figli si salvano tutti o nessuno: il blocco figli
-  // cancella prima di reinserire, quindi un errore a metà lascerebbe l'invitato
-  // senza i familiari che aveva appena confermato — dato non ricostruibile.
+  // Ospite principale, partner e figli si salvano tutti o nessuno: un errore a
+  // metà lascerebbe la famiglia con una risposta registrata solo in parte.
   const salvaRisposta = db.transaction(() => {
     // Ospite principale
     let mainId = id;
@@ -147,24 +146,45 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
       upsertPartner({ nome: partner.nome.trim(), cognome: partner.cognome?.trim() || '', rsvp: partner.rsvp, intolleranze: partner.intolleranze?.trim() || null, parent_id: mainId });
     }
 
-    // Figli: cancella quelli esistenti e reinserisce dal form (evita duplicati alla ri-sottomissione).
-    // Il tipo (adulto/bambino) si deduce dall'età rispetto alla soglia configurata — un figlio
+    // Figli. Il tipo (adulto/bambino) si deduce dall'età rispetto alla soglia configurata — un figlio
     // maggiorenne non deve essere trattato come bambino nei conteggi/menu, ma resta comunque
     // un "figlio" a livello di parentela (relazione), a prescindere dall'età.
+    //
+    // I figli già in lista si aggiornano, non si cancellano e ricreano: la riga
+    // porta tavolo, cognome, lato e note che il form pubblico non conosce, e
+    // ricrearla li azzerava (bambini tolti dal tavolo a ogni risposta). Si
+    // riconoscono dall'id rimandato dal form o, in mancanza, dal nome; quelli
+    // tolti dal form si eliminano, quelli nuovi si inseriscono.
     if (Array.isArray(figli)) {
-      const mainFonte = db.prepare('SELECT fonte FROM ospiti WHERE id = ?').get(mainId)?.fonte || 'sito';
+      const main = db.prepare('SELECT fonte, lato FROM ospiti WHERE id = ?').get(mainId);
       const soglia = db.prepare('SELECT soglia_eta_bambino FROM config LIMIT 1').get()?.soglia_eta_bambino || 12;
-      db.prepare("DELETE FROM ospiti WHERE parent_id = ? AND relazione = 'figlio'").run(mainId);
+      const liberi = new Map(db.prepare("SELECT id, nome FROM ospiti WHERE parent_id = ? AND relazione = 'figlio'")
+        .all(mainId).map(e => [e.id, e]));
+      const trova = f => {
+        const id = parseInt(f.id);
+        if (liberi.has(id)) return liberi.get(id);
+        const nome = f.nome.trim().toLowerCase();
+        return [...liberi.values()].find(e => (e.nome || '').trim().toLowerCase() === nome);
+      };
       for (const f of figli) {
         if (!f.nome?.trim()) continue;
         const fRsvp = ['confermato', 'declinato'].includes(f.rsvp) ? f.rsvp : 'confermato';
         // Non `|| null`: 0 è l'età valida di un neonato.
         const fEta = Number.isNaN(parseInt(f.eta)) ? null : parseInt(f.eta);
         const fTipo = fEta != null && fEta >= soglia ? 'adulto' : 'bambino';
-        db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, parent_id, relazione)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'figlio')`)
-          .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, mainFonte, mainId);
+        const esistente = trova(f);
+        if (esistente) {
+          liberi.delete(esistente.id);
+          db.prepare('UPDATE ospiti SET nome = ?, rsvp = ?, tipo = ?, intolleranze = ?, eta = ? WHERE id = ?')
+            .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, esistente.id);
+        } else {
+          db.prepare(`INSERT INTO ospiti (nome, rsvp, tipo, intolleranze, eta, fonte, lato, parent_id, relazione)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'figlio')`)
+            .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, main?.fonte || 'sito', main?.lato || 'comune', mainId);
+        }
       }
+      const elimina = db.prepare('DELETE FROM ospiti WHERE id = ?');
+      for (const id of liberi.keys()) elimina.run(id);
     }
     return mainId;
   });

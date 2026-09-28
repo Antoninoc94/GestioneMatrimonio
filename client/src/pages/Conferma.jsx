@@ -93,7 +93,7 @@ export default function Conferma() {
       // Pre-carica figli esistenti se presenti
       if (o.figli && o.figli.length > 0) {
         setConFigli(true);
-        setFigli(o.figli.map(f => ({ nome: f.nome || '', eta: f.eta != null ? String(f.eta) : '', intolleranze: f.intolleranze || '', rsvp: f.rsvp === 'confermato' || f.rsvp === 'declinato' ? f.rsvp : null })));
+        setFigli(o.figli.map(f => ({ id: f.id, nome: f.nome || '', eta: f.eta != null ? String(f.eta) : '', intolleranze: f.intolleranze || '', rsvp: f.rsvp === 'confermato' || f.rsvp === 'declinato' ? f.rsvp : null })));
       } else {
         setConFigli(false); setFigli([emptyFiglio()]);
       }
