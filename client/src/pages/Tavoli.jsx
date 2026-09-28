@@ -41,10 +41,8 @@ export default function Tavoli() {
   // il click sembra semplicemente non fare nulla.
   const assignGuests = async (ids, tavoloId) => {
     try {
-      for (const id of ids) {
-        const o = ospiti.find(x => x.id === id);
-        if (o) await api.put(`/ospiti/${id}`, { ...o, tavolo_id: tavoloId });
-      }
+      // Una richiesta per tutto il gruppo, applicata in un'unica transazione.
+      await api.post('/ospiti/bulk/aggiorna', { ids, tavolo_id: tavoloId });
     } catch (err) {
       alert(err.response?.data?.error || 'Errore durante l\'assegnazione del tavolo');
     }

@@ -56,6 +56,8 @@ export default function Ospiti() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(new Set());
   const [soglia, setSoglia] = useState(12);
+  const [saving, setSaving] = useState(false);
+  const [errore, setErrore] = useState('');
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
@@ -80,7 +82,7 @@ export default function Ospiti() {
     setFigli([{ id: null, nome: '', eta: '', intolleranze: '', rsvp: 'attesa' }]);
   };
 
-  const openNew = () => { setForm(empty); setEditId(null); resetExtra(); setModal(true); };
+  const openNew = () => { setForm(empty); setEditId(null); resetExtra(); setErrore(''); setModal(true); };
 
   const openEdit = o => {
     setForm({
@@ -94,6 +96,7 @@ export default function Ospiti() {
       note: o.note || '',
     });
     setEditId(o.id);
+    setErrore('');
 
     // Carica partner e figli esistenti (solo per ospiti master)
     const partner = items.find(i => i.parent_id === o.id && i.relazione === 'partner');
@@ -124,39 +127,37 @@ export default function Ospiti() {
       tipo: isFiglio ? tipoFiglio(form.eta) : form.tipo,
     };
 
-    if (editId) {
-      await api.put(`/ospiti/${editId}`, payload);
+    // Invitato, partner e figli in una sola richiesta: il server li salva in
+    // un'unica transazione, quindi o tutta la famiglia o niente.
+    const partner = conPartner && partnerForm.nome.trim()
+      ? { id: partnerForm.id || null, nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null }
+      : null;
+    // Il tipo (adulto/bambino) si deduce dall'età, la relazione resta sempre "figlio"
+    const figliPayload = conFigli
+      ? figli.filter(f => f.nome.trim()).map(f => ({ id: f.id || null, nome: f.nome.trim(), tipo: tipoFiglio(f.eta), rsvp: f.rsvp || 'attesa', eta: parseEta(f.eta), intolleranze: f.intolleranze?.trim() || null }))
+      : [];
 
-      // Aggiorna o crea partner
-      if (conPartner && partnerForm.nome.trim()) {
-        const pp = { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', relazione: 'partner', parent_id: editId };
-        if (partnerForm.id) await api.put(`/ospiti/${partnerForm.id}`, pp);
-        else await api.post('/ospiti', pp);
-      }
-
-      // Aggiorna o crea figli — il tipo (adulto/bambino) si deduce dall'età, la relazione resta sempre "figlio"
-      if (conFigli) {
-        for (const f of figli) {
-          if (!f.nome.trim()) continue;
-          const fp = { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseEta(f.eta), intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: editId };
-          if (f.id) await api.put(`/ospiti/${f.id}`, fp);
-          else await api.post('/ospiti', fp);
-        }
-      }
-    } else {
-      const r = await api.post('/ospiti', payload);
-      const mainId = r.data.id;
-      if (conPartner && partnerForm.nome.trim()) {
-        await api.post('/ospiti', { nome: partnerForm.nome.trim(), cognome: partnerForm.cognome?.trim() || null, rsvp: partnerForm.rsvp, intolleranze: partnerForm.intolleranze?.trim() || null, lato: form.lato, tipo: 'adulto', relazione: 'partner', parent_id: mainId });
-      }
-      if (conFigli) {
-        for (const f of figli) {
-          if (!f.nome.trim()) continue;
-          await api.post('/ospiti', { nome: f.nome.trim(), tipo: tipoFiglio(f.eta), relazione: 'figlio', rsvp: f.rsvp || 'attesa', eta: parseEta(f.eta), intolleranze: f.intolleranze?.trim() || null, lato: form.lato, parent_id: mainId });
-        }
-      }
+    setSaving(true);
+    setErrore('');
+    try {
+      await api.post('/ospiti/famiglia', { id: editId, ospite: payload, partner, figli: figliPayload });
+      setModal(false);
+      load();
+    } catch (err) {
+      setErrore(err.response?.data?.error || 'Salvataggio non riuscito. Controlla la connessione e riprova.');
+    } finally {
+      setSaving(false);
     }
-    setModal(false);
+  };
+
+  // Per le azioni fuori dal form: un errore va detto, altrimenti il click
+  // sembra semplicemente non aver fatto nulla.
+  const esegui = async (azione, messaggio) => {
+    try {
+      await azione();
+    } catch (err) {
+      alert(err.response?.data?.error || messaggio);
+    }
     load();
   };
 
@@ -166,8 +167,7 @@ export default function Ospiti() {
       ? `Eliminare questo ospite? Verranno eliminati anche ${deps.length} familiare/i collegati (partner/figli).`
       : 'Eliminare questo ospite?';
     if (!confirm(msg)) return;
-    await api.delete(`/ospiti/${id}`);
-    load();
+    await esegui(() => api.delete(`/ospiti/${id}`), 'Eliminazione non riuscita. Riprova.');
   };
 
   const childrenOf = id => items.filter(i => i.parent_id === id);
@@ -247,33 +247,33 @@ export default function Ospiti() {
       : new Set(paginated.map(o => o.id))
     );
 
+  // Una richiesta per tutta la selezione: il server applica la modifica in
+  // un'unica transazione, quindi non resta mai fatta a metà.
   const bulkDelete = async () => {
     if (!confirm(`Eliminare ${selected.size} ospiti selezionati?`)) return;
-    for (const id of selected) await api.delete(`/ospiti/${id}`);
+    await esegui(() => api.post('/ospiti/bulk/elimina', { ids: [...selected] }), 'Eliminazione non riuscita. Riprova.');
     setSelected(new Set());
-    load();
   };
 
+  // Lo stato RSVP vale per tutta la famiglia dell'invitato selezionato.
   const bulkSetRsvp = async rsvp => {
-    for (const id of selected) {
-      const o = items.find(i => i.id === id);
-      if (o) await api.put(`/ospiti/${id}`, { ...o, rsvp });
-      for (const c of items.filter(i => i.parent_id === id)) {
-        await api.put(`/ospiti/${c.id}`, { ...c, rsvp });
-      }
-    }
+    const ids = [...selected].flatMap(id => [id, ...childrenOf(id).map(c => c.id)]);
+    await esegui(() => api.post('/ospiti/bulk/aggiorna', { ids, rsvp }), 'Aggiornamento RSVP non riuscito. Riprova.');
     setSelected(new Set());
-    load();
   };
 
+  // Come nella pagina Tavoli: gli adulti della famiglia che oggi siedono con
+  // l'invitato lo seguono, i bambini restano da sistemare a parte.
   const bulkSetTavolo = async val => {
     const tavolo_id = val === '' ? null : parseInt(val);
-    for (const id of selected) {
+    const ids = [...selected].flatMap(id => {
       const o = items.find(i => i.id === id);
-      if (o) await api.put(`/ospiti/${id}`, { ...o, tavolo_id: isNaN(tavolo_id) ? null : tavolo_id });
-    }
+      if (!o) return [];
+      const seguono = childrenOf(id).filter(c => c.tipo !== 'bambino' && (c.tavolo_id || null) === (o.tavolo_id || null));
+      return [id, ...seguono.map(c => c.id)];
+    });
+    await esegui(() => api.post('/ospiti/bulk/aggiorna', { ids, tavolo_id: isNaN(tavolo_id) ? null : tavolo_id }), 'Assegnazione del tavolo non riuscita. Riprova.');
     setSelected(new Set());
-    load();
   };
 
   const exportPDF = () => {
@@ -905,8 +905,9 @@ export default function Ospiti() {
                 </div>
               )}
 
+              {errore && <p className="text-sm text-red-500">{errore}</p>}
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="btn-primary">Salva</button>
+                <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Salvo…' : 'Salva'}</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>
               </div>
             </form>
