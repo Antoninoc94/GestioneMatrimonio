@@ -4,7 +4,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../api';
 
-const rsvpColor = { confermato: 'text-green-600', declinato: 'text-red-400', attesa: 'text-yellow-500' };
 const empty = { nome: '', capienza: 8, note: '' };
 
 export default function Tavoli() {
@@ -13,7 +12,6 @@ export default function Tavoli() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
-  const [assignModal, setAssignModal] = useState(null);
 
   const load = () => {
     api.get('/tavoli').then(r => setTavoli(r.data));
@@ -95,7 +93,7 @@ export default function Tavoli() {
   const [collapsedTavoli, setCollapsedTavoli] = useState(new Set());
   const toggleCollapse = id => setCollapsedTavoli(prev => {
     const n = new Set(prev);
-    n.has(id) ? n.delete(id) : n.add(id);
+    if (n.has(id)) n.delete(id); else n.add(id);
     return n;
   });
 
@@ -107,8 +105,7 @@ export default function Tavoli() {
   const [searchSenza, setSearchSenza] = useState('');
 
   const exportSegnaposti = () => {
-    const assegnati = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato' && !o.parent_id);
-    // Include anche figli/partner confermati
+    // Tutti i confermati con un tavolo, partner e figli compresi
     const tutti = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato');
     if (tutti.length === 0) return alert('Nessun ospite confermato con tavolo assegnato.');
     setExportingCards(true);
@@ -127,7 +124,6 @@ export default function Tavoli() {
       tavoli.forEach(t => { tavoloMap[t.id] = t.nome; });
 
       tutti.forEach((o, idx) => {
-        const page = Math.floor(idx / (COLS * ROWS));
         const pos  = idx % (COLS * ROWS);
         const col  = pos % COLS;
         const row  = Math.floor(pos / COLS);
