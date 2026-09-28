@@ -11,8 +11,10 @@ const storage = multer.diskStorage({
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
+  // Il campo nel nome: foto, originale e anteprima arrivano nella stessa
+  // richiesta, e con solo il timestamp due file .jpg si sovrascrivevano.
   filename: (req, file, cb) => {
-    const name = `landing-${Date.now()}${path.extname(file.originalname)}`;
+    const name = `landing-${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`;
     cb(null, name);
   }
 });
@@ -41,44 +43,45 @@ router.get('/info', (req, res) => {
   res.json({ config, locations, cronologia });
 });
 
+const rimuovi = filename => {
+  if (!filename) return;
+  const filePath = path.join(__dirname, '../uploads/landing', filename);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+};
+
 // Upload foto landing: 'foto' è sempre la versione ritagliata da mostrare
 // pubblicamente; 'originale' è presente solo quando si carica una foto nuova
 // (non quando si ritaglia di nuovo una foto già caricata), e viene conservata
 // per permettere di rifare il ritaglio in futuro senza ricaricarla.
-router.post('/foto', auth, upload.fields([{ name: 'foto', maxCount: 1 }, { name: 'originale', maxCount: 1 }]), (req, res) => {
+// 'anteprima' è la copia piccola del ritaglio per l'anteprima dei link.
+
+router.post('/foto', auth, upload.fields([{ name: 'foto', maxCount: 1 }, { name: 'originale', maxCount: 1 }, { name: 'anteprima', maxCount: 1 }]), (req, res) => {
   const croppedFile = req.files?.foto?.[0];
   const originalFile = req.files?.originale?.[0];
+  const anteprimaFile = req.files?.anteprima?.[0];
   if (!croppedFile) return res.status(400).json({ error: 'File mancante' });
 
-  const old = db.prepare('SELECT landing_foto, landing_foto_originale FROM config LIMIT 1').get();
-  if (old?.landing_foto) {
-    const oldPath = path.join(__dirname, '../uploads/landing', old.landing_foto);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
+  const old = db.prepare('SELECT landing_foto, landing_foto_originale, landing_foto_anteprima FROM config LIMIT 1').get();
+  rimuovi(old?.landing_foto);
+  // L'anteprima segue sempre il ritaglio: una vecchia non va più bene.
+  rimuovi(old?.landing_foto_anteprima);
 
   let originaleFilename = old?.landing_foto_originale || null;
   if (originalFile) {
-    if (old?.landing_foto_originale) {
-      const oldOrigPath = path.join(__dirname, '../uploads/landing', old.landing_foto_originale);
-      if (fs.existsSync(oldOrigPath)) fs.unlinkSync(oldOrigPath);
-    }
+    rimuovi(old?.landing_foto_originale);
     originaleFilename = originalFile.filename;
   }
 
-  db.prepare('UPDATE config SET landing_foto = ?, landing_foto_originale = ?, landing_foto_crop = ?')
-    .run(croppedFile.filename, originaleFilename, req.body.crop || null);
+  db.prepare('UPDATE config SET landing_foto = ?, landing_foto_originale = ?, landing_foto_crop = ?, landing_foto_anteprima = ?')
+    .run(croppedFile.filename, originaleFilename, req.body.crop || null, anteprimaFile?.filename || null);
   res.json({ landing_foto: croppedFile.filename, landing_foto_originale: originaleFilename });
 });
 
-// Rimuovi foto landing (ritagliata + originale)
+// Rimuovi foto landing (ritagliata, originale e anteprima)
 router.delete('/foto', auth, (req, res) => {
-  const cfg = db.prepare('SELECT landing_foto, landing_foto_originale FROM config LIMIT 1').get();
-  for (const filename of [cfg?.landing_foto, cfg?.landing_foto_originale]) {
-    if (!filename) continue;
-    const filePath = path.join(__dirname, '../uploads/landing', filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-  db.prepare('UPDATE config SET landing_foto = NULL, landing_foto_originale = NULL, landing_foto_crop = NULL').run();
+  const cfg = db.prepare('SELECT landing_foto, landing_foto_originale, landing_foto_anteprima FROM config LIMIT 1').get();
+  [cfg?.landing_foto, cfg?.landing_foto_originale, cfg?.landing_foto_anteprima].forEach(rimuovi);
+  db.prepare('UPDATE config SET landing_foto = NULL, landing_foto_originale = NULL, landing_foto_crop = NULL, landing_foto_anteprima = NULL').run();
   res.json({ ok: true });
 });
 

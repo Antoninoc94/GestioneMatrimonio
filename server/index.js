@@ -131,8 +131,69 @@ app.use('/api/checklist', require('./routes/checklist'));
 
 // Serve React build in production
 const clientDist = path.join(__dirname, '../client/dist');
+// ── Anteprima dei link (WhatsApp, Telegram, Facebook…) ──────────
+// Le app di chat non eseguono JavaScript: leggono solo l'HTML iniziale, dove
+// c'era il titolo fisso "Il Nostro Matrimonio" di index.html. Il server ci
+// scrive i dati veri prima di inviarlo: per /wedding e /conferma nomi degli
+// sposi, data e foto; per il resto dell'app il nome impostato in Aspetto.
+const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const dataLunga = iso => {
+  try {
+    return new Date(`${iso}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return iso;
+  }
+};
+
+// Stessa normalizzazione di client/src/publicUrl.js: "dominio.it/" → "https://dominio.it".
+const baseUrl = (urlPubblico, req) => {
+  const v = (urlPubblico || '').trim().replace(/\/+$/, '');
+  if (!v) return `${req.protocol}://${req.get('host')}`;
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+};
+
+const renderIndex = (html, req) => {
+  const cfg = db.prepare(`SELECT app_name, nome_sposo1, nome_sposo2, data_matrimonio, landing_abilitata,
+    landing_foto, landing_foto_anteprima, url_pubblico FROM config LIMIT 1`).get() || {};
+  const appName = cfg.app_name || 'Il Nostro Matrimonio';
+  const pagina = req.path.replace(/\/+$/, '');
+  if (pagina !== '/wedding' && pagina !== '/conferma') {
+    return html.replace(/<title>.*?<\/title>/, `<title>${escHtml(appName)}</title>`);
+  }
+
+  const titolo = cfg.nome_sposo1 && cfg.nome_sposo2 ? `${cfg.nome_sposo1} & ${cfg.nome_sposo2}` : appName;
+  const quando = cfg.data_matrimonio ? `Ci sposiamo il ${dataLunga(cfg.data_matrimonio)}.` : '';
+  const descrizione = pagina === '/conferma'
+    ? [quando, 'Conferma qui la tua presenza.'].filter(Boolean).join(' ')
+    : quando || 'Tutte le informazioni sul nostro matrimonio.';
+  const base = baseUrl(cfg.url_pubblico, req);
+  // A pagina disattivata la foto non si mostra neanche nell'anteprima.
+  const foto = cfg.landing_abilitata === 1 ? (cfg.landing_foto_anteprima || cfg.landing_foto) : null;
+
+  const meta = [
+    `<meta name="description" content="${escHtml(descrizione)}" />`,
+    '<meta property="og:type" content="website" />',
+    `<meta property="og:title" content="${escHtml(titolo)}" />`,
+    `<meta property="og:description" content="${escHtml(descrizione)}" />`,
+    `<meta property="og:url" content="${escHtml(base + pagina)}" />`,
+    ...(foto ? [
+      `<meta property="og:image" content="${escHtml(`${base}/uploads/landing/${foto}`)}" />`,
+      '<meta name="twitter:card" content="summary_large_image" />',
+    ] : []),
+  ].join('\n    ');
+
+  return html
+    .replace(/<title>.*?<\/title>/, `<title>${escHtml(titolo)}</title>`)
+    .replace('</head>', `    ${meta}\n  </head>`);
+};
+
 if (require('fs').existsSync(clientDist)) {
+  const indexHtml = require('fs').readFileSync(path.join(clientDist, 'index.html'), 'utf8');
   app.use(express.static(clientDist, {
+    // "/" deve passare da renderIndex come ogni altra pagina, non uscire
+    // come file statico col titolo fisso.
+    index: false,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('index.html')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -143,7 +204,7 @@ if (require('fs').existsSync(clientDist)) {
   }));
   app.get('/{*splat}', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(path.join(clientDist, 'index.html'));
+    res.type('html').send(renderIndex(indexHtml, req));
   });
 }
 

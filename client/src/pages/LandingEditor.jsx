@@ -103,12 +103,26 @@ export default function LandingEditor() {
     setCropper(null);
   };
 
+  // Copia piccola (1200px di lato, ~100-200 KB) per l'anteprima del link su
+  // WhatsApp: il ritaglio intero di una foto del telefono pesa MB e non viene mostrato.
+  const creaAnteprima = async blob => {
+    const img = await createImageBitmap(blob);
+    const scala = Math.min(1, 1200 / img.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scala);
+    canvas.height = Math.round(img.height * scala);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+  };
+
   const confirmCrop = async (blob, cropMeta) => {
     setUploading(true);
     setMsg('');
     try {
       const fd = new FormData();
       fd.append('foto', blob, 'foto.jpg');
+      const anteprima = await creaAnteprima(blob).catch(() => null);
+      if (anteprima) fd.append('anteprima', anteprima, 'anteprima.jpg');
       if (cropper.isNewFile) fd.append('originale', cropper.file);
       fd.append('crop', JSON.stringify(cropMeta));
       const { data } = await api.post('/landing/foto', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
