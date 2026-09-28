@@ -23,8 +23,7 @@ export const MESSAGGIO_SOLLECITO_DEFAULT =
 // Link WhatsApp col messaggio già scritto. Niente emoji nei testi predefiniti:
 // passando dal link, WhatsApp Web/desktop le può mostrare come "�". Per lo
 // stesso motivo si usa api.whatsapp.com/send e non wa.me, che reindirizza lì.
-// Numeri italiani senza prefisso
-// (3xx…) ricevono +39; "00" iniziale vale come "+". null se il numero manca.
+// Numeri italiani senza prefisso (3xx…) ricevono +39; "00" iniziale vale come "+". null se il numero manca.
 export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
   let n = (telefono || '').replace(/[^\d+]/g, '');
   if (n.startsWith('+')) n = n.slice(1);
