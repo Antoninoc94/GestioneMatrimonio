@@ -56,7 +56,7 @@ export default function Conferma() {
   useEffect(() => {
     api.get('/conferma/info').then(r => {
       setInfo(r.data);
-      if (r.data.conferma_abilitata === 0) setDisabilitata(true);
+      if (r.data.conferma_abilitata === 0) setDisabilitata(r.data.scaduta || true);
     }).catch(() => {});
   }, []);
 
@@ -99,7 +99,7 @@ export default function Conferma() {
       }
     } catch (err) {
       if (err.response?.data?.disabilitata) {
-        setDisabilitata(true);
+        setDisabilitata(err.response.data.scaduta || true);
       } else {
         setErrore('Errore di connessione. Riprova.');
       }
@@ -162,7 +162,11 @@ export default function Conferma() {
             <div className="text-center py-12">
               <div className="text-5xl mb-4">🔒</div>
               <h2 className="text-xl font-bold text-gray-700 mb-2">Pagina non disponibile</h2>
-              <p className="text-gray-400 text-sm">La conferma presenze è momentaneamente chiusa. Contatta gli sposi per maggiori informazioni.</p>
+              <p className="text-gray-400 text-sm">
+                {typeof disabilitata === 'string'
+                  ? `Le conferme si sono chiuse il ${formatData(disabilitata)}. Se non hai ancora risposto, contatta direttamente gli sposi.`
+                  : 'La conferma presenze è momentaneamente chiusa. Contatta gli sposi per maggiori informazioni.'}
+              </p>
             </div>
           ) : <>
 

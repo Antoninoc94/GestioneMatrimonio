@@ -55,6 +55,11 @@ export default function Impostazioni() {
     setTimeout(() => setConfigSaved(false), 2500);
   };
 
+  const saveScadenza = async val => {
+    setConfig(c => ({ ...c, conferma_scadenza: val }));
+    await api.put('/config', { conferma_scadenza: val });
+  };
+
   const toggleConferma = async (val) => {
     const updated = { ...config, conferma_abilitata: val, budget_totale: parseFloat(config.budget_totale) || 0 };
     setConfig(c => ({ ...c, conferma_abilitata: val }));
@@ -310,6 +315,17 @@ export default function Impostazioni() {
                   <p>Gli ospiti che visitano <strong>/conferma</strong> vedranno un messaggio di pagina non disponibile.</p>
                 </>
               )}
+            </div>
+
+            <div>
+              <label className="form-label">Chiudi le conferme dopo il</label>
+              <div className="flex gap-2 items-center">
+                <input type="date" className="form-input w-auto" value={config.conferma_scadenza || ''} onChange={e => saveScadenza(e.target.value)} />
+                {config.conferma_scadenza && (
+                  <button type="button" className="text-xs text-gray-400 hover:text-red-500" onClick={() => saveScadenza('')}>Rimuovi</button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Ultimo giorno in cui gli ospiti possono rispondere (incluso). Dal giorno dopo la pagina si chiude da sola. Vuoto: nessun limite.</p>
             </div>
           </div>
         </Section>

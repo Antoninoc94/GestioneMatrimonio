@@ -2,18 +2,38 @@ const router = require('express').Router();
 const db = require('../db');
 const { sendRsvpNotifica } = require('../email');
 
+// La data di chiusura vale in ora italiana: il container gira in UTC, e a
+// mezzanotte e mezza del giorno dopo le conferme devono essere già chiuse.
+// Se il runtime non conoscesse il fuso, meglio la data UTC che un 500 su /conferma.
+const oggiItalia = () => {
+  try {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
+// Chiusa a mano (interruttore in Impostazioni) oppure passato l'ultimo giorno utile.
+const statoConferma = () => {
+  const cfg = db.prepare('SELECT conferma_abilitata, conferma_scadenza FROM config LIMIT 1').get();
+  if (cfg?.conferma_abilitata === 0) return { aperta: false };
+  if (cfg?.conferma_scadenza && oggiItalia() > cfg.conferma_scadenza) return { aperta: false, scaduta: cfg.conferma_scadenza };
+  return { aperta: true };
+};
+
 const checkAbilitata = (req, res, next) => {
-  const cfg = db.prepare('SELECT conferma_abilitata FROM config LIMIT 1').get();
-  if (cfg && cfg.conferma_abilitata === 0) {
-    return res.status(403).json({ disabilitata: true, error: 'La pagina di conferma è momentaneamente disabilitata.' });
+  const stato = statoConferma();
+  if (!stato.aperta) {
+    return res.status(403).json({ disabilitata: true, scaduta: stato.scaduta || null, error: 'La pagina di conferma è chiusa.' });
   }
   next();
 };
 
 // Info matrimonio (pubblica — sempre accessibile, serve per mostrare msg disabilitata)
 router.get('/info', (req, res) => {
-  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, app_name, app_emoji, conferma_abilitata FROM config LIMIT 1').get();
-  res.json(cfg || {});
+  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, app_name, app_emoji, conferma_scadenza FROM config LIMIT 1').get();
+  const stato = statoConferma();
+  res.json({ ...cfg, conferma_abilitata: stato.aperta ? 1 : 0, scaduta: stato.scaduta || null });
 });
 
 // Trova ospite per nome + cognome esatti (case-insensitive, prova anche invertiti)

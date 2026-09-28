@@ -258,6 +258,10 @@ if (!configCols.find(c => c.name === 'soglia_eta_bambino')) {
 if (!configCols.find(c => c.name === 'url_pubblico')) {
   db.prepare('ALTER TABLE config ADD COLUMN url_pubblico TEXT').run();
 }
+// Ultimo giorno (YYYY-MM-DD, incluso) in cui /conferma accetta risposte. NULL = nessun limite.
+if (!configCols.find(c => c.name === 'conferma_scadenza')) {
+  db.prepare('ALTER TABLE config ADD COLUMN conferma_scadenza TEXT').run();
+}
 // Testo dell'invito mandato via WhatsApp dalla Lista Ospiti. NULL = testo predefinito.
 if (!configCols.find(c => c.name === 'messaggio_whatsapp')) {
   db.prepare('ALTER TABLE config ADD COLUMN messaggio_whatsapp TEXT').run();

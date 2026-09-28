@@ -13,9 +13,16 @@ export const MESSAGGIO_WHATSAPP_DEFAULT =
   'E qui puoi confermare la tua presenza: {link_conferma}\n\n' +
   'Ti aspettiamo!';
 
+// Per chi ha già l'invito ma non ha ancora risposto. {scadenza} è la data di
+// chiusura delle conferme, se impostata.
+export const MESSAGGIO_SOLLECITO_DEFAULT =
+  'Ciao {nome}! 😊 Ti ricordiamo di confermare la tua presenza al nostro matrimonio{scadenza}.\n\n' +
+  'Basta un minuto qui: {link_conferma}\n\n' +
+  'Grazie!';
+
 // Link wa.me col messaggio già scritto. Numeri italiani senza prefisso
 // (3xx…) ricevono +39; "00" iniziale vale come "+". null se il numero manca.
-export const linkWhatsApp = (telefono, { nome, template, base }) => {
+export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
   let n = (telefono || '').replace(/[^\d+]/g, '');
   if (n.startsWith('+')) n = n.slice(1);
   else if (n.startsWith('00')) n = n.slice(2);
@@ -24,6 +31,9 @@ export const linkWhatsApp = (telefono, { nome, template, base }) => {
   if (n.length < 8) return null;
   const testo = (template || MESSAGGIO_WHATSAPP_DEFAULT)
     .replaceAll('{nome}', nome || '')
+    .replaceAll('{scadenza}', scadenza
+      ? ` entro il ${new Date(scadenza).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`
+      : '')
     .replaceAll('{link_wedding}', `${base}/wedding`)
     .replaceAll('{link_conferma}', `${base}/conferma`);
   return `https://wa.me/${n}?text=${encodeURIComponent(testo)}`;

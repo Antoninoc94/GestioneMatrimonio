@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart, S
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { baseUrlPubblico, linkWhatsApp } from '../publicUrl';
+import { baseUrlPubblico, linkWhatsApp, MESSAGGIO_SOLLECITO_DEFAULT } from '../publicUrl';
 
 const LATO = ['sposo1', 'sposo2', 'comune'];
 const RSVP = ['attesa', 'confermato', 'declinato'];
@@ -44,6 +44,7 @@ export default function Ospiti() {
   const [filtroSito, setFiltroSito] = useState(false);
   const [filtroFigli, setFiltroFigli] = useState(''); // '' | 'figli' | 'senzaEta'
   const [filtroInvito, setFiltroInvito] = useState(false);
+  const [filtroSollecito, setFiltroSollecito] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [conPartner, setConPartner] = useState(false);
   const [partnerForm, setPartnerForm] = useState({ nome: '', cognome: '', rsvp: 'confermato', intolleranze: '' });
@@ -60,14 +61,14 @@ export default function Ospiti() {
   const [soglia, setSoglia] = useState(12);
   const [saving, setSaving] = useState(false);
   const [errore, setErrore] = useState('');
-  const [condivisione, setCondivisione] = useState({ base: window.location.origin, template: '' });
+  const [condivisione, setCondivisione] = useState({ base: window.location.origin, template: '', scadenza: null });
 
   const load = () => {
     api.get('/ospiti').then(r => setItems(r.data));
     api.get('/tavoli').then(r => setTavoli(r.data));
     api.get('/config').then(r => {
       setSoglia(r.data.soglia_eta_bambino || 12);
-      setCondivisione({ base: baseUrlPubblico(r.data.url_pubblico), template: r.data.messaggio_whatsapp || '' });
+      setCondivisione({ base: baseUrlPubblico(r.data.url_pubblico), template: r.data.messaggio_whatsapp || '', scadenza: r.data.conferma_scadenza || null });
     });
   };
   useEffect(() => { load(); }, []);
@@ -179,7 +180,13 @@ export default function Ospiti() {
     }
   };
 
-  const waLink = o => linkWhatsApp(o.telefono, { nome: o.nome, template: condivisione.template, base: condivisione.base });
+  // Chi ha già l'invito e non ha risposto riceve il promemoria, non un secondo invito.
+  const waLink = o => linkWhatsApp(o.telefono, {
+    nome: o.nome,
+    template: daSollecitare(o) ? MESSAGGIO_SOLLECITO_DEFAULT : condivisione.template,
+    base: condivisione.base,
+    scadenza: condivisione.scadenza,
+  });
 
   // Apre WhatsApp col messaggio pronto; se poi l'ha inviato davvero non lo
   // sappiamo, quindi lo si chiede invece di segnarlo da solo.
@@ -202,7 +209,7 @@ export default function Ospiti() {
       </button>;
 
   const waButton = (o, size) => waLink(o) && (
-    <button className="p-1.5 rounded hover:bg-green-50 text-green-600" title="Invia l'invito su WhatsApp" onClick={() => inviaWhatsApp(o)}>
+    <button className="p-1.5 rounded hover:bg-green-50 text-green-600" title={daSollecitare(o) ? 'Manda un promemoria su WhatsApp' : "Invia l'invito su WhatsApp"} onClick={() => inviaWhatsApp(o)}>
       <MessageCircle size={size} />
     </button>
   );
@@ -229,6 +236,13 @@ export default function Ospiti() {
   const figliSenzaEta = items.filter(i => i.relazione === 'figlio' && i.eta == null).length;
   // L'invito si consegna alla famiglia: conta solo sugli invitati principali.
   const invitiDaInviare = items.filter(i => !i.parent_id && !i.invito_inviato).length;
+  // Hanno l'invito ma la famiglia non ha ancora risposto.
+  const daSollecitare = o => !!o.invito_inviato && o.rsvp === 'attesa';
+  const nDaSollecitare = items.filter(i => !i.parent_id && daSollecitare(i)).length;
+  // Giorni all'ultimo giorno utile per rispondere (0 = oggi, negativo = chiuse).
+  const giorniAllaChiusura = condivisione.scadenza
+    ? Math.round((new Date(condivisione.scadenza) - new Date(new Date().toISOString().slice(0, 10))) / 86400000)
+    : null;
 
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
@@ -241,7 +255,8 @@ export default function Ospiti() {
       || (filtroFigli === 'figli' && figli.length > 0)
       || (filtroFigli === 'senzaEta' && figli.some(c => c.eta == null));
     const invitoMatch = !filtroInvito || !o.invito_inviato;
-    return rsvpMatch && sitoMatch && figliMatch && invitoMatch && (!filtroLato || o.lato === filtroLato);
+    const sollecitoMatch = !filtroSollecito || daSollecitare(o);
+    return rsvpMatch && sitoMatch && figliMatch && invitoMatch && sollecitoMatch && (!filtroLato || o.lato === filtroLato);
   });
 
   const q = search.toLowerCase().trim();
@@ -484,6 +499,23 @@ export default function Ospiti() {
         ))}
       </div>
 
+      {/* Chiusura conferme vicina: chi ha l'invito e tace va sentito adesso */}
+      {giorniAllaChiusura !== null && giorniAllaChiusura <= 21 && nDaSollecitare > 0 && (
+        <div className="card mb-4 flex flex-wrap items-center gap-3 bg-orange-50 border-orange-200 text-sm text-orange-800">
+          <Clock size={16} className="flex-shrink-0" />
+          <span className="flex-1 min-w-48">
+            {giorniAllaChiusura < 0
+              ? 'Le conferme dal sito sono chiuse'
+              : giorniAllaChiusura === 0 ? 'Le conferme chiudono oggi'
+              : `Le conferme chiudono tra ${giorniAllaChiusura} ${giorniAllaChiusura === 1 ? 'giorno' : 'giorni'}`}
+            : <strong>{nDaSollecitare}</strong> {nDaSollecitare === 1 ? 'famiglia ha' : 'famiglie hanno'} l'invito ma non ha ancora risposto.
+          </span>
+          {!filtroSollecito && (
+            <button className="btn-secondary text-sm py-1" onClick={() => { setFiltroSollecito(true); setPage(1); setSelected(new Set()); }}>Mostrale</button>
+          )}
+        </div>
+      )}
+
       {/* Filtri + Ricerca */}
       <div className="card mb-4">
         <div className="relative mb-3">
@@ -528,6 +560,12 @@ export default function Ospiti() {
             <button className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroInvito ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`}
               onClick={() => { setFiltroInvito(v => !v); setPage(1); setSelected(new Set()); }}>
               <Mail size={11} /> Inviti da consegnare ({invitiDaInviare})
+            </button>
+          )}
+          {nDaSollecitare > 0 && (
+            <button className={`badge px-3 py-1.5 cursor-pointer flex items-center gap-1 ${filtroSollecito ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700'}`}
+              onClick={() => { setFiltroSollecito(v => !v); setPage(1); setSelected(new Set()); }}>
+              <Clock size={11} /> Da sollecitare ({nDaSollecitare})
             </button>
           )}
           {figliSenzaEta > 0 && (
