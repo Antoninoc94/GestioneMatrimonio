@@ -11,6 +11,7 @@ const TEMI = [
   { key: 'salvia',  label: 'Salvia',    primary: '#059669', light: '#ecfdf5', border: '#a7f3d0' },
   { key: 'cielo',   label: 'Cielo',     primary: '#0284c7', light: '#f0f9ff', border: '#bae6fd' },
   { key: 'oro',     label: 'Champagne', primary: '#b45309', light: '#fffbeb', border: '#fde68a' },
+  { key: 'biancoro', label: 'Bianco e oro', primary: '#9c7a1c', light: '#fdfaf3', border: '#e9d9ae' },
 ];
 
 const empty = {

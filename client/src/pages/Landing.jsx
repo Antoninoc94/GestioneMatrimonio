@@ -12,6 +12,9 @@ const TEMI = {
   salvia:  { primary: '#047857', light: '#ecfdf5', border: '#6ee7b7', text: '#065f46', mid: '#10b981', dark: '#064e3b' },
   cielo:   { primary: '#0369a1', light: '#f0f9ff', border: '#7dd3fc', text: '#075985', mid: '#0ea5e9', dark: '#0c4a6e' },
   oro:     { primary: '#b45309', light: '#fffbeb', border: '#fcd34d', text: '#92400e', mid: '#f59e0b', dark: '#78350f' },
+  // Sfondo bianco pieno e scritte oro. Titoli e testi sono un oro scuro: quello
+  // brillante (mid) sul bianco non si legge, quindi resta a ornamenti e icone.
+  biancoro: { primary: '#9c7a1c', light: '#fdfaf3', border: '#e9d9ae', text: '#94731c', mid: '#c8a24a', dark: '#8b6914', bg: '#ffffff' },
 };
 
 // Chiavi minuscole: i tipi location/cronologia sono confrontati case-insensitive
@@ -71,11 +74,11 @@ export default function Landing() {
     axios.get('/api/landing/info').then(r => setData(r.data)).finally(() => setLoading(false));
   }, []);
 
-  const bg = '#faf7f4';
+  const bgBase = '#faf7f4';
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgBase }}>
         <div style={{ color: '#be185d', fontSize: '2.5rem', animation: 'pulse 1.5s infinite' }}>💍</div>
       </div>
     );
@@ -83,6 +86,7 @@ export default function Landing() {
 
   const { config = {}, locations = [], cronologia = [] } = data || {};
   const tema = TEMI[config.landing_tema] || TEMI.rose;
+  const bg = tema.bg || bgBase;
 
   if (config.landing_abilitata !== 1) {
     return (
