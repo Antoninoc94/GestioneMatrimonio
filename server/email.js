@@ -162,4 +162,59 @@ async function sendScadenzeReminder(giorni = 14) {
   return { dest, imminenti: scadenze.length, scadute: scaduteGia.length };
 }
 
-module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder, getDestinatari, isConfigured };
+// Tutto ciò che arriva dal form pubblico va nell'HTML come testo: un ospite (o
+// chiunque apra /conferma) non deve poter iniettare markup nell'email agli sposi.
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Avviso agli sposi a ogni risposta dal sito. `nuovo`: l'ospite non era in
+// lista ed è stato aggiunto dal form, da controllare.
+async function sendRsvpNotifica(mainId, nuovo) {
+  const cfg = getConfig();
+  if (!cfg?.notifica_rsvp) return;
+  const transporter = getTransporter(cfg);
+  if (!transporter) return;
+
+  const appName = db.prepare('SELECT app_name FROM config LIMIT 1').get()?.app_name || 'Il Nostro Matrimonio';
+  const main = db.prepare('SELECT * FROM ospiti WHERE id = ?').get(mainId);
+  if (!main) return;
+  const familiari = db.prepare('SELECT * FROM ospiti WHERE parent_id = ? ORDER BY relazione DESC, id').all(mainId);
+
+  const stato = { confermato: '✅ Ci sarà', declinato: '❌ Non ci sarà', attesa: '⏳ Ancora in dubbio' };
+  const nomeDi = o => esc([o.nome, o.cognome].filter(Boolean).join(' '));
+  const riga = o => {
+    const chi = o.relazione === 'partner' ? 'Partner' : o.relazione === 'figlio' ? `Figlio${o.eta != null ? ` (${o.eta} anni)` : ''}` : 'Invitato';
+    return `<tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;"><strong>${nomeDi(o)}</strong><br><span style="color:#9ca3af;font-size:12px;">${chi}</span></td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;">${stato[o.rsvp] || esc(o.rsvp)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;color:#c2410c;">${esc(o.intolleranze)}</td>
+    </tr>`;
+  };
+  const presenti = [main, ...familiari].filter(o => o.rsvp === 'confermato').length;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff;border-radius:12px;border:1px solid #f3f4f6;">
+      <h2 style="color:#e11d48;margin-top:0;">💌 Nuova risposta dal sito</h2>
+      <p style="color:#374151;"><strong>${nomeDi(main)}</strong> ha risposto: ${stato[main.rsvp] || esc(main.rsvp)}${presenti ? ` — <strong>${presenti}</strong> ${presenti === 1 ? 'persona' : 'persone'} in arrivo` : ''}.</p>
+      ${nuovo ? `<p style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 12px;border-radius:8px;font-size:14px;">⚠️ Non era nella lista ospiti: è stato aggiunto dal sito. Controlla che non sia un doppione (nome scritto diversamente).</p>` : ''}
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f9fafb;">
+          <th style="padding:6px 10px;text-align:left;font-size:12px;color:#9ca3af;">CHI</th>
+          <th style="padding:6px 10px;text-align:left;font-size:12px;color:#9ca3af;">RISPOSTA</th>
+          <th style="padding:6px 10px;text-align:left;font-size:12px;color:#9ca3af;">INTOLLERANZE</th>
+        </tr></thead>
+        <tbody>${[main, ...familiari].map(riga).join('')}</tbody>
+      </table>
+      ${main.messaggio_ospite ? `<p style="margin-top:16px;padding:12px;background:#fff1f2;border-radius:8px;color:#374151;font-style:italic;">“${esc(main.messaggio_ospite)}”</p>` : ''}
+      <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
+      <p style="color:#9ca3af;font-size:12px;">Inviato da ${esc(appName)}</p>
+    </div>`;
+
+  await transporter.sendMail({
+    from: `"${cfg.from_name || appName}" <${cfg.from_email || cfg.smtp_user}>`,
+    to: getDestinatari(cfg),
+    subject: `💌 ${[main.nome, main.cognome].filter(Boolean).join(' ')}: ${main.rsvp === 'confermato' ? 'ci sarà' : main.rsvp === 'declinato' ? 'non ci sarà' : 'ha risposto'}`,
+    html,
+  });
+}
+
+module.exports = { sendEmail, testConnection, sendTestEmail, sendScadenzeReminder, sendRsvpNotifica, getDestinatari, isConfigured };

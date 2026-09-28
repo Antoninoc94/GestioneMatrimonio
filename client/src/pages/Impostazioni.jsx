@@ -37,7 +37,7 @@ export default function Impostazioni() {
   const [showPwd, setShowPwd] = useState({ vecchia: false, nuova: false, conferma: false });
 
   // Email config
-  const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false, reminder_abilitato: false, reminder_frequenza: 'settimanale', reminder_giorni_anticipo: 14, reminder_ora: 8, ultimo_invio_auto: null });
+  const [emailCfg, setEmailCfg] = useState({ smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: '', smtp_password: '', from_name: 'Il Nostro Matrimonio', from_email: '', enabled: false, reminder_abilitato: false, reminder_frequenza: 'settimanale', reminder_giorni_anticipo: 14, reminder_ora: 8, ultimo_invio_auto: null, notifica_rsvp: true });
   const [emailMsg, setEmailMsg] = useState('');
   const [testingEmail, setTestingEmail] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
@@ -45,7 +45,7 @@ export default function Impostazioni() {
   useEffect(() => {
     api.get('/config').then(r => setConfig({ ...r.data, data_matrimonio: r.data.data_matrimonio || '', budget_totale: r.data.budget_totale?.toString() || '', app_name: r.data.app_name || 'Il Nostro Matrimonio', app_emoji: r.data.app_emoji || '💍', login_subtitle: r.data.login_subtitle || '', conferma_abilitata: r.data.conferma_abilitata !== 0, soglia_eta_bambino: r.data.soglia_eta_bambino || 12 }));
     api.get('/profilo/me').then(r => setProfilo({ nome: r.data.nome || '', username: r.data.username || '', email: r.data.email || '' }));
-    api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled, reminder_abilitato: !!r.data.reminder_abilitato }));
+    api.get('/email-config').then(r => setEmailCfg({ ...r.data, smtp_password: '', enabled: !!r.data.enabled, reminder_abilitato: !!r.data.reminder_abilitato, notifica_rsvp: r.data.notifica_rsvp !== 0 }));
   }, []);
 
   const saveConfig = async e => {
@@ -350,6 +350,14 @@ export default function Impostazioni() {
             <div>
               <label className="form-label">Nome mittente</label>
               <input className="form-input" value={emailCfg.from_name} onChange={e => setEmailCfg({ ...emailCfg, from_name: e.target.value })} placeholder="Il Nostro Matrimonio" />
+            </div>
+
+            <div className="flex items-start gap-3 border-t border-gray-100 pt-3 mt-1">
+              <input type="checkbox" id="notifica_rsvp" checked={emailCfg.notifica_rsvp} onChange={e => setEmailCfg({ ...emailCfg, notifica_rsvp: e.target.checked })} className="w-4 h-4 mt-0.5 accent-rose-500" />
+              <div>
+                <label htmlFor="notifica_rsvp" className="form-label mb-0 font-semibold">Avvisami quando un ospite risponde dal sito</label>
+                <p className="text-xs text-gray-400">Una email con chi ha risposto, partner, figli, intolleranze e messaggio.</p>
+              </div>
             </div>
 
             {/* ── Promemoria automatico ── */}

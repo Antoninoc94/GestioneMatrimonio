@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
+const { sendRsvpNotifica } = require('../email');
 
 const checkAbilitata = (req, res, next) => {
   const cfg = db.prepare('SELECT conferma_abilitata FROM config LIMIT 1').get();
@@ -145,10 +146,15 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
           .run(f.nome.trim(), fRsvp, fTipo, f.intolleranze?.trim() || null, fEta, mainFonte, mainId);
       }
     }
+    return mainId;
   });
 
-  salvaRisposta();
+  const mainId = salvaRisposta();
   res.json({ ok: true });
+
+  // Dopo aver risposto all'ospite: l'invio SMTP può metterci secondi o fallire,
+  // e la sua risposta è comunque salvata. Un errore si registra e basta.
+  sendRsvpNotifica(mainId, !id).catch(err => console.error('[RSVP] notifica email non inviata:', err.message));
 });
 
 module.exports = router;

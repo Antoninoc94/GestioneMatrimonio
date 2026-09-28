@@ -4,25 +4,25 @@ const auth = require('../middleware/auth');
 const { testConnection, sendTestEmail, sendScadenzeReminder } = require('../email');
 
 router.get('/', auth, (req, res) => {
-  const cfg = db.prepare('SELECT id, smtp_host, smtp_port, smtp_user, from_name, from_email, enabled, reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora, ultimo_invio_auto FROM email_config WHERE id = 1').get();
+  const cfg = db.prepare('SELECT id, smtp_host, smtp_port, smtp_user, from_name, from_email, enabled, reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora, ultimo_invio_auto, notifica_rsvp FROM email_config WHERE id = 1').get();
   res.json(cfg);
 });
 
 router.put('/', auth, (req, res) => {
   const { smtp_host, smtp_port, smtp_user, smtp_password, from_name, from_email, enabled,
-          reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora } = req.body;
+          reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora, notifica_rsvp } = req.body;
 
   if (smtp_password) {
-    db.prepare('UPDATE email_config SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, from_name=?, from_email=?, enabled=?, reminder_abilitato=?, reminder_frequenza=?, reminder_giorni_anticipo=?, reminder_ora=? WHERE id=1')
+    db.prepare('UPDATE email_config SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, from_name=?, from_email=?, enabled=?, reminder_abilitato=?, reminder_frequenza=?, reminder_giorni_anticipo=?, reminder_ora=?, notifica_rsvp=? WHERE id=1')
       .run(smtp_host, smtp_port || 587, smtp_user, smtp_password, from_name, from_email, enabled ? 1 : 0,
-           reminder_abilitato ? 1 : 0, reminder_frequenza || 'settimanale', reminder_giorni_anticipo || 14, reminder_ora ?? 8);
+           reminder_abilitato ? 1 : 0, reminder_frequenza || 'settimanale', reminder_giorni_anticipo || 14, reminder_ora ?? 8, notifica_rsvp === false ? 0 : 1);
   } else {
-    db.prepare('UPDATE email_config SET smtp_host=?, smtp_port=?, smtp_user=?, from_name=?, from_email=?, enabled=?, reminder_abilitato=?, reminder_frequenza=?, reminder_giorni_anticipo=?, reminder_ora=? WHERE id=1')
+    db.prepare('UPDATE email_config SET smtp_host=?, smtp_port=?, smtp_user=?, from_name=?, from_email=?, enabled=?, reminder_abilitato=?, reminder_frequenza=?, reminder_giorni_anticipo=?, reminder_ora=?, notifica_rsvp=? WHERE id=1')
       .run(smtp_host, smtp_port || 587, smtp_user, from_name, from_email, enabled ? 1 : 0,
-           reminder_abilitato ? 1 : 0, reminder_frequenza || 'settimanale', reminder_giorni_anticipo || 14, reminder_ora ?? 8);
+           reminder_abilitato ? 1 : 0, reminder_frequenza || 'settimanale', reminder_giorni_anticipo || 14, reminder_ora ?? 8, notifica_rsvp === false ? 0 : 1);
   }
 
-  const cfg = db.prepare('SELECT id, smtp_host, smtp_port, smtp_user, from_name, from_email, enabled, reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora, ultimo_invio_auto FROM email_config WHERE id = 1').get();
+  const cfg = db.prepare('SELECT id, smtp_host, smtp_port, smtp_user, from_name, from_email, enabled, reminder_abilitato, reminder_frequenza, reminder_giorni_anticipo, reminder_ora, ultimo_invio_auto, notifica_rsvp FROM email_config WHERE id = 1').get();
   res.json(cfg);
 });
 

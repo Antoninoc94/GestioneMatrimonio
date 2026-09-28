@@ -315,6 +315,11 @@ if (!emailCols.includes('reminder_ora')) {
 if (!emailCols.includes('ultimo_invio_auto')) {
   db.prepare('ALTER TABLE email_config ADD COLUMN ultimo_invio_auto TEXT').run();
 }
+// Email agli sposi a ogni risposta dal sito. Attiva di default: chi ha già
+// configurato l'email la vuole quasi certamente.
+if (!emailCols.includes('notifica_rsvp')) {
+  db.prepare('ALTER TABLE email_config ADD COLUMN notifica_rsvp INTEGER DEFAULT 1').run();
+}
 
 // Migrazione: aggiunge messaggio_ospite agli ospiti
 const ospCols = db.prepare('PRAGMA table_info(ospiti)').all().map(c => c.name);
