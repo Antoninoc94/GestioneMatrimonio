@@ -423,6 +423,23 @@ db.exec(`
   )
 `);
 
+// Prezzo a persona e fasce d'età dei bambini, diverse per ogni location: servono
+// a stimare il costo del ricevimento sulla lista ospiti reale.
+const locationCols = db.prepare('PRAGMA table_info(location)').all().map(c => c.name);
+if (!locationCols.includes('prezzo_adulto')) {
+  db.prepare('ALTER TABLE location ADD COLUMN prezzo_adulto REAL').run();
+}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS location_fasce (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL REFERENCES location(id) ON DELETE CASCADE,
+    eta_da INTEGER NOT NULL,
+    eta_a INTEGER NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'percentuale',
+    valore REAL NOT NULL DEFAULT 0
+  )
+`);
+
 // Migrazione: il vecchio anticipo singolo diventa la prima rata (già pagata).
 // Le colonne anticipo/data_anticipo vengono svuotate così la migrazione non si
 // ripete se in seguito l'utente cancella quella rata.
