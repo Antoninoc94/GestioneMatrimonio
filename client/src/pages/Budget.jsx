@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CheckCircle, Circle, Download, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle, Circle, Download, Search, ChevronUp, ChevronDown, ChevronsUpDown, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -33,6 +34,8 @@ function SortTh({ label, col, sortKey, sortDir, onSort, className = '' }) {
 export default function Budget() {
   const [items, setItems] = useState([]);
   const [fornitori, setFornitori] = useState([]);
+  const [preventivi, setPreventivi] = useState([]);
+  const [budgetTotale, setBudgetTotale] = useState(0);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -50,6 +53,8 @@ export default function Budget() {
   const load = () => {
     api.get('/costi').then(r => setItems(r.data));
     api.get('/fornitori').then(r => setFornitori(r.data));
+    api.get('/preventivi').then(r => setPreventivi(r.data));
+    api.get('/config').then(r => setBudgetTotale(r.data.budget_totale || 0));
   };
   useEffect(() => { load(); }, []);
 
@@ -92,16 +97,55 @@ export default function Budget() {
     load();
   };
 
-  const totalePrev = items.reduce((s, i) => s + i.importo_preventivo, 0);
-  const totaleEff = items.reduce((s, i) => s + i.importo_effettivo, 0);
-  const totalePagato = items.filter(i => i.pagato).reduce((s, i) => s + i.importo_effettivo, 0);
+  // I preventivi accettati entrano nel budget come voci automatiche in sola lettura
+  // (si modificano dalla pagina Preventivi): l'importo è l'impegno preso, il
+  // pagato è la somma delle rate saldate.
+  const vociPreventivi = preventivi.filter(p => p.stato === 'accettato').map(p => ({
+    id: `prev_${p.id}`,
+    auto: true,
+    categoria: p.categoria,
+    descrizione: [p.location_nome || p.fornitore_nome, p.descrizione].filter(Boolean).join(' — ') || 'Preventivo',
+    importo_preventivo: p.importo,
+    importo_effettivo: p.importo,
+    importo_pagato: p.totale_pagato,
+    pagato: p.importo > 0 && p.totale_pagato >= p.importo,
+    data_pagamento: null,
+    fornitore_id: p.fornitore_id,
+    note: p.note,
+  }));
+  const voci = [...items.map(c => ({ ...c, importo_pagato: c.pagato ? c.importo_effettivo : 0 })), ...vociPreventivi];
 
-  const categorie = [...new Set(items.map(i => i.categoria))];
+  const StatoPagamento = ({ c, size }) => {
+    if (!c.auto) return (
+      <button onClick={() => togglePagato(c)} className="text-gray-400 hover:text-green-500">
+        {c.pagato ? <CheckCircle size={size} className="text-green-500" /> : <Circle size={size} className="text-gray-300" />}
+      </button>
+    );
+    if (c.pagato) return <CheckCircle size={size} className="text-green-500" />;
+    // Le rate si segnano dal preventivo: qui solo l'avanzamento
+    const pct = c.importo_preventivo > 0 ? Math.round((c.importo_pagato / c.importo_preventivo) * 100) : 0;
+    return <span className="text-xs font-semibold text-amber-600" title={`${formatEuro(c.importo_pagato)} pagati`}>{pct}%</span>;
+  };
+
+  const Azioni = ({ c }) => c.auto ? (
+    <Link to="/preventivi" className="p-1.5 rounded hover:bg-blue-50 text-gray-500 hover:text-blue-600" title="Si gestisce dalla pagina Preventivi"><FileText size={14} /></Link>
+  ) : (
+    <>
+      <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(c)}><Pencil size={14} /></button>
+      <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(c.id)}><Trash2 size={14} /></button>
+    </>
+  );
+
+  const totalePrev = voci.reduce((s, i) => s + i.importo_preventivo, 0);
+  const totaleEff = voci.reduce((s, i) => s + i.importo_effettivo, 0);
+  const totalePagato = voci.reduce((s, i) => s + i.importo_pagato, 0);
+
+  const categorie = [...new Set(voci.map(i => i.categoria))];
 
   const chartData = categorie.map(c => ({
     name: c,
-    Preventivato: items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_preventivo, 0),
-    Effettivo: items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0),
+    Preventivato: voci.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_preventivo, 0),
+    Effettivo: voci.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0),
   }));
 
   const onSort = col => {
@@ -110,7 +154,7 @@ export default function Budget() {
   };
 
   // filtering + sort pipeline
-  const afterCategoria = filtroCategoria ? items.filter(i => i.categoria === filtroCategoria) : items;
+  const afterCategoria = filtroCategoria ? voci.filter(i => i.categoria === filtroCategoria) : voci;
   const q = search.toLowerCase().trim();
   const afterSearch = q
     ? afterCategoria.filter(i => {
@@ -154,7 +198,7 @@ export default function Budget() {
       doc.text('Budget & Costi', 14, 12);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${items.length} voci · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
+      doc.text(`${voci.length} voci · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
 
       // Stats boxes
       const statsY = 34;
@@ -178,8 +222,8 @@ export default function Budget() {
 
       // Category breakdown
       const catRows = categorie.map(c => {
-        const prev = items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_preventivo, 0);
-        const eff = items.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0);
+        const prev = voci.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_preventivo, 0);
+        const eff = voci.filter(i => i.categoria === c).reduce((s, i) => s + i.importo_effettivo, 0);
         return [c, prev, eff, eff - prev];
       });
 
@@ -224,9 +268,9 @@ export default function Budget() {
       autoTable(doc, {
         startY: sec2Y + 3,
         head: [['Categoria', 'Descrizione / Fornitore / Note', 'Preventivato', 'Effettivo', 'Pagato']],
-        body: items.map(c => {
+        body: voci.map(c => {
           const forn = c.fornitore_id ? (fornitori.find(f => f.id === c.fornitore_id)?.nome || '') : '';
-          const lines = [c.descrizione];
+          const lines = [c.auto ? `${c.descrizione} (preventivo accettato)` : c.descrizione];
           if (forn) lines.push(`Fornitore: ${forn}`);
           if (c.note) lines.push(`Note: ${c.note}`);
           return [
@@ -234,7 +278,9 @@ export default function Budget() {
             lines.join('\n'),
             formatEuro(c.importo_preventivo),
             formatEuro(c.importo_effettivo),
-            c.pagato ? (c.data_pagamento ? `Si - ${fmtData(c.data_pagamento)}` : 'Si') : 'No',
+            c.auto
+              ? (c.pagato ? 'Si' : `${formatEuro(c.importo_pagato)} pagati`)
+              : c.pagato ? (c.data_pagamento ? `Si - ${fmtData(c.data_pagamento)}` : 'Si') : 'No',
           ];
         }),
         headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -249,7 +295,7 @@ export default function Budget() {
         },
         didParseCell: data => {
           if (data.section === 'body' && data.column.index === 3) {
-            const item = items[data.row.index];
+            const item = voci[data.row.index];
             if (item && item.importo_effettivo > item.importo_preventivo)
               data.cell.styles.textColor = [220, 38, 38];
           }
@@ -281,10 +327,10 @@ export default function Budget() {
 
   return (
     <div>
-      <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="page-header flex flex-col sm:flex-row sm:voci-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Budget & Costi</h1>
-          <p className="page-subtitle">{items.length} voci di spesa</p>
+          <p className="page-subtitle">{voci.length} voci di spesa</p>
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={exportPDF} disabled={exporting}>
@@ -295,15 +341,18 @@ export default function Budget() {
       </div>
 
       {/* Totali */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className={`grid grid-cols-2 ${budgetTotale > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-4 mb-6`}>
         {[
+          budgetTotale > 0 && { label: 'Budget totale', value: formatEuro(budgetTotale), color: 'text-gray-700' },
           { label: 'Preventivato', value: formatEuro(totalePrev), color: 'text-blue-600' },
-          { label: 'Speso', value: formatEuro(totaleEff), color: 'text-orange-600' },
-          { label: 'Pagato', value: formatEuro(totalePagato), color: 'text-green-600' },
-        ].map(({ label, value, color }) => (
+          { label: 'Speso / impegnato', value: formatEuro(totaleEff), color: 'text-orange-600' },
+          { label: 'Pagato', value: formatEuro(totalePagato), color: 'text-green-600', sub: `Da pagare: ${formatEuro(totaleEff - totalePagato)}` },
+          budgetTotale > 0 && { label: 'Rimasto dal budget', value: formatEuro(budgetTotale - totaleEff), color: totaleEff > budgetTotale ? 'text-red-600' : 'text-gray-900' },
+        ].filter(Boolean).map(({ label, value, color, sub }) => (
           <div key={label} className="card text-center">
             <div className="text-xs text-gray-500 font-medium mb-1">{label}</div>
             <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
           </div>
         ))}
       </div>
@@ -353,10 +402,9 @@ export default function Budget() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-gray-900 truncate">{c.descrizione}</div>
                 <span className="badge bg-gray-100 text-gray-600 text-xs mt-0.5">{c.categoria}</span>
+                {c.auto && <span className="badge bg-blue-50 text-blue-600 text-xs mt-0.5 ml-1">Preventivo</span>}
               </div>
-              <button onClick={() => togglePagato(c)} className="flex-shrink-0 mt-0.5">
-                {c.pagato ? <CheckCircle size={22} className="text-green-500" /> : <Circle size={22} className="text-gray-300" />}
-              </button>
+              <div className="flex-shrink-0 mt-0.5"><StatoPagamento c={c} size={22} /></div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm mb-2">
               <div>
@@ -372,8 +420,7 @@ export default function Budget() {
             </div>
             {c.data_pagamento && <div className="text-xs text-gray-400 mb-2">Pagato il {c.data_pagamento}</div>}
             <div className="flex gap-1 justify-end border-t border-gray-100 pt-2">
-              <button className="p-1.5 rounded hover:bg-gray-100 text-gray-500" onClick={() => openEdit(c)}><Pencil size={14} /></button>
-              <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(c.id)}><Trash2 size={14} /></button>
+              <Azioni c={c} />
             </div>
           </div>
         ))}
@@ -400,21 +447,17 @@ export default function Budget() {
               )}
               {sorted.map(c => (
                 <tr key={c.id}>
-                  <td>
-                    <button onClick={() => togglePagato(c)} className="text-gray-400 hover:text-green-500">
-                      {c.pagato ? <CheckCircle size={18} className="text-green-500" /> : <Circle size={18} />}
-                    </button>
-                  </td>
+                  <td><StatoPagamento c={c} size={18} /></td>
                   <td><span className="badge bg-gray-100 text-gray-600">{c.categoria}</span></td>
-                  <td className="font-medium text-gray-900">{c.descrizione}</td>
+                  <td className="font-medium text-gray-900">
+                    {c.descrizione}
+                    {c.auto && <span className="badge bg-blue-50 text-blue-600 text-xs ml-2">Preventivo</span>}
+                  </td>
                   <td className="text-blue-600 font-medium">{formatEuro(c.importo_preventivo)}</td>
                   <td className={`font-bold ${c.importo_effettivo > c.importo_preventivo ? 'text-red-600' : 'text-gray-900'}`}>{formatEuro(c.importo_effettivo)}</td>
                   <td className="text-gray-400 text-sm">{c.data_pagamento || '—'}</td>
                   <td>
-                    <div className="flex gap-1">
-                      <button className="p-1.5 rounded hover:bg-gray-100" onClick={() => openEdit(c)}><Pencil size={14} /></button>
-                      <button className="p-1.5 rounded hover:bg-red-50 text-red-400" onClick={() => del(c.id)}><Trash2 size={14} /></button>
-                    </div>
+                    <div className="flex gap-1"><Azioni c={c} /></div>
                   </td>
                 </tr>
               ))}

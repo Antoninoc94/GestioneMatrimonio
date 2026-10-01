@@ -12,6 +12,12 @@ router.get('/', auth, (req, res) => {
   const totaleCosti = db.prepare('SELECT SUM(importo_effettivo) as tot, SUM(importo_preventivo) as prev FROM costi').get();
   const costiPagati = db.prepare('SELECT SUM(importo_effettivo) as tot FROM costi WHERE pagato = 1').get();
   const preventiviAccettati = db.prepare("SELECT SUM(importo) as tot FROM preventivi WHERE stato = 'accettato'").get();
+  // Come nella pagina Budget: dei preventivi accettati conta come pagato la somma delle rate saldate
+  const ratePagate = db.prepare(`
+    SELECT SUM(r.importo) as tot FROM preventivi_rate r
+    JOIN preventivi p ON p.id = r.preventivo_id
+    WHERE r.pagata = 1 AND p.stato = 'accettato'
+  `).get();
 
   // Scadenze unificate
   const tutteScadenze = getAllScadenze(db);
@@ -90,7 +96,7 @@ router.get('/', auth, (req, res) => {
       totale: config?.budget_totale || 0,
       preventivato: totaleCosti.prev || 0,
       effettivo: totaleCosti.tot || 0,
-      pagato: costiPagati.tot || 0,
+      pagato: (costiPagati.tot || 0) + (ratePagate.tot || 0),
       preventiviAccettati: preventiviAccettati.tot || 0,
     },
     ospiti: ospitiStats,
