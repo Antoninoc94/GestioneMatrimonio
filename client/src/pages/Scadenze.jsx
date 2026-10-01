@@ -14,6 +14,7 @@ const sourceInfo = {
   preventivo: { label: 'Preventivo', icon: FileText, color: 'bg-blue-100 text-blue-700', link: '/preventivi' },
   viaggio:    { label: 'Viaggio',    icon: Plane,    color: 'bg-purple-100 text-purple-700', link: '/viaggio' },
   costo:      { label: 'Pagamento',  icon: DollarSign, color: 'bg-orange-100 text-orange-700', link: '/budget' },
+  rata:       { label: 'Rata',       icon: DollarSign, color: 'bg-amber-100 text-amber-700', link: '/preventivi' },
 };
 
 const formatEuro = n => n ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n) : null;
@@ -152,7 +153,7 @@ export default function Scadenze() {
           {s.source === 'preventivo' && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">{formatEuro(s.importo)} · Stato: {statoPreventivo[s.stato] ?? s.stato}</p>
           )}
-          {s.source === 'costo' && s.importo && (
+          {(s.source === 'costo' || s.source === 'rata') && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">Da pagare: {formatEuro(s.importo)}</p>
           )}
 

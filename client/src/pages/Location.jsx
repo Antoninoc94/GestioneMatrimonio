@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, MapPin, Globe, Phone, Mail, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, Globe, Phone, Mail, Users, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../api';
 
 const TIPI = ['Ricevimento', 'Chiesa', 'Municipio', 'Cerimonia civile', 'Altro'];
@@ -13,11 +14,15 @@ const formatEuro = n => n ? new Intl.NumberFormat('it-IT', { style: 'currency', 
 
 export default function Location() {
   const [items, setItems] = useState([]);
+  const [preventivi, setPreventivi] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
 
-  const load = () => api.get('/location').then(r => setItems(r.data));
+  const load = () => {
+    api.get('/location').then(r => setItems(r.data));
+    api.get('/preventivi').then(r => setPreventivi(r.data));
+  };
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
@@ -105,6 +110,14 @@ export default function Location() {
                     </div>
                   )}
                   {l.note && <p className="text-xs text-gray-400 mt-2 italic">{l.note}</p>}
+                  {preventivi.filter(p => p.location_id === l.id).map(p => (
+                    <Link key={p.id} to="/preventivi" className="flex items-center gap-1.5 text-xs mt-2 px-2 py-1.5 rounded bg-gray-50 hover:bg-rose-50 text-gray-600">
+                      <FileText size={12} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate flex-1">{p.descrizione || p.categoria}</span>
+                      <span className="font-semibold text-gray-700">{formatEuro(p.importo)}</span>
+                      {p.rate.length > 0 && <span className="text-gray-400">· resta {formatEuro(p.residuo) || '0 €'}</span>}
+                    </Link>
+                  ))}
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                     <button className="btn-secondary text-xs py-1 px-3" onClick={() => openEdit(l)}><Pencil size={13} /> Modifica</button>
                     <button className="btn-danger text-xs py-1 px-3" onClick={() => del(l.id)}><Trash2 size={13} /></button>

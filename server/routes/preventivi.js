@@ -25,20 +25,95 @@ const deleteFile = percorso_file => {
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
+// Il preventivo arriva come multipart (per l'allegato), quindi le rate viaggiano
+// come stringa JSON. Restituisce { rate } oppure { error }; rate === undefined
+// significa "campo assente", cioè rate da lasciare invariate.
+const parseRate = raw => {
+  if (raw === undefined) return { rate: undefined };
+  let list;
+  try { list = JSON.parse(raw || '[]'); } catch { return { error: 'Piano di pagamento non valido' }; }
+  if (!Array.isArray(list)) return { error: 'Piano di pagamento non valido' };
+  const oggi = new Date().toISOString().split('T')[0];
+  const rate = [];
+  for (const r of list) {
+    const importo = parseFloat(r.importo);
+    if (!(importo > 0)) return { error: 'Ogni rata deve avere un importo maggiore di zero' };
+    const pagata = r.pagata ? 1 : 0;
+    rate.push({
+      id: parseInt(r.id) || null,
+      descrizione: r.descrizione?.trim() || null,
+      importo,
+      data_scadenza: r.data_scadenza || null,
+      pagata,
+      data_pagamento: pagata ? (r.data_pagamento || oggi) : null,
+    });
+  }
+  return { rate };
+};
+
+// Allinea le rate del preventivo alla lista ricevuta: aggiorna quelle con id,
+// inserisce le nuove, elimina quelle sparite. Va chiamata dentro una transazione.
+const salvaRate = (preventivoId, rate) => {
+  const esistenti = db.prepare('SELECT id FROM preventivi_rate WHERE preventivo_id = ?').all(preventivoId).map(r => r.id);
+  const tenute = new Set();
+  const upd = db.prepare('UPDATE preventivi_rate SET descrizione=?, importo=?, data_scadenza=?, pagata=?, data_pagamento=?, ordine=? WHERE id=? AND preventivo_id=?');
+  const ins = db.prepare('INSERT INTO preventivi_rate (preventivo_id, descrizione, importo, data_scadenza, pagata, data_pagamento, ordine) VALUES (?,?,?,?,?,?,?)');
+  rate.forEach((r, i) => {
+    if (r.id && esistenti.includes(r.id)) {
+      upd.run(r.descrizione, r.importo, r.data_scadenza, r.pagata, r.data_pagamento, i, r.id, preventivoId);
+      tenute.add(r.id);
+    } else {
+      ins.run(preventivoId, r.descrizione, r.importo, r.data_scadenza, r.pagata, r.data_pagamento, i);
+    }
+  });
+  const del = db.prepare('DELETE FROM preventivi_rate WHERE id = ?');
+  esistenti.filter(id => !tenute.has(id)).forEach(id => del.run(id));
+};
+
+const SELECT_PREVENTIVO = `
+  SELECT p.*, l.nome AS location_nome
+  FROM preventivi p LEFT JOIN location l ON l.id = p.location_id
+`;
+
+const conRate = p => {
+  const rate = db.prepare('SELECT * FROM preventivi_rate WHERE preventivo_id = ? ORDER BY ordine, id').all(p.id);
+  const pagato = rate.filter(r => r.pagata).reduce((s, r) => s + r.importo, 0);
+  return { ...p, rate, totale_pagato: pagato, residuo: p.importo - pagato };
+};
+
+const getPreventivo = id => {
+  const p = db.prepare(`${SELECT_PREVENTIVO} WHERE p.id = ?`).get(id);
+  return p ? conRate(p) : null;
+};
+
 router.get('/', auth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM preventivi ORDER BY created_at DESC').all());
+  res.json(db.prepare(`${SELECT_PREVENTIVO} ORDER BY p.created_at DESC`).all().map(conRate));
 });
 
 router.post('/', auth, upload.single('allegato'), (req, res) => {
-  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, anticipo, data_anticipo } = req.body;
+  const { fornitore_id, fornitore_nome, location_id, categoria, descrizione, importo, stato, data_scadenza, note } = req.body;
+  const { rate, error } = parseRate(req.body.rate);
+  if (error) {
+    deleteFile(req.file?.filename);
+    return res.status(400).json({ error });
+  }
   const file = req.file ? { nome_file: req.file.originalname, percorso_file: req.file.filename, dimensione_file: req.file.size } : { nome_file: null, percorso_file: null, dimensione_file: null };
-  const r = db.prepare('INSERT INTO preventivi (fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, nome_file, percorso_file, dimensione_file, anticipo, data_anticipo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato || 'in_attesa', data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, anticipo ? parseFloat(anticipo) : null, data_anticipo || null);
-  res.json(db.prepare('SELECT * FROM preventivi WHERE id = ?').get(r.lastInsertRowid));
+  const id = db.transaction(() => {
+    const r = db.prepare('INSERT INTO preventivi (fornitore_id, fornitore_nome, location_id, categoria, descrizione, importo, stato, data_scadenza, note, nome_file, percorso_file, dimensione_file) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(fornitore_id || null, fornitore_nome, location_id || null, categoria, descrizione, parseFloat(importo), stato || 'in_attesa', data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file);
+    if (rate) salvaRate(r.lastInsertRowid, rate);
+    return r.lastInsertRowid;
+  })();
+  res.json(getPreventivo(id));
 });
 
 router.put('/:id', auth, upload.single('allegato'), (req, res) => {
-  const { fornitore_id, fornitore_nome, categoria, descrizione, importo, stato, data_scadenza, note, rimuovi_allegato, anticipo, data_anticipo } = req.body;
+  const { fornitore_id, fornitore_nome, location_id, categoria, descrizione, importo, stato, data_scadenza, note, rimuovi_allegato } = req.body;
+  const { rate, error } = parseRate(req.body.rate);
+  if (error) {
+    deleteFile(req.file?.filename);
+    return res.status(400).json({ error });
+  }
   // dimensione_file va riletta insieme alle altre: se manca dalla SELECT, il ramo
   // "allegato invariato" la riscrive come NULL a ogni modifica del preventivo.
   const existing = db.prepare('SELECT nome_file, percorso_file, dimensione_file FROM preventivi WHERE id = ?').get(req.params.id);
@@ -52,9 +127,12 @@ router.put('/:id', auth, upload.single('allegato'), (req, res) => {
     file = { nome_file: null, percorso_file: null, dimensione_file: null };
   }
 
-  db.prepare('UPDATE preventivi SET fornitore_id=?, fornitore_nome=?, categoria=?, descrizione=?, importo=?, stato=?, data_scadenza=?, note=?, nome_file=?, percorso_file=?, dimensione_file=?, anticipo=?, data_anticipo=? WHERE id=?')
-    .run(fornitore_id || null, fornitore_nome, categoria, descrizione, parseFloat(importo), stato, data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, anticipo ? parseFloat(anticipo) : null, data_anticipo || null, req.params.id);
-  res.json(db.prepare('SELECT * FROM preventivi WHERE id = ?').get(req.params.id));
+  db.transaction(() => {
+    db.prepare('UPDATE preventivi SET fornitore_id=?, fornitore_nome=?, location_id=?, categoria=?, descrizione=?, importo=?, stato=?, data_scadenza=?, note=?, nome_file=?, percorso_file=?, dimensione_file=? WHERE id=?')
+      .run(fornitore_id || null, fornitore_nome, location_id || null, categoria, descrizione, parseFloat(importo), stato, data_scadenza, note, file.nome_file, file.percorso_file, file.dimensione_file, req.params.id);
+    if (rate) salvaRate(Number(req.params.id), rate);
+  })();
+  res.json(getPreventivo(req.params.id));
 });
 
 router.get('/download/:id', auth, (req, res) => {

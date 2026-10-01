@@ -404,6 +404,39 @@ if (!preventiviCols.includes('anticipo')) {
 if (!preventiviCols.includes('data_anticipo')) {
   db.prepare('ALTER TABLE preventivi ADD COLUMN data_anticipo TEXT').run();
 }
+// Un preventivo può riguardare una location (tabella separata dai fornitori)
+if (!preventiviCols.includes('location_id')) {
+  db.prepare('ALTER TABLE preventivi ADD COLUMN location_id INTEGER REFERENCES location(id) ON DELETE SET NULL').run();
+}
+
+// Piano di pagamento: caparra, tranche e saldo di un preventivo
+db.exec(`
+  CREATE TABLE IF NOT EXISTS preventivi_rate (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    preventivo_id INTEGER NOT NULL REFERENCES preventivi(id) ON DELETE CASCADE,
+    descrizione TEXT,
+    importo REAL NOT NULL,
+    data_scadenza TEXT,
+    pagata INTEGER DEFAULT 0,
+    data_pagamento TEXT,
+    ordine INTEGER DEFAULT 0
+  )
+`);
+
+// Migrazione: il vecchio anticipo singolo diventa la prima rata (già pagata).
+// Le colonne anticipo/data_anticipo vengono svuotate così la migrazione non si
+// ripete se in seguito l'utente cancella quella rata.
+const conAnticipo = db.prepare('SELECT id, anticipo, data_anticipo FROM preventivi WHERE anticipo > 0').all();
+if (conAnticipo.length > 0) {
+  const insRata = db.prepare("INSERT INTO preventivi_rate (preventivo_id, descrizione, importo, data_scadenza, pagata, data_pagamento, ordine) VALUES (?, 'Anticipo', ?, ?, 1, ?, 0)");
+  const svuota = db.prepare('UPDATE preventivi SET anticipo = NULL, data_anticipo = NULL WHERE id = ?');
+  db.transaction(() => {
+    for (const p of conAnticipo) {
+      insRata.run(p.id, p.anticipo, p.data_anticipo, p.data_anticipo);
+      svuota.run(p.id);
+    }
+  })();
+}
 
 // Seed checklist predefinita
 const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();

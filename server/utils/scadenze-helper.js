@@ -52,7 +52,27 @@ function getAllScadenze(db) {
     ORDER BY data_pagamento ASC
   `).all();
 
-  const tutte = [...manuali, ...daPreventivi, ...daViaggio, ...daCosti];
+  // Solo i preventivi accettati: le rate di un preventivo ancora in valutazione
+  // non sono un impegno preso.
+  const daRate = db.prepare(`
+    SELECT
+      'rata_' || r.id        AS id,
+      'Rata: ' || COALESCE(r.descrizione, 'pagamento') || ' — ' || COALESCE(l.nome, p.fornitore_nome, p.categoria) AS titolo,
+      p.categoria            AS categoria,
+      r.data_scadenza,
+      'alta'                 AS priorita,
+      0                      AS completata,
+      'rata'                 AS source,
+      p.id                   AS source_id,
+      r.importo              AS importo
+    FROM preventivi_rate r
+    JOIN preventivi p ON p.id = r.preventivo_id
+    LEFT JOIN location l ON l.id = p.location_id
+    WHERE r.pagata = 0 AND r.data_scadenza IS NOT NULL AND p.stato = 'accettato'
+    ORDER BY r.data_scadenza ASC
+  `).all();
+
+  const tutte = [...manuali, ...daPreventivi, ...daViaggio, ...daCosti, ...daRate];
   tutte.sort((a, b) => {
     if (!a.data_scadenza) return 1;
     if (!b.data_scadenza) return -1;

@@ -29,8 +29,8 @@ const getMilestone = giorni => {
   return { emoji: '💍', title: 'Domani è il grande giorno!', desc: 'Dormite bene questa notte 💑' };
 };
 
-const sourceColor = { preventivo: 'text-blue-600 bg-blue-50', viaggio: 'text-purple-600 bg-purple-50', costo: 'text-orange-600 bg-orange-50', manuale: 'text-gray-600 bg-gray-50' };
-const sourceLabel = { preventivo: 'Preventivo', viaggio: 'Viaggio', costo: 'Pagamento', manuale: 'Manuale' };
+const sourceColor = { preventivo: 'text-blue-600 bg-blue-50', viaggio: 'text-purple-600 bg-purple-50', costo: 'text-orange-600 bg-orange-50', rata: 'text-amber-600 bg-amber-50', manuale: 'text-gray-600 bg-gray-50' };
+const sourceLabel = { preventivo: 'Preventivo', viaggio: 'Viaggio', costo: 'Pagamento', rata: 'Rata', manuale: 'Manuale' };
 
 export default function Dashboard() {
   const [data, setData] = useState(null);

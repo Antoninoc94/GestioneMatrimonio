@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Paperclip, Eye, X, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Paperclip, Eye, X, Download, MapPin } from 'lucide-react';
 import api from '../api';
 import PdfViewer from '../components/PdfViewer';
 import { format, parseISO } from 'date-fns';
@@ -11,13 +11,15 @@ const statoColor = { in_attesa: 'bg-gray-100 text-gray-600', in_valutazione: 'bg
 const statoLabel = { in_attesa: 'In attesa', in_valutazione: 'In valutazione', accettato: 'Accettato', rifiutato: 'Rifiutato' };
 const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-const empty = { fornitore_id: '', fornitore_nome: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '', anticipo: '', data_anticipo: '' };
+const empty = { fornitore_id: '', fornitore_nome: '', location_id: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '', rate: [] };
+const rataVuota = () => ({ id: null, descrizione: '', importo: '', data_scadenza: '', pagata: false, data_pagamento: '' });
 
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
 
 export default function Preventivi() {
   const [items, setItems] = useState([]);
   const [fornitori, setFornitori] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -31,11 +33,12 @@ export default function Preventivi() {
   const load = () => {
     api.get('/preventivi').then(r => setItems(r.data));
     api.get('/fornitori').then(r => setFornitori(r.data));
+    api.get('/location').then(r => setLocations(r.data));
   };
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setForm(empty); setEditId(null); setFile(null); setRimuoviAllegato(false); setErrore(''); setModal(true); };
-  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '', anticipo: p.anticipo != null ? p.anticipo.toString() : '', data_anticipo: p.data_anticipo || '' }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setErrore(''); setModal(true); };
+  const openEdit = p => { setForm({ ...p, fornitore_id: p.fornitore_id || '', location_id: p.location_id || '', importo: p.importo?.toString(), data_scadenza: p.data_scadenza || '', rate: (p.rate || []).map(r => ({ ...r, descrizione: r.descrizione || '', importo: r.importo.toString(), data_scadenza: r.data_scadenza || '', pagata: !!r.pagata, data_pagamento: r.data_pagamento || '' })) }); setEditId(p.id); setFile(null); setRimuoviAllegato(false); setErrore(''); setModal(true); };
 
   const save = async e => {
     e.preventDefault();
@@ -49,8 +52,8 @@ export default function Preventivi() {
     fd.append('stato', form.stato);
     fd.append('data_scadenza', form.data_scadenza || '');
     fd.append('note', form.note || '');
-    fd.append('anticipo', form.anticipo || '');
-    fd.append('data_anticipo', form.data_anticipo || '');
+    fd.append('location_id', form.location_id || '');
+    fd.append('rate', JSON.stringify(form.rate));
     if (file) fd.append('allegato', file);
     else if (rimuoviAllegato) fd.append('rimuovi_allegato', 'true');
     try {
@@ -100,14 +103,21 @@ export default function Preventivi() {
   };
 
   const filtered = filtroStato ? items.filter(i => i.stato === filtroStato) : items;
-  const totaleAccettati = items.filter(i => i.stato === 'accettato').reduce((s, i) => s + i.importo, 0);
+  const accettati = items.filter(i => i.stato === 'accettato');
+  const totaleAccettati = accettati.reduce((s, i) => s + i.importo, 0);
+  const totalePagato = accettati.reduce((s, i) => s + i.totale_pagato, 0);
+
+  const setRata = (i, campi) => setForm(f => ({ ...f, rate: f.rate.map((r, j) => j === i ? { ...r, ...campi } : r) }));
+  const sommaRate = form.rate.reduce((s, r) => s + (parseFloat(r.importo) || 0), 0);
+  const sommaPagata = form.rate.filter(r => r.pagata).reduce((s, r) => s + (parseFloat(r.importo) || 0), 0);
+  const nome = p => p.location_nome || p.fornitore_nome || '—';
 
   return (
     <div>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Preventivi</h1>
-          <p className="page-subtitle">{items.length} preventivi · Accettati: {formatEuro(totaleAccettati)}</p>
+          <p className="page-subtitle">{items.length} preventivi · Accettati: {formatEuro(totaleAccettati)} · Pagato: {formatEuro(totalePagato)} · Da pagare: {formatEuro(totaleAccettati - totalePagato)}</p>
         </div>
         <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuovo Preventivo</button>
       </div>
@@ -132,7 +142,7 @@ export default function Preventivi() {
           <div key={p.id} className="card p-3">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-gray-900 truncate">{p.fornitore_nome || '—'}</div>
+                <div className="font-semibold text-gray-900 truncate flex items-center gap-1">{p.location_id && <MapPin size={13} className="text-rose-400 flex-shrink-0" />}{nome(p)}</div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   <span className="badge bg-gray-100 text-gray-600 text-xs">{p.categoria}</span>
                   <span className={`badge text-xs ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span>
@@ -140,7 +150,7 @@ export default function Preventivi() {
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="font-bold text-gray-900 text-sm">{formatEuro(p.importo)}</div>
-                {p.anticipo > 0 && <div className="text-xs text-gray-400">Anticipo {formatEuro(p.anticipo)}</div>}
+                {p.rate.length > 0 && <div className="text-xs text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}</div>}
               </div>
             </div>
             {p.descrizione && <div className="text-xs text-gray-500 mb-2 truncate">{p.descrizione}</div>}
@@ -177,12 +187,12 @@ export default function Preventivi() {
               )}
               {filtered.map(p => (
                 <tr key={p.id}>
-                  <td className="font-medium text-gray-900">{p.fornitore_nome || '—'}</td>
+                  <td className="font-medium text-gray-900"><span className="flex items-center gap-1">{p.location_id && <MapPin size={13} className="text-rose-400 flex-shrink-0" />}{nome(p)}</span></td>
                   <td className="text-gray-500">{p.categoria}</td>
                   <td className="text-gray-600 max-w-xs truncate">{p.descrizione || '—'}</td>
                   <td className="font-bold text-gray-900">
                     {formatEuro(p.importo)}
-                    {p.anticipo > 0 && <div className="text-xs font-normal text-gray-400">Anticipo {formatEuro(p.anticipo)}</div>}
+                    {p.rate.length > 0 && <div className="text-xs font-normal text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}</div>}
                   </td>
                   <td><span className={`badge ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span></td>
                   <td className="text-gray-500 text-sm">{p.data_scadenza ? format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it }) : '—'}</td>
@@ -209,7 +219,7 @@ export default function Preventivi() {
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{preview?.item?.fornitore_nome || 'Allegato'}</p>
+                <p className="font-semibold text-gray-800 truncate">{preview?.item ? nome(preview.item) : 'Allegato'}</p>
                 <p className="text-xs text-gray-400 truncate">{preview?.item?.nome_file}</p>
               </div>
               <div className="flex gap-1 flex-shrink-0">
@@ -287,6 +297,13 @@ export default function Preventivi() {
                 <input className="form-input" value={form.fornitore_nome} onChange={e => setForm({ ...form, fornitore_nome: e.target.value })} placeholder="Nome azienda..." />
               </div>
               <div>
+                <label className="form-label">Location (opzionale)</label>
+                <select className="form-input" value={form.location_id} onChange={e => setForm({ ...form, location_id: e.target.value })}>
+                  <option value="">-- Nessuna --</option>
+                  {locations.map(l => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="form-label">Descrizione</label>
                 <input className="form-input" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
               </div>
@@ -306,18 +323,49 @@ export default function Preventivi() {
                 <label className="form-label">Scadenza preventivo</label>
                 <input type="date" className="form-input" value={form.data_scadenza} onChange={e => setForm({ ...form, data_scadenza: e.target.value })} />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">Anticipo versato (€)</label>
-                  <input type="number" step="0.01" min="0" className="form-input" value={form.anticipo} onChange={e => setForm({ ...form, anticipo: e.target.value })} />
-                  {form.anticipo && form.importo && (
-                    <p className="text-xs text-gray-400 mt-1">Saldo residuo: {formatEuro(parseFloat(form.importo) - parseFloat(form.anticipo))}</p>
-                  )}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label mb-0">Piano di pagamento</label>
+                  <button type="button" className="text-xs text-rose-500 hover:underline flex items-center gap-1" onClick={() => setForm(f => ({ ...f, rate: [...f.rate, rataVuota()] }))}>
+                    <Plus size={12} /> Aggiungi rata
+                  </button>
                 </div>
-                <div>
-                  <label className="form-label">Data anticipo</label>
-                  <input type="date" className="form-input" value={form.data_anticipo} onChange={e => setForm({ ...form, data_anticipo: e.target.value })} />
-                </div>
+                {form.rate.length === 0 ? (
+                  <p className="text-xs text-gray-400">Nessuna rata. Aggiungi caparra, tranche e saldo per tenere traccia dei pagamenti.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="hidden sm:grid grid-cols-4 gap-2 px-2 text-xs text-gray-400">
+                      <span className="col-span-2">Descrizione</span><span>Importo (€)</span><span>Scadenza</span>
+                    </div>
+                    {form.rate.map((r, i) => (
+                      <div key={i} className={`rounded-lg border p-2 ${r.pagata ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <input className="form-input col-span-2" placeholder="es. Caparra, Saldo..." value={r.descrizione} onChange={e => setRata(i, { descrizione: e.target.value })} />
+                          <input type="number" step="0.01" min="0.01" className="form-input" placeholder="€" value={r.importo} onChange={e => setRata(i, { importo: e.target.value })} required />
+                          <input type="date" className="form-input" title="Scadenza" value={r.data_scadenza} onChange={e => setRata(i, { data_scadenza: e.target.value })} />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 text-sm">
+                          <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer">
+                            <input type="checkbox" checked={r.pagata} onChange={e => setRata(i, { pagata: e.target.checked, data_pagamento: e.target.checked ? (r.data_pagamento || new Date().toISOString().split('T')[0]) : '' })} />
+                            Pagata
+                          </label>
+                          {r.pagata && (
+                            <input type="date" className="form-input py-1 w-auto" title="Data pagamento" value={r.data_pagamento} onChange={e => setRata(i, { data_pagamento: e.target.value })} />
+                          )}
+                          <button type="button" className="ml-auto p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => setForm(f => ({ ...f, rate: f.rate.filter((_, j) => j !== i) }))} title="Rimuovi rata">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-500">
+                      Pagato {formatEuro(sommaPagata)} · Resta {formatEuro((parseFloat(form.importo) || 0) - sommaPagata)}
+                    </p>
+                    {form.importo && Math.abs(sommaRate - parseFloat(form.importo)) > 0.009 && (
+                      <p className="text-xs text-amber-600">Le rate sommano {formatEuro(sommaRate)}, mentre il preventivo è di {formatEuro(parseFloat(form.importo))}.</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">Allegato (es. PDF del preventivo)</label>
