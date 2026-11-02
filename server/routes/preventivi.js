@@ -76,9 +76,20 @@ const SELECT_PREVENTIVO = `
 `;
 
 const conRate = p => {
-  const rate = db.prepare('SELECT * FROM preventivi_rate WHERE preventivo_id = ? ORDER BY ordine, id').all(p.id);
+  // Fatture collegate alle rate (vedi fatture_rate): una fattura che copre più
+  // rate compare su ognuna, ma nel fatturato del preventivo conta una volta sola.
+  const fatture = db.prepare(`
+    SELECT fr.rata_id, d.id, d.titolo, d.nome_file, d.numero_fattura, d.data_fattura, d.importo_fattura
+    FROM fatture_rate fr
+    JOIN documenti d ON d.id = fr.documento_id
+    JOIN preventivi_rate r ON r.id = fr.rata_id
+    WHERE r.preventivo_id = ? ORDER BY d.data_fattura, d.id
+  `).all(p.id);
+  const rate = db.prepare('SELECT * FROM preventivi_rate WHERE preventivo_id = ? ORDER BY ordine, id').all(p.id)
+    .map(r => ({ ...r, fatture: fatture.filter(f => f.rata_id === r.id) }));
   const pagato = rate.filter(r => r.pagata).reduce((s, r) => s + r.importo, 0);
-  return { ...p, rate, totale_pagato: pagato, residuo: p.importo - pagato };
+  const fatturato = [...new Map(fatture.map(f => [f.id, f.importo_fattura || 0])).values()].reduce((s, n) => s + n, 0);
+  return { ...p, rate, totale_pagato: pagato, residuo: p.importo - pagato, totale_fatturato: fatturato, n_fatture: new Set(fatture.map(f => f.id)).size };
 };
 
 const getPreventivo = id => {

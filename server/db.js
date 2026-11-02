@@ -455,6 +455,28 @@ if (conAnticipo.length > 0) {
   })();
 }
 
+// Fatture: sono documenti di categoria Fattura, legati al fornitore, con numero,
+// data e importo. Non corrispondono per forza a una rata: una fattura può coprire
+// più rate (o nessuna) e una rata può non averne. Il collegamento, facoltativo, sta
+// in fatture_rate; se la rata sparisce la fattura resta in Documenti, scollegata.
+const documentiCols = db.prepare('PRAGMA table_info(documenti)').all().map(c => c.name);
+if (!documentiCols.includes('numero_fattura')) {
+  db.prepare('ALTER TABLE documenti ADD COLUMN numero_fattura TEXT').run();
+}
+if (!documentiCols.includes('data_fattura')) {
+  db.prepare('ALTER TABLE documenti ADD COLUMN data_fattura TEXT').run();
+}
+if (!documentiCols.includes('importo_fattura')) {
+  db.prepare('ALTER TABLE documenti ADD COLUMN importo_fattura REAL').run();
+}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fatture_rate (
+    documento_id INTEGER NOT NULL REFERENCES documenti(id) ON DELETE CASCADE,
+    rata_id INTEGER NOT NULL REFERENCES preventivi_rate(id) ON DELETE CASCADE,
+    PRIMARY KEY (documento_id, rata_id)
+  )
+`);
+
 // Seed checklist predefinita
 const checklistExists = db.prepare('SELECT id FROM checklist_items LIMIT 1').get();
 if (!checklistExists) {

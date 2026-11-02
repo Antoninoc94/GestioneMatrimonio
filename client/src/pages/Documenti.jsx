@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Upload, Trash2, Download, FolderOpen, X, Eye } from 'lucide-react';
+import { Upload, Trash2, Download, FolderOpen, X, Pencil } from 'lucide-react';
 import api from '../api';
 import PdfViewer from '../components/PdfViewer';
 import { format, parseISO } from 'date-fns';
@@ -7,9 +7,11 @@ import { it } from 'date-fns/locale';
 
 const toUtc = s => s && !s.endsWith('Z') ? s.replace(' ', 'T') + 'Z' : s;
 
-const CATEGORIE = ['Contratto', 'Preventivo', 'Ricevuta', 'Certificato', 'Permesso', 'Foto ispirazione', 'Altro'];
+const CATEGORIE = ['Contratto', 'Preventivo', 'Fattura', 'Ricevuta', 'Certificato', 'Permesso', 'Foto ispirazione', 'Altro'];
 
-const empty = { titolo: '', categoria: 'Contratto', fornitore_id: '', note: '' };
+const empty = { titolo: '', categoria: 'Contratto', fornitore_id: '', note: '', numero_fattura: '', data_fattura: '', importo_fattura: '', rate_ids: [] };
+
+const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
 
 const iconExt = ext => {
   if (['pdf'].includes(ext)) return '📄';
@@ -31,8 +33,10 @@ const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 export default function Documenti() {
   const [items, setItems] = useState([]);
   const [fornitori, setFornitori] = useState([]);
+  const [preventivi, setPreventivi] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
+  const [editId, setEditId] = useState(null);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [errore, setErrore] = useState('');
@@ -44,23 +48,50 @@ export default function Documenti() {
   const load = () => {
     api.get('/documenti').then(r => setItems(r.data));
     api.get('/fornitori').then(r => setFornitori(r.data));
+    api.get('/preventivi').then(r => setPreventivi(r.data));
   };
   useEffect(() => { load(); }, []);
 
-  const openUpload = () => { setForm(empty); setFile(null); setErrore(''); setModal(true); };
+  const openUpload = () => { setForm(empty); setEditId(null); setFile(null); setErrore(''); setModal(true); };
+  const openEdit = d => {
+    setForm({
+      titolo: d.titolo, categoria: d.categoria, fornitore_id: d.fornitore_id || '', note: d.note || '',
+      numero_fattura: d.numero_fattura || '', data_fattura: d.data_fattura || '',
+      importo_fattura: d.importo_fattura?.toString() || '', rate_ids: d.rate.map(r => r.id),
+    });
+    setEditId(d.id); setFile(null); setErrore(''); setModal(true);
+  };
 
   const save = async e => {
     e.preventDefault();
-    if (!file) return alert('Seleziona un file');
+    if (!editId && !file) return alert('Seleziona un file');
     setUploading(true);
     setErrore('');
+    // Numero, data, importo e rate collegate hanno senso solo per le fatture.
+    const fattura = form.categoria === 'Fattura';
+    const campiFattura = {
+      numero_fattura: fattura ? form.numero_fattura : '',
+      data_fattura: fattura ? form.data_fattura : '',
+      importo_fattura: fattura ? form.importo_fattura : '',
+      rate_ids: fattura ? form.rate_ids : [],
+    };
     try {
+      if (editId) {
+        await api.put(`/documenti/${editId}`, { titolo: form.titolo, categoria: form.categoria, fornitore_id: form.fornitore_id || null, note: form.note, ...campiFattura });
+        setModal(false);
+        load();
+        return;
+      }
       const fd = new FormData();
       fd.append('file', file);
       fd.append('titolo', form.titolo || file.name);
       fd.append('categoria', form.categoria);
       if (form.fornitore_id) fd.append('fornitore_id', form.fornitore_id);
       if (form.note) fd.append('note', form.note);
+      fd.append('numero_fattura', campiFattura.numero_fattura);
+      fd.append('data_fattura', campiFattura.data_fattura);
+      fd.append('importo_fattura', campiFattura.importo_fattura);
+      fd.append('rate_ids', JSON.stringify(campiFattura.rate_ids));
       await api.post('/documenti', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setModal(false);
       load();
@@ -110,10 +141,19 @@ export default function Documenti() {
   };
 
   const filtered = items.filter(i =>
-    !filtro || i.titolo.toLowerCase().includes(filtro.toLowerCase()) || i.categoria.toLowerCase().includes(filtro.toLowerCase())
+    !filtro || [i.titolo, i.categoria, i.fornitore_nome, i.numero_fattura].some(v => v?.toLowerCase().includes(filtro.toLowerCase()))
   );
 
   const byCategoria = CATEGORIE.filter(c => filtered.some(i => i.categoria === c));
+
+  // Rate dei preventivi accettati a cui può corrispondere una fattura; se è scelto
+  // un fornitore si mostrano solo le sue. Quelle già collegate restano sempre in
+  // lista, così si possono anche scollegare.
+  const rateCollegabili = preventivi
+    .flatMap(p => p.rate.map(r => ({ ...r, preventivo: p, chi: p.location_nome || p.fornitore_nome || p.categoria })))
+    .filter(r => form.rate_ids.includes(r.id) ||
+      (r.preventivo.stato === 'accettato' && (!form.fornitore_id || r.preventivo.fornitore_id === parseInt(form.fornitore_id))));
+  const toggleRata = id => setForm(f => ({ ...f, rate_ids: f.rate_ids.includes(id) ? f.rate_ids.filter(x => x !== id) : [...f.rate_ids, id] }));
 
   return (
     <div>
@@ -152,6 +192,17 @@ export default function Documenti() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-gray-800 truncate">{d.titolo}</p>
                     <p className="text-xs text-gray-400 truncate">{d.nome_file}</p>
+                    {d.fornitore_nome && <p className="text-xs text-gray-500 truncate">{d.fornitore_nome}</p>}
+                    {(d.numero_fattura || d.data_fattura || d.importo_fattura) && (
+                      <p className="text-xs text-gray-500 truncate">
+                        Fattura{d.numero_fattura ? ` n. ${d.numero_fattura}` : ''}{d.data_fattura ? ` del ${format(parseISO(d.data_fattura), 'd MMM yyyy', { locale: it })}` : ''}{d.importo_fattura ? ` · ${formatEuro(d.importo_fattura)}` : ''}
+                      </p>
+                    )}
+                    {d.rate.length > 0 && (
+                      <p className="text-xs text-rose-500 truncate" title={d.rate.map(r => `${r.descrizione || 'Rata'} – ${r.preventivo_nome}`).join('\n')}>
+                        Per: {d.rate.map(r => `${r.descrizione || 'Rata'} (${formatEuro(r.importo)})`).join(', ')}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-gray-300 mt-0.5">
                       {d.dimensione && <span>{formatSize(d.dimensione)}</span>}
                       <span>{format(parseISO(toUtc(d.created_at)), 'd MMM yyyy', { locale: it })}</span>
@@ -160,6 +211,7 @@ export default function Documenti() {
                   </div>
                   <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                     <button className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500" onClick={() => download(d)} title="Scarica"><Download size={14} /></button>
+                    <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700" onClick={() => openEdit(d)} title="Modifica"><Pencil size={14} /></button>
                     <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(d.id)} title="Elimina"><Trash2 size={14} /></button>
                   </div>
                 </div>
@@ -232,25 +284,27 @@ export default function Documenti() {
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Carica Documento</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">{editId ? 'Modifica Documento' : 'Carica Documento'}</h2>
             <form onSubmit={save} className="space-y-3">
-              <div
-                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-rose-300 transition-colors"
-                onClick={() => fileRef.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); }}
-              >
-                <Upload size={24} className="mx-auto text-gray-300 mb-2" />
-                {file ? (
-                  <p className="text-sm font-medium text-gray-700">{file.name} ({formatSize(file.size)})</p>
-                ) : (
-                  <p className="text-sm text-gray-400">Clicca o trascina un file qui<br /><span className="text-xs">PDF, Word, Excel, Immagini (max 10 MB)</span></p>
-                )}
-                <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files[0])} />
-              </div>
+              {!editId && (
+                <div
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-rose-300 transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); }}
+                >
+                  <Upload size={24} className="mx-auto text-gray-300 mb-2" />
+                  {file ? (
+                    <p className="text-sm font-medium text-gray-700">{file.name} ({formatSize(file.size)})</p>
+                  ) : (
+                    <p className="text-sm text-gray-400">Clicca o trascina un file qui<br /><span className="text-xs">PDF, Word, Excel, Immagini (max 10 MB)</span></p>
+                  )}
+                  <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files[0])} />
+                </div>
+              )}
               <div>
-                <label className="form-label">Titolo</label>
-                <input className="form-input" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} placeholder="es. Contratto fotografo" />
+                <label className="form-label">Titolo{editId && ' *'}</label>
+                <input className="form-input" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} placeholder="es. Contratto fotografo" required={!!editId} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -267,13 +321,48 @@ export default function Documenti() {
                   </select>
                 </div>
               </div>
+              {form.categoria === 'Fattura' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="form-label">Numero fattura</label>
+                      <input className="form-input" value={form.numero_fattura} onChange={e => setForm({ ...form, numero_fattura: e.target.value })} placeholder="es. 12/2026" />
+                    </div>
+                    <div>
+                      <label className="form-label">Data fattura</label>
+                      <input type="date" className="form-input" value={form.data_fattura} onChange={e => setForm({ ...form, data_fattura: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="form-label">Importo (€)</label>
+                      <input type="number" step="0.01" min="0" className="form-input" value={form.importo_fattura} onChange={e => setForm({ ...form, importo_fattura: e.target.value })} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">A cosa corrisponde (opzionale)</label>
+                    {rateCollegabili.length === 0 ? (
+                      <p className="text-xs text-gray-400">Nessuna rata di preventivi accettati{form.fornitore_id ? ' per questo fornitore' : ''}. Puoi descrivere la fattura nelle note.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto rounded-lg border border-gray-100 p-2">
+                        {rateCollegabili.map(r => (
+                          <label key={r.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" checked={form.rate_ids.includes(r.id)} onChange={() => toggleRata(r.id)} />
+                            <span className="truncate">{r.chi} – {r.descrizione || 'Rata'} ({formatEuro(r.importo)})</span>
+                            <span className={`ml-auto text-xs flex-shrink-0 ${r.pagata ? 'text-green-600' : 'text-gray-400'}`}>{r.pagata ? 'pagata' : 'da pagare'}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">Una fattura può coprire più rate, oppure nessuna (es. un extra).</p>
+                  </div>
+                </>
+              )}
               <div>
                 <label className="form-label">Note</label>
                 <textarea className="form-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
               </div>
               {errore && <p className="text-sm text-red-500">{errore}</p>}
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="btn-primary" disabled={uploading}>{uploading ? 'Caricamento...' : 'Carica'}</button>
+                <button type="submit" className="btn-primary" disabled={uploading}>{uploading ? 'Salvataggio...' : editId ? 'Salva' : 'Carica'}</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>
               </div>
             </form>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Paperclip, Eye, X, Download, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, Paperclip, Eye, X, Download, MapPin, FileText } from 'lucide-react';
 import api from '../api';
 import PdfViewer from '../components/PdfViewer';
 import { format, parseISO } from 'date-fns';
@@ -13,6 +13,9 @@ const PREVIEWABLE = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 const empty = { fornitore_id: '', fornitore_nome: '', location_id: '', categoria: 'Fotografo', descrizione: '', importo: '', stato: 'in_attesa', data_scadenza: '', note: '', rate: [] };
 const rataVuota = () => ({ id: null, descrizione: '', importo: '', data_scadenza: '', pagata: false, data_pagamento: '' });
+
+const oggi = () => new Date().toISOString().split('T')[0];
+const fatturaVuota = { file: null, numero: '', data: '', importo: '' };
 
 const formatEuro = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n || 0);
 
@@ -29,6 +32,10 @@ export default function Preventivi() {
   const [preview, setPreview] = useState(null); // { item, url, ext }
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [errore, setErrore] = useState('');
+  const [fatturaRata, setFatturaRata] = useState(null); // rata a cui si sta allegando la fattura
+  const [fatturaForm, setFatturaForm] = useState(fatturaVuota);
+  const [fatturaErrore, setFatturaErrore] = useState('');
+  const [fatturaUpload, setFatturaUpload] = useState(false);
 
   const load = () => {
     api.get('/preventivi').then(r => setItems(r.data));
@@ -75,8 +82,12 @@ export default function Preventivi() {
     load();
   };
 
+  // L'allegato del preventivo e le fatture delle rate (che sono documenti)
+  // passano dallo stesso visualizzatore: cambia solo l'URL di download.
+  const urlAllegato = p => p.rata_id ? `/documenti/download/${p.id}` : `/preventivi/download/${p.id}`;
+
   const scaricaAllegato = async p => {
-    const response = await api.get(`/preventivi/download/${p.id}`, { responseType: 'blob' });
+    const response = await api.get(urlAllegato(p), { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
     const a = document.createElement('a');
     a.href = url; a.download = p.nome_file; a.click();
@@ -88,7 +99,7 @@ export default function Preventivi() {
     if (!PREVIEWABLE.includes(ext)) { setPreview({ item: p, url: null, ext }); return; }
     setLoadingPreview(true);
     try {
-      const response = await api.get(`/preventivi/download/${p.id}`, { responseType: 'blob' });
+      const response = await api.get(urlAllegato(p), { responseType: 'blob' });
       const mime = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
       const blob = new Blob([response.data], { type: mime });
       setPreview({ item: p, url: URL.createObjectURL(blob), ext });
@@ -106,6 +117,44 @@ export default function Preventivi() {
   const accettati = items.filter(i => i.stato === 'accettato');
   const totaleAccettati = accettati.reduce((s, i) => s + i.importo, 0);
   const totalePagato = accettati.reduce((s, i) => s + i.totale_pagato, 0);
+
+  const apriFattura = r => { setFatturaRata(r); setFatturaForm({ ...fatturaVuota, data: oggi(), importo: r.importo }); setFatturaErrore(''); };
+
+  // La fattura si carica subito come documento (categoria Fattura) del fornitore,
+  // collegato a questa rata, senza aspettare il salvataggio del preventivo: per questo serve una rata
+  // già salvata. Le modifiche in corso nel form del preventivo restano intatte.
+  const salvaFattura = async e => {
+    e.preventDefault();
+    if (!fatturaForm.file) { setFatturaErrore('Seleziona il file della fattura'); return; }
+    const r = fatturaRata;
+    const chi = nome(form) !== '—' ? nome(form) : '';
+    const titolo = ['Fattura', fatturaForm.numero && `n. ${fatturaForm.numero}`, r.descrizione && `– ${r.descrizione}`, chi && `– ${chi}`].filter(Boolean).join(' ');
+    const fd = new FormData();
+    fd.append('file', fatturaForm.file);
+    fd.append('titolo', titolo);
+    fd.append('categoria', 'Fattura');
+    fd.append('rate_ids', JSON.stringify([r.id]));
+    fd.append('numero_fattura', fatturaForm.numero);
+    fd.append('data_fattura', fatturaForm.data);
+    fd.append('importo_fattura', fatturaForm.importo);
+    if (form.fornitore_id) fd.append('fornitore_id', form.fornitore_id);
+    setFatturaUpload(true);
+    setFatturaErrore('');
+    try {
+      const { data } = await api.post('/documenti', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setForm(f => ({ ...f, rate: f.rate.map(x => x.id === r.id ? { ...x, fatture: [...(x.fatture || []), { ...data, rata_id: r.id }] } : x) }));
+      setFatturaRata(null);
+      load();
+    } catch (err) {
+      setFatturaErrore(err.response?.data?.error || 'Caricamento fallito. Riprova.');
+    } finally {
+      setFatturaUpload(false);
+    }
+  };
+
+  // Una fattura non corrisponde per forza a una rata: qui si mostra solo quanto
+  // risulta fatturato; a quali rate corrisponde si decide in Documenti.
+  const fatturato = p => p.n_fatture > 0 && <span> · Fatturato {formatEuro(p.totale_fatturato)}</span>;
 
   const setRata = (i, campi) => setForm(f => ({ ...f, rate: f.rate.map((r, j) => j === i ? { ...r, ...campi } : r) }));
   const sommaRate = form.rate.reduce((s, r) => s + (parseFloat(r.importo) || 0), 0);
@@ -150,7 +199,7 @@ export default function Preventivi() {
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="font-bold text-gray-900 text-sm">{formatEuro(p.importo)}</div>
-                {p.rate.length > 0 && <div className="text-xs text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}</div>}
+                {p.rate.length > 0 && <div className="text-xs text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}{fatturato(p)}</div>}
               </div>
             </div>
             {p.descrizione && <div className="text-xs text-gray-500 mb-2 truncate">{p.descrizione}</div>}
@@ -192,7 +241,7 @@ export default function Preventivi() {
                   <td className="text-gray-600 max-w-xs truncate">{p.descrizione || '—'}</td>
                   <td className="font-bold text-gray-900">
                     {formatEuro(p.importo)}
-                    {p.rate.length > 0 && <div className="text-xs font-normal text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}</div>}
+                    {p.rate.length > 0 && <div className="text-xs font-normal text-gray-400">Pagato {formatEuro(p.totale_pagato)} · Resta {formatEuro(p.residuo)}{fatturato(p)}</div>}
                   </td>
                   <td><span className={`badge ${statoColor[p.stato]}`}>{statoLabel[p.stato]}</span></td>
                   <td className="text-gray-500 text-sm">{p.data_scadenza ? format(parseISO(p.data_scadenza), 'd MMM yyyy', { locale: it }) : '—'}</td>
@@ -219,7 +268,7 @@ export default function Preventivi() {
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{preview?.item ? nome(preview.item) : 'Allegato'}</p>
+                <p className="font-semibold text-gray-800 truncate">{preview?.item ? (preview.item.titolo || nome(preview.item)) : 'Allegato'}</p>
                 <p className="text-xs text-gray-400 truncate">{preview?.item?.nome_file}</p>
               </div>
               <div className="flex gap-1 flex-shrink-0">
@@ -356,6 +405,23 @@ export default function Preventivi() {
                             <Trash2 size={14} />
                           </button>
                         </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
+                          {(r.fatture || []).map(d => (
+                            <span key={d.id} className="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
+                              <FileText size={12} className="text-rose-400" />
+                              <button type="button" className="hover:text-blue-600 hover:underline" onClick={() => openPreview(d)} title={d.nome_file}>
+                                Fattura{d.numero_fattura ? ` n. ${d.numero_fattura}` : ''}{d.data_fattura ? ` del ${format(parseISO(d.data_fattura), 'd/M/yyyy')}` : ''}
+                              </button>
+                            </span>
+                          ))}
+                          {r.id ? (
+                            <button type="button" className="text-rose-500 hover:underline flex items-center gap-1" onClick={() => apriFattura(r)}>
+                              <Paperclip size={12} /> Allega fattura
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">Salva il preventivo per poter allegare la fattura di questa rata.</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                     <p className="text-xs text-gray-500">
@@ -391,6 +457,41 @@ export default function Preventivi() {
               <div className="flex gap-2 pt-3 -mx-4 sm:-mx-6 px-4 sm:px-6 sticky bottom-0 bg-white border-t border-gray-100">
                 <button type="submit" className="btn-primary">Salva</button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Annulla</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {fatturaRata && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setFatturaRata(null)}>
+          <div className="modal">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Allega fattura</h2>
+            <p className="text-sm text-gray-500 mb-4">{fatturaRata.descrizione || 'Rata'} · {formatEuro(parseFloat(fatturaRata.importo))}{nome(form) !== '—' && ` · ${nome(form)}`}</p>
+            <form onSubmit={salvaFattura} className="space-y-3">
+              <div>
+                <label className="form-label">File della fattura *</label>
+                <input type="file" accept="application/pdf,image/*,.xml,.p7m" className="form-input" onChange={e => setFatturaForm({ ...fatturaForm, file: e.target.files[0] })} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="form-label">Numero fattura</label>
+                  <input className="form-input" value={fatturaForm.numero} onChange={e => setFatturaForm({ ...fatturaForm, numero: e.target.value })} placeholder="es. 12/2026" />
+                </div>
+                <div>
+                  <label className="form-label">Data fattura</label>
+                  <input type="date" className="form-input" value={fatturaForm.data} onChange={e => setFatturaForm({ ...fatturaForm, data: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label">Importo (€)</label>
+                  <input type="number" step="0.01" min="0" className="form-input" value={fatturaForm.importo} onChange={e => setFatturaForm({ ...fatturaForm, importo: e.target.value })} />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">La fattura viene salvata subito e la trovi in Documenti, nella categoria Fattura: da lì puoi cambiare a quali rate corrisponde.</p>
+              {fatturaErrore && <p className="text-sm text-red-500">{fatturaErrore}</p>}
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="btn-primary" disabled={fatturaUpload}>{fatturaUpload ? 'Caricamento...' : 'Allega'}</button>
+                <button type="button" className="btn-secondary" onClick={() => setFatturaRata(null)}>Annulla</button>
               </div>
             </form>
           </div>
