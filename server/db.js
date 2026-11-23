@@ -478,6 +478,17 @@ const viaggioCols = db.prepare('PRAGMA table_info(viaggio)').all().map(c => c.na
 for (const col of ['ora_inizio', 'ora_fine', 'compagnia', 'numero_volo', 'luogo_partenza', 'luogo_arrivo', 'link', 'contatto']) {
   if (!viaggioCols.includes(col)) db.prepare(`ALTER TABLE viaggio ADD COLUMN ${col} TEXT`).run();
 }
+// Soldi del viaggio: quanto è già pagato, entro quando va saldato il resto e
+// entro quando prenotare (prima la scadenza "da prenotare" usava la data del
+// viaggio, cioè avvisava il giorno della partenza).
+if (!viaggioCols.includes('pagato')) {
+  db.prepare('ALTER TABLE viaggio ADD COLUMN pagato REAL').run();
+  // Chi l'aveva segnata come pagata l'ha pagata tutta.
+  db.prepare("UPDATE viaggio SET pagato = costo WHERE stato IN ('pagato', 'completato') AND costo > 0").run();
+}
+for (const col of ['data_saldo', 'prenotare_entro']) {
+  if (!viaggioCols.includes(col)) db.prepare(`ALTER TABLE viaggio ADD COLUMN ${col} TEXT`).run();
+}
 
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);

@@ -79,7 +79,7 @@ export default function Dashboard() {
   } = data;
 
   const milestone = giorniAlMatrimonio > 0 ? getMilestone(giorniAlMatrimonio) : null;
-  const budgetImpegnato = (budget.preventiviAccettati || 0) + (budget.effettivo || 0);
+  const budgetImpegnato = (budget.preventiviAccettati || 0) + (budget.effettivo || 0) + (budget.viaggioPrenotato || 0);
   const budgetUsato = budget.totale > 0 ? Math.round((budgetImpegnato / budget.totale) * 100) : 0;
   const budgetRimanente = Math.max(0, budget.totale - budgetImpegnato);
 

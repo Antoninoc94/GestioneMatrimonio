@@ -61,15 +61,37 @@ function controlli(items, partenza, ritorno) {
   return out;
 }
 
+// Saldi e prenotazioni scaduti o in arrivo nei prossimi 14 giorni.
+function scadenze(items) {
+  const out = [];
+  const oggiS = oggi();
+  const entro = piuGiorni(oggiS, 14);
+  const quando = d => {
+    const g = giorniTra(oggiS, d);
+    return g < 0 ? `scaduto il ${fmt(d)}` : g === 0 ? 'entro oggi' : g === 1 ? 'entro domani' : `entro il ${fmt(d)}`;
+  };
+  for (const i of items) {
+    const residuo = (i.costo || 0) - (i.pagato || 0);
+    if (i.data_saldo && residuo > 0 && i.stato !== 'da_prenotare' && i.data_saldo <= entro) {
+      out.push({ key: `s${i.id}`, item: i, d: i.data_saldo, scaduta: i.data_saldo < oggiS, testo: `Saldo di ${formatEuro(residuo)} per ${i.titolo}: ${quando(i.data_saldo)}` });
+    }
+    if (i.prenotare_entro && i.stato === 'da_prenotare' && i.prenotare_entro <= entro) {
+      out.push({ key: `p${i.id}`, item: i, d: i.prenotare_entro, scaduta: i.prenotare_entro < oggiS, testo: `Da prenotare ${i.titolo}: ${quando(i.prenotare_entro).replace('scaduto', 'scadeva')}` });
+    }
+  }
+  return out.sort((a, b) => a.d.localeCompare(b.d));
+}
+
 const empty = {
   tipo: 'volo', titolo: '', luogo: '', data_inizio: '', ora_inizio: '', data_fine: '', ora_fine: '',
   compagnia: '', numero_volo: '', luogo_partenza: '', luogo_arrivo: '',
-  costo: '', numero_prenotazione: '', link: '', contatto: '', stato: 'da_prenotare', note: '',
+  costo: '', pagato: '', data_saldo: '', prenotare_entro: '', numero_prenotazione: '', link: '', contatto: '', stato: 'da_prenotare', note: '',
 };
 
 export default function Viaggio() {
   const [items, setItems] = useState([]);
   const [viaggio, setViaggio] = useState({ destinazione: '', partenza: '', ritorno: '', budget: '' });
+  const [regaliDenaro, setRegaliDenaro] = useState(0);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -86,6 +108,9 @@ export default function Viaggio() {
       destinazione: r.data.viaggio_destinazione || '', partenza: r.data.viaggio_partenza || '',
       ritorno: r.data.viaggio_ritorno || '', budget: r.data.viaggio_budget || '',
     }));
+    // Buste e bonifici ricevuti: quanto del viaggio coprono.
+    api.get('/regali').then(r => setRegaliDenaro(r.data
+      .filter(g => ['busta', 'bonifico'].includes(g.tipo)).reduce((t, g) => t + (g.valore_stimato || 0), 0)));
   }, []);
   const cambiaVista = v => { setVista(v); try { localStorage.setItem('viaggio_vista', v); } catch { /* solo comodità */ } };
 
@@ -128,6 +153,9 @@ export default function Viaggio() {
 
   const { partenza, ritorno } = viaggio;
   const totaleCosto = items.reduce((s, i) => s + (i.costo || 0), 0);
+  const totalePagato = items.reduce((s, i) => s + (i.pagato || 0), 0);
+  const daPagare = items.filter(i => i.stato !== 'da_prenotare').reduce((s, i) => s + Math.max(0, (i.costo || 0) - (i.pagato || 0)), 0);
+  const scadenzeSoldi = scadenze(items);
   const budget = parseFloat(viaggio.budget) || 0;
   const notti = partenza && ritorno ? giorniTra(partenza, ritorno) : null;
   const { scoperte, sovrapposti } = controlli(items, partenza, ritorno);
@@ -172,23 +200,45 @@ export default function Viaggio() {
         </div>
         {(budget > 0 || totaleCosto > 0) && (
           <div className="mt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Prenotato <strong className="text-gray-900">{formatEuro(totaleCosto) || '0 €'}</strong></span>
-              {budget > 0 && <span className="text-gray-400">su {formatEuro(budget)} previsti</span>}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[['Costo totale', totaleCosto, 'text-gray-900'], ['Pagato', totalePagato, 'text-green-700'], ['Da pagare', daPagare, daPagare > 0 ? 'text-amber-700' : 'text-gray-400']].map(([l, v, c]) => (
+                <div key={l} className="rounded-lg bg-white/80 border border-rose-100 px-2.5 py-2">
+                  <div className="text-xs text-gray-400">{l}</div>
+                  <div className={`font-bold ${c}`}>{formatEuro(v) || '0 €'}</div>
+                </div>
+              ))}
             </div>
+            {budget > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Budget</span>
+                <span className="text-gray-400">{formatEuro(totaleCosto) || '0 €'} su {formatEuro(budget)} previsti</span>
+              </div>
+            )}
             {budget > 0 && (
               <div className="h-2 rounded-full bg-white border border-rose-100 mt-1.5 overflow-hidden">
                 <div className={`h-full rounded-full ${totaleCosto > budget ? 'bg-red-500' : 'bg-rose-400'}`} style={{ width: `${Math.min(100, (totaleCosto / budget) * 100)}%` }} />
               </div>
             )}
             {budget > 0 && totaleCosto > budget && <p className="text-xs text-red-600 mt-1">Oltre il budget di {formatEuro(totaleCosto - budget)}</p>}
+            {regaliDenaro > 0 && totaleCosto > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                🎁 I regali in denaro ({formatEuro(regaliDenaro)}) {regaliDenaro >= totaleCosto ? 'coprono tutto il viaggio' : `coprono il ${Math.round((regaliDenaro / totaleCosto) * 100)}% del viaggio`}
+              </p>
+            )}
           </div>
         )}
       </div>
 
       {/* Avvisi */}
-      {(scoperte.length > 0 || sovrapposti.length > 0) && (
+      {(scoperte.length > 0 || sovrapposti.length > 0 || scadenzeSoldi.length > 0) && (
         <div className="card mb-4 border-amber-200 bg-amber-50/60 space-y-2">
+          {scadenzeSoldi.map(s => (
+            <div key={s.key} className={`flex items-center gap-2 text-sm flex-wrap ${s.scaduta ? 'text-red-700' : 'text-amber-800'}`}>
+              <AlertTriangle size={15} className="shrink-0" />
+              <span className="flex-1 min-w-0">{s.testo}</span>
+              <button className="text-xs px-2.5 py-1 rounded-lg bg-white border border-amber-200 hover:border-amber-400" onClick={() => openEdit(s.item)}>Apri</button>
+            </div>
+          ))}
           {scoperte.map(n => (
             <div key={n.da} className="flex items-center gap-2 text-sm text-amber-800 flex-wrap">
               <AlertTriangle size={15} className="shrink-0" />
@@ -403,6 +453,14 @@ function Scheda({ item: i, onEdit, onDel, conOra, conData }) {
         )}
         <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-xs">
           {i.costo > 0 && <span className="font-semibold text-gray-700 text-sm">{formatEuro(i.costo)}</span>}
+          {i.costo > 0 && i.stato !== 'da_prenotare' && (
+            i.pagato >= i.costo
+              ? <span className="text-green-700">✓ pagato</span>
+              : <span className="text-amber-700">
+                  {i.pagato > 0 ? `pagati ${formatEuro(i.pagato)} · ` : ''}saldo {formatEuro(i.costo - (i.pagato || 0))}{i.data_saldo && ` entro il ${fmt(i.data_saldo)}`}
+                </span>
+          )}
+          {i.stato === 'da_prenotare' && i.prenotare_entro && <span className="text-amber-700">prenotare entro il {fmt(i.prenotare_entro)}</span>}
           {i.numero_prenotazione && <span className="font-mono bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 text-gray-600">#{i.numero_prenotazione}</span>}
           {i.link && (
             <a href={i.link} target="_blank" rel="noreferrer" className="text-rose-600 hover:underline flex items-center gap-1">
@@ -488,14 +546,14 @@ function FormPrenotazione({ form, setForm, editId, errore, onSave, onClose }) {
               <label className="form-label">{lInizio}</label>
               <div className="flex gap-1.5">
                 <input type="date" className="form-input min-w-0" value={form.data_inizio} onChange={set('data_inizio')} />
-                <input type="time" className="form-input w-[6.5rem] shrink-0" value={form.ora_inizio} onChange={set('ora_inizio')} />
+                <input type="time" className="form-input w-[7.25rem] shrink-0" value={form.ora_inizio} onChange={set('ora_inizio')} />
               </div>
             </div>
             <div>
               <label className="form-label">{lFine}</label>
               <div className="flex gap-1.5">
                 <input type="date" className="form-input min-w-0" value={form.data_fine} min={form.data_inizio || undefined} onChange={set('data_fine')} />
-                <input type="time" className="form-input w-[6.5rem] shrink-0" value={form.ora_fine} onChange={set('ora_fine')} />
+                <input type="time" className="form-input w-[7.25rem] shrink-0" value={form.ora_fine} onChange={set('ora_fine')} />
               </div>
             </div>
           </div>
@@ -510,6 +568,30 @@ function FormPrenotazione({ form, setForm, editId, errore, onSave, onClose }) {
               <input className="form-input font-mono" value={form.numero_prenotazione} onChange={set('numero_prenotazione')} />
             </div>
           </div>
+          {form.stato === 'da_prenotare' ? (
+            <div>
+              <label className="form-label">Prenotare entro</label>
+              <input type="date" className="form-input" value={form.prenotare_entro} onChange={set('prenotare_entro')} />
+              <p className="text-xs text-gray-400 mt-1">Ti arriva in Scadenze, con il promemoria.</p>
+            </div>
+          ) : parseFloat(form.costo) > 0 && (
+            <div className="rounded-lg bg-gray-50 border border-gray-100 p-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Già pagato (€)</label>
+                <div className="flex gap-1.5">
+                  <input type="number" step="0.01" min="0" className="form-input min-w-0" value={form.pagato} onChange={set('pagato')} placeholder="Acconto" />
+                  <button type="button" className="text-xs px-2 rounded-lg border border-gray-200 bg-white hover:border-rose-300 shrink-0"
+                    onClick={() => setForm(f => ({ ...f, pagato: f.costo }))}>Tutto</button>
+                </div>
+              </div>
+              {(parseFloat(form.pagato) || 0) < parseFloat(form.costo) && (
+                <div>
+                  <label className="form-label">Saldo entro</label>
+                  <input type="date" className="form-input" value={form.data_saldo} onChange={set('data_saldo')} />
+                </div>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="form-label">Link prenotazione</label>

@@ -21,19 +21,35 @@ function getAllScadenze(db) {
     ORDER BY data_scadenza ASC
   `).all();
 
+  // Viaggio: entro quando prenotare (non la data del viaggio, che avvisava il
+  // giorno della partenza) e il saldo di quanto resta da pagare.
   const daViaggio = db.prepare(`
     SELECT
       'viag_' || id          AS id,
       'Da prenotare: ' || titolo AS titolo,
       'viaggio'              AS categoria,
-      data_inizio            AS data_scadenza,
+      prenotare_entro        AS data_scadenza,
       'media'                AS priorita,
       0                      AS completata,
       'viaggio'              AS source,
-      id                     AS source_id
+      id                     AS source_id,
+      NULL                   AS importo
     FROM viaggio
-    WHERE data_inizio IS NOT NULL AND stato = 'da_prenotare'
-    ORDER BY data_inizio ASC
+    WHERE prenotare_entro IS NOT NULL AND stato = 'da_prenotare'
+    UNION ALL
+    SELECT
+      'viag_saldo_' || id    AS id,
+      'Saldo viaggio: ' || titolo AS titolo,
+      'viaggio'              AS categoria,
+      data_saldo             AS data_scadenza,
+      'alta'                 AS priorita,
+      0                      AS completata,
+      'viaggio'              AS source,
+      id                     AS source_id,
+      costo - COALESCE(pagato, 0) AS importo
+    FROM viaggio
+    WHERE data_saldo IS NOT NULL AND costo > COALESCE(pagato, 0) AND stato != 'da_prenotare'
+    ORDER BY data_scadenza ASC
   `).all();
 
   const daCosti = db.prepare(`

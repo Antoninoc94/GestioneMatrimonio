@@ -153,7 +153,7 @@ export default function Scadenze() {
           {s.source === 'preventivo' && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">{formatEuro(s.importo)} · Stato: {statoPreventivo[s.stato] ?? s.stato}</p>
           )}
-          {(s.source === 'costo' || s.source === 'rata') && s.importo && (
+          {(s.source === 'costo' || s.source === 'rata' || s.source === 'viaggio') && s.importo && (
             <p className="text-xs text-gray-400 mt-0.5">Da pagare: {formatEuro(s.importo)}</p>
           )}
 

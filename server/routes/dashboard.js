@@ -20,6 +20,11 @@ router.get('/', auth, (req, res) => {
     WHERE r.pagata = 1 AND p.stato = 'accettato'
   `).get();
 
+  // Viaggio di nozze, come la sua riga in Budget: impegnato quanto è prenotato, pagato quanto versato.
+  const viaggioSoldi = db.prepare(`
+    SELECT SUM(CASE WHEN stato != 'da_prenotare' THEN costo ELSE 0 END) as prenotato, SUM(pagato) as pagato FROM viaggio
+  `).get();
+
   // Scadenze unificate
   const tutteScadenze = getAllScadenze(db);
   const scadenzeImminenti = tutteScadenze.filter(s => !s.completata && s.data_scadenza >= oggi).slice(0, 6);
@@ -97,8 +102,9 @@ router.get('/', auth, (req, res) => {
       totale: config?.budget_totale || 0,
       preventivato: totaleCosti.prev || 0,
       effettivo: totaleCosti.tot || 0,
-      pagato: (costiPagati.tot || 0) + (ratePagate.tot || 0),
+      pagato: (costiPagati.tot || 0) + (ratePagate.tot || 0) + (viaggioSoldi.pagato || 0),
       preventiviAccettati: preventiviAccettati.tot || 0,
+      viaggioPrenotato: viaggioSoldi.prenotato || 0,
     },
     ospiti: ospitiStats,
     fornitori: { totale: fornitoriTotale, confermati: fornitoriConfermati, perStato: fornitoriPerStato },

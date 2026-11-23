@@ -33,6 +33,16 @@ function campi(b) {
     note: testo(b.note),
   };
   if (v.link && !/^https?:\/\//i.test(v.link)) v.link = `https://${v.link}`;
+  // Pagamenti: "pagato" senza importo vuol dire tutto; pagato tutto porta lo
+  // stato a pagato (se era solo prenotato). Saldo e "prenotare entro" servono
+  // solo finché c'è qualcosa da saldare o da prenotare.
+  const pagato = parseFloat(b.pagato);
+  v.pagato = Number.isFinite(pagato) && pagato > 0 ? pagato : null;
+  if (v.stato === 'pagato' && v.costo && !v.pagato) v.pagato = v.costo;
+  if (v.stato === 'prenotato' && v.costo && v.pagato >= v.costo) v.stato = 'pagato';
+  if (v.costo && v.pagato > v.costo) return { error: 'Il pagato supera il costo' };
+  v.data_saldo = v.costo && (v.pagato || 0) < v.costo ? data(b.data_saldo) : null;
+  v.prenotare_entro = v.stato === 'da_prenotare' ? data(b.prenotare_entro) : null;
   // Un volo si descrive da sé: senza titolo diventa "Roma → Tokyo".
   if (!v.titolo && tipo === 'volo') {
     v.titolo = [v.luogo_partenza, v.luogo_arrivo].filter(Boolean).join(' → ') || v.numero_volo || null;
@@ -45,7 +55,7 @@ function campi(b) {
 }
 
 const COLONNE = ['tipo', 'titolo', 'luogo', 'data_inizio', 'ora_inizio', 'data_fine', 'ora_fine', 'compagnia', 'numero_volo',
-  'luogo_partenza', 'luogo_arrivo', 'costo', 'numero_prenotazione', 'link', 'contatto', 'stato', 'note'];
+  'luogo_partenza', 'luogo_arrivo', 'costo', 'pagato', 'data_saldo', 'prenotare_entro', 'numero_prenotazione', 'link', 'contatto', 'stato', 'note'];
 
 router.get('/', auth, (req, res) => {
   res.json(db.prepare(`SELECT * FROM viaggio ORDER BY data_inizio IS NULL, data_inizio ASC, ora_inizio IS NULL, ora_inizio ASC, created_at ASC`).all());

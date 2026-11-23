@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CheckCircle, Circle, Download, Search, ChevronUp, ChevronDown, ChevronsUpDown, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle, Circle, Download, Search, ChevronUp, ChevronDown, ChevronsUpDown, FileText, Plane } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
@@ -44,6 +44,8 @@ export default function Budget() {
   const [payModal, setPayModal] = useState(null);
   const [payImporto, setPayImporto] = useState('');
   const [payData, setPayData] = useState('');
+  const [viaggio, setViaggio] = useState([]);
+  const [budgetViaggio, setBudgetViaggio] = useState(0);
 
   // new state
   const [search, setSearch] = useState('');
@@ -54,7 +56,8 @@ export default function Budget() {
     api.get('/costi').then(r => setItems(r.data));
     api.get('/fornitori').then(r => setFornitori(r.data));
     api.get('/preventivi').then(r => setPreventivi(r.data));
-    api.get('/config').then(r => setBudgetTotale(r.data.budget_totale || 0));
+    api.get('/config').then(r => { setBudgetTotale(r.data.budget_totale || 0); setBudgetViaggio(r.data.viaggio_budget || 0); });
+    api.get('/viaggio').then(r => setViaggio(r.data));
   };
   useEffect(() => { load(); }, []);
 
@@ -113,7 +116,28 @@ export default function Budget() {
     fornitore_id: p.fornitore_id,
     note: p.note,
   }));
-  const voci = [...items.map(c => ({ ...c, importo_pagato: c.pagato ? c.importo_effettivo : 0 })), ...vociPreventivi];
+  // Il viaggio di nozze è una riga sola, calcolata dalle sue prenotazioni:
+  // preventivato è il budget del viaggio (o, senza budget, la somma dei costi),
+  // effettivo quanto è già prenotato, pagato la somma dei pagamenti.
+  const costiViaggio = viaggio.reduce((s, v) => s + (v.costo || 0), 0);
+  const prenotatoViaggio = viaggio.filter(v => v.stato !== 'da_prenotare').reduce((s, v) => s + (v.costo || 0), 0);
+  const pagatoViaggio = viaggio.reduce((s, v) => s + (v.pagato || 0), 0);
+  const vociViaggio = costiViaggio > 0 || budgetViaggio > 0 ? [{
+    id: 'viaggio',
+    auto: 'viaggio',
+    categoria: 'Viaggio di nozze',
+    descrizione: 'Viaggio di nozze',
+    importo_preventivo: budgetViaggio || costiViaggio,
+    importo_effettivo: prenotatoViaggio,
+    importo_pagato: pagatoViaggio,
+    pagato: prenotatoViaggio > 0 && pagatoViaggio >= prenotatoViaggio,
+    data_pagamento: null,
+    note: viaggio.length ? `${viaggio.length} prenotazioni` : null,
+  }] : [];
+  const voci = [...items.map(c => ({ ...c, importo_pagato: c.pagato ? c.importo_effettivo : 0 })), ...vociPreventivi, ...vociViaggio];
+  const badgeAuto = c => c.auto === 'viaggio'
+    ? <span className="badge bg-purple-50 text-purple-600 text-xs ml-1">Viaggio</span>
+    : <span className="badge bg-blue-50 text-blue-600 text-xs ml-1">Preventivo</span>;
 
   const StatoPagamento = ({ c, size }) => {
     if (!c.auto) return (
@@ -122,12 +146,15 @@ export default function Budget() {
       </button>
     );
     if (c.pagato) return <CheckCircle size={size} className="text-green-500" />;
-    // Le rate si segnano dal preventivo: qui solo l'avanzamento
-    const pct = c.importo_preventivo > 0 ? Math.round((c.importo_pagato / c.importo_preventivo) * 100) : 0;
+    // Le rate si segnano dal preventivo (i pagamenti del viaggio dalla sua pagina): qui solo l'avanzamento
+    // Sull'effettivo: per un preventivo coincide col preventivato, per il viaggio è il prenotato (non il budget).
+    const pct = c.importo_effettivo > 0 ? Math.round((c.importo_pagato / c.importo_effettivo) * 100) : 0;
     return <span className="text-xs font-semibold text-amber-600" title={`${formatEuro(c.importo_pagato)} pagati`}>{pct}%</span>;
   };
 
-  const Azioni = ({ c }) => c.auto ? (
+  const Azioni = ({ c }) => c.auto === 'viaggio' ? (
+    <Link to="/viaggio" className="p-1.5 rounded hover:bg-purple-50 text-gray-500 hover:text-purple-600" title="Si gestisce dalla pagina Viaggio di nozze"><Plane size={14} /></Link>
+  ) : c.auto ? (
     <Link to="/preventivi" className="p-1.5 rounded hover:bg-blue-50 text-gray-500 hover:text-blue-600" title="Si gestisce dalla pagina Preventivi"><FileText size={14} /></Link>
   ) : (
     <>
@@ -270,7 +297,7 @@ export default function Budget() {
         head: [['Categoria', 'Descrizione / Fornitore / Note', 'Preventivato', 'Effettivo', 'Pagato']],
         body: voci.map(c => {
           const forn = c.fornitore_id ? (fornitori.find(f => f.id === c.fornitore_id)?.nome || '') : '';
-          const lines = [c.auto ? `${c.descrizione} (preventivo accettato)` : c.descrizione];
+          const lines = [c.auto === 'viaggio' ? `${c.descrizione} (dalle prenotazioni)` : c.auto ? `${c.descrizione} (preventivo accettato)` : c.descrizione];
           if (forn) lines.push(`Fornitore: ${forn}`);
           if (c.note) lines.push(`Note: ${c.note}`);
           return [
@@ -402,7 +429,7 @@ export default function Budget() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-gray-900 truncate">{c.descrizione}</div>
                 <span className="badge bg-gray-100 text-gray-600 text-xs mt-0.5">{c.categoria}</span>
-                {c.auto && <span className="badge bg-blue-50 text-blue-600 text-xs mt-0.5 ml-1">Preventivo</span>}
+                {c.auto && badgeAuto(c)}
               </div>
               <div className="flex-shrink-0 mt-0.5"><StatoPagamento c={c} size={22} /></div>
             </div>
@@ -451,7 +478,7 @@ export default function Budget() {
                   <td><span className="badge bg-gray-100 text-gray-600">{c.categoria}</span></td>
                   <td className="font-medium text-gray-900">
                     {c.descrizione}
-                    {c.auto && <span className="badge bg-blue-50 text-blue-600 text-xs ml-2">Preventivo</span>}
+                    {c.auto && badgeAuto(c)}
                   </td>
                   <td className="text-blue-600 font-medium">{formatEuro(c.importo_preventivo)}</td>
                   <td className={`font-bold ${c.importo_effettivo > c.importo_preventivo ? 'text-red-600' : 'text-gray-900'}`}>{formatEuro(c.importo_effettivo)}</td>
