@@ -431,6 +431,14 @@ if (!cronCols.includes('location_id')) {
 if (!cronCols.includes('pubblico')) {
   db.prepare('ALTER TABLE cronologia ADD COLUMN pubblico INTEGER DEFAULT 1').run();
 }
+// Fornitori coinvolti in ogni evento: dato interno, la landing non lo riceve.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cronologia_fornitori (
+    cronologia_id INTEGER NOT NULL REFERENCES cronologia(id) ON DELETE CASCADE,
+    fornitore_id INTEGER NOT NULL REFERENCES fornitori(id) ON DELETE CASCADE,
+    PRIMARY KEY (cronologia_id, fornitore_id)
+  )
+`);
 
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);

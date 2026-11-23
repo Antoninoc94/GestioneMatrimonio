@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Clock, Download, Sparkles, MapPin, Lock, AlertTriangle, MoveVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Download, Sparkles, MapPin, Lock, AlertTriangle, MoveVertical, Phone, Users, ChevronDown } from 'lucide-react';
 import api from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -17,14 +17,9 @@ const tipoLabel = {
   cerimonia: '💍 Cerimonia', ricevimento: '🥂 Ricevimento', foto: '📷 Foto',
   viaggio: '🚗 Viaggio', preparativi: '💄 Preparativi', altro: '📌 Altro',
 };
-// jsPDF/helvetica non rende le emoji — versione solo testo per il PDF
-const tipoLabelPdf = {
-  cerimonia: 'Cerimonia', ricevimento: 'Ricevimento', foto: 'Foto',
-  viaggio: 'Viaggio', preparativi: 'Preparativi', altro: 'Altro',
-};
 const TIPI_CERIMONIA = ['Chiesa', 'Municipio', 'Cerimonia civile'];
 
-const empty = { ora: '', titolo: '', descrizione: '', luogo: '', location_id: '', durata: '', tipo: 'altro', pubblico: 1 };
+const empty = { ora: '', titolo: '', descrizione: '', luogo: '', location_id: '', durata: '', tipo: 'altro', pubblico: 1, fornitori: [] };
 
 // Minuti dalle 5:00, come l'ordinamento del server: la festa dopo mezzanotte
 // resta in fondo alla giornata.
@@ -34,6 +29,9 @@ const hhmm = min => { const m = ((min % 1440) + 1440) % 1440; return `${String(M
 const fine = ev => ev.durata ? hhmm(minuti(ev.ora) + ev.durata) : null;
 
 const luogoDi = ev => ev.location_nome || ev.luogo || '';
+// I fornitori di una lista di eventi, una volta sola, per categoria e nome.
+const unici = eventi => [...new Map(eventi.flatMap(ev => ev.fornitori || []).map(f => [f.id, f])).values()]
+  .sort((a, b) => a.categoria.localeCompare(b.categoria) || a.nome.localeCompare(b.nome));
 const mapsUrl = (nome, indirizzo) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([nome, indirizzo].filter(Boolean).join(', '))}`;
 
@@ -75,11 +73,14 @@ export default function Cronologia() {
   const [exporting, setExporting] = useState(false);
   const [bozza, setBozza] = useState(null);
   const [spostaId, setSpostaId] = useState(null);
+  const [fornitori, setFornitori] = useState([]);
+  const [menuPdf, setMenuPdf] = useState(false);
 
   const load = () => api.get('/cronologia').then(r => setItems(r.data));
   useEffect(() => {
     load();
     api.get('/location').then(r => setLocations(r.data.filter(l => l.stato !== 'escluso')));
+    api.get('/fornitori').then(r => setFornitori(r.data));
   }, []);
 
   const confermate = locations.filter(l => l.stato === 'confermato');
@@ -87,7 +88,10 @@ export default function Cronologia() {
 
   const openNew = () => { setForm(empty); setEditId(null); setErrore(''); setModal(true); };
   const openEdit = i => {
-    setForm({ ...empty, ...i, durata: i.durata?.toString() || '', location_id: i.location_id || '', luogo: i.luogo || '', descrizione: i.descrizione || '' });
+    setForm({
+      ...empty, ...i, durata: i.durata?.toString() || '', location_id: i.location_id || '', luogo: i.luogo || '',
+      descrizione: i.descrizione || '', fornitori: (i.fornitori || []).map(f => f.id),
+    });
     setEditId(i.id); setErrore(''); setModal(true);
   };
 
@@ -139,13 +143,20 @@ export default function Cronologia() {
     }
   };
 
-  const exportPDF = () => {
-    if (items.length === 0) return alert('Nessun evento da esportare.');
+  // Senza argomento: la scaletta completa per voi, testimoni e coordinatore,
+  // con tutti gli eventi e i contatti dei fornitori. Con un fornitore: solo
+  // gli eventi in cui serve, da mandargli perché sappia dove essere e quando.
+  const exportPDF = fornitore => {
+    setMenuPdf(false);
+    const eventi = fornitore ? items.filter(ev => ev.fornitori?.some(f => f.id === fornitore.id)) : items;
+    if (eventi.length === 0) return alert('Nessun evento da esportare.');
     setExporting(true);
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const rose = [225, 29, 72];
       const gray = [107, 114, 128];
+      const titolo = fornitore ? `Programma per ${fornitore.nome}` : 'Scaletta del Giorno';
+      const oggi = new Date().toLocaleDateString('it-IT');
 
       // Header
       doc.setFillColor(...rose);
@@ -153,38 +164,56 @@ export default function Cronologia() {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('Cronologia del Giorno', 14, 12);
+      doc.text(titolo, 14, 12);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${items.length} eventi · ${new Date().toLocaleDateString('it-IT')}`, 14, 20);
+      doc.text(`${fornitore ? `${fornitore.categoria} · ` : ''}${eventi.length} ${eventi.length === 1 ? 'evento' : 'eventi'} · ${oggi}`, 14, 20);
 
-      autoTable(doc, {
-        startY: 34,
-        head: [['Ora', 'Evento', 'Tipo', 'Durata']],
-        body: items.map(ev => {
-          const lines = [ev.titolo];
-          const luogo = luogoDi(ev);
-          if (luogo) lines.push(`Luogo: ${luogo}${ev.location_indirizzo ? ` - ${ev.location_indirizzo}` : ''}`);
-          if (ev.descrizione) lines.push(ev.descrizione);
-          if (!ev.pubblico) lines.push('(solo per gli sposi)');
-          return [
-            fine(ev) ? `${ev.ora}\n${fine(ev)}` : (ev.ora || '-'),
-            lines.join('\n'),
-            tipoLabelPdf[ev.tipo] || ev.tipo,
-            ev.durata ? `${ev.durata} min` : '-',
-          ];
-        }),
+      const stili = {
         headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
         bodyStyles: { fontSize: 8.5, textColor: [55, 65, 81] },
         alternateRowStyles: { fillColor: [255, 251, 252] },
-        columnStyles: {
-          0: { cellWidth: 20, fontStyle: 'bold' },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 32 },
-          3: { cellWidth: 24, halign: 'center' },
-        },
         margin: { left: 14, right: 14 },
+      };
+      const orario = ev => fine(ev) ? `${ev.ora}\n${fine(ev)}` : (ev.ora || '-');
+      const evento = ev => {
+        const lines = [ev.titolo];
+        const luogo = luogoDi(ev);
+        if (luogo) lines.push(`Luogo: ${luogo}${ev.location_id && ev.location_indirizzo ? ` - ${ev.location_indirizzo}` : ''}`);
+        if (ev.descrizione) lines.push(ev.descrizione);
+        if (!fornitore && !ev.pubblico) lines.push('(solo per gli sposi)');
+        return lines.join('\n');
+      };
+
+      autoTable(doc, fornitore ? {
+        ...stili,
+        startY: 34,
+        head: [['Ora', 'Evento', 'Durata']],
+        body: eventi.map(ev => [orario(ev), evento(ev), ev.durata ? `${ev.durata} min` : '-']),
+        columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 24, halign: 'center' } },
+      } : {
+        ...stili,
+        startY: 34,
+        head: [['Ora', 'Evento', 'Fornitori']],
+        body: eventi.map(ev => [
+          orario(ev),
+          evento(ev),
+          (ev.fornitori || []).map(f => `${f.nome}${f.telefono ? ` · ${f.telefono}` : ''}`).join('\n') || '-',
+        ]),
+        columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 58 } },
       });
+
+      // In coda alla scaletta, la rubrica dei fornitori coinvolti.
+      const coinvolti = fornitore ? [] : unici(eventi);
+      if (coinvolti.length) {
+        autoTable(doc, {
+          ...stili,
+          startY: doc.lastAutoTable.finalY + 10,
+          head: [['Fornitore', 'Categoria', 'Referente', 'Telefono', 'Email']],
+          body: coinvolti.map(f => [f.nome, f.categoria, f.contatto || '-', f.telefono || '-', f.email || '-']),
+          columnStyles: { 0: { fontStyle: 'bold' } },
+        });
+      }
 
       // Footer
       const pageCount = doc.getNumberOfPages();
@@ -193,14 +222,24 @@ export default function Cronologia() {
         doc.setFontSize(7);
         doc.setTextColor(...gray);
         doc.text(`Pagina ${p} di ${pageCount}`, 196, 290, { align: 'right' });
-        doc.text(`Cronologia del Giorno - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+        doc.text(`${titolo} - ${oggi}`, 14, 290);
       }
 
-      doc.save('cronologia-matrimonio.pdf');
+      const slug = fornitore?.nome.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      doc.save(fornitore ? `programma-${slug || 'fornitore'}.pdf` : 'scaletta-matrimonio.pdf');
     } finally {
       setExporting(false);
     }
   };
+
+  // Fornitori collegati ad almeno un evento: quelli per cui ha senso un PDF.
+  const fornitoriInScaletta = unici(items);
+  // Nel form: i confermati, più quelli già collegati all'evento anche se nel
+  // frattempo hanno cambiato stato (altrimenti salvando sparirebbero).
+  const fornitoriScelta = fornitori.filter(f => f.stato === 'confermato' || form.fornitori.includes(f.id));
+  const toggleFornitore = id => setForm(f => ({
+    ...f, fornitori: f.fornitori.includes(id) ? f.fornitori.filter(x => x !== id) : [...f.fornitori, id],
+  }));
 
   const privati = items.filter(i => !i.pubblico).length;
   const elencoAvvisi = avvisi(items);
@@ -218,9 +257,34 @@ export default function Cronologia() {
           </p>
         </div>
         <div className="grid grid-cols-3 sm:flex gap-2">
-          <button className="btn-secondary justify-center" onClick={exportPDF} disabled={exporting}>
-            <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
-          </button>
+          <div className="relative">
+            <button className="btn-secondary justify-center w-full" onClick={() => setMenuPdf(!menuPdf)} disabled={exporting}>
+              <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'} <ChevronDown size={13} />
+            </button>
+            {menuPdf && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuPdf(false)} />
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 z-20 w-64 bg-white rounded-xl border border-gray-200 shadow-lg py-1 text-sm">
+                  <button className="w-full text-left px-3 py-2 hover:bg-rose-50" onClick={() => exportPDF()}>
+                    <span className="font-medium text-gray-800">Scaletta completa</span>
+                    <span className="block text-xs text-gray-400">Tutti gli eventi e i contatti, per testimoni e coordinatore</span>
+                  </button>
+                  {fornitoriInScaletta.length > 0 && (
+                    <>
+                      <p className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-t border-gray-100 mt-1">Per un fornitore</p>
+                      <div className="max-h-64 overflow-y-auto">
+                        {fornitoriInScaletta.map(f => (
+                          <button key={f.id} className="w-full text-left px-3 py-1.5 hover:bg-rose-50" onClick={() => exportPDF(f)}>
+                            <span className="text-gray-800">{f.nome}</span> <span className="text-xs text-gray-400">· {f.categoria}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button className="btn-secondary justify-center" onClick={apriBozza}>
             <Sparkles size={15} /> Bozza
           </button>
@@ -286,6 +350,24 @@ export default function Cronologia() {
                             </p>
                           )}
                           {ev.descrizione && <p className="text-sm text-gray-500 mt-1">{ev.descrizione}</p>}
+                          {ev.fornitori?.length > 0 && (
+                            <div className="mt-2 flex items-start gap-1.5">
+                              <Users size={13} className="mt-1 shrink-0 text-gray-400" />
+                              <div className="flex flex-wrap gap-1.5">
+                                {ev.fornitori.map(f => (
+                                  <span key={f.id} className="inline-flex flex-wrap items-center gap-x-1 text-xs bg-white/70 border border-gray-200 rounded-2xl px-2 py-0.5 text-gray-700 max-w-full">
+                                    <span className="whitespace-nowrap">{f.nome}</span>
+                                    <span className="text-gray-400 whitespace-nowrap">· {f.categoria}</span>
+                                    {f.telefono && (
+                                      <a href={`tel:${f.telefono.replace(/\s+/g, '')}`} className="inline-flex items-center gap-0.5 text-rose-600 hover:underline whitespace-nowrap" title={`Chiama ${f.nome}`}>
+                                        <Phone size={10} /> {f.telefono}
+                                      </a>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {spostaId === ev.id && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap text-xs">
                               <span className="text-gray-500">Sposta questo e i successivi:</span>
@@ -410,6 +492,25 @@ export default function Cronologia() {
               <div>
                 <label className="form-label">Descrizione</label>
                 <textarea className="form-input" rows={2} value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
+              </div>
+              <div>
+                <label className="form-label">Fornitori coinvolti</label>
+                {fornitoriScelta.length === 0 ? (
+                  <p className="text-xs text-gray-400">Nessun fornitore confermato: segnali come "Confermato" in Fornitori per collegarli qui.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {fornitoriScelta.map(f => {
+                      const on = form.fornitori.includes(f.id);
+                      return (
+                        <button type="button" key={f.id} onClick={() => toggleFornitore(f.id)}
+                          className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${on ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-rose-300'}`}>
+                          {f.nome} <span className={on ? 'text-rose-100' : 'text-gray-400'}>· {f.categoria}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">Restano interni: gli invitati non li vedono.</p>
               </div>
               <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" className="mt-0.5" checked={!!form.pubblico} onChange={e => setForm({ ...form, pubblico: e.target.checked ? 1 : 0 })} />
