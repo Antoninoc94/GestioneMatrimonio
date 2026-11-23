@@ -43,8 +43,8 @@ router.get('/info', (req, res) => {
   // Solo gli eventi segnati come visibili, e solo i campi che servono a un
   // invitato: i preparativi a casa degli sposi restano nella gestione.
   const cronologia = eventi('WHERE c.pubblico = 1').map(e => ({
-    id: e.id, ora: e.ora, durata: e.durata, titolo: e.titolo, descrizione: e.descrizione, tipo: e.tipo,
-    luogo: e.location_nome || e.luogo, indirizzo: e.location_id ? e.location_indirizzo : null,
+    id: e.id, ora: e.ora, titolo: e.titolo, descrizione: e.descrizione, tipo: e.tipo,
+    luogo: e.location_nome || e.luogo,
   }));
   res.json({ config, locations, cronologia });
 });

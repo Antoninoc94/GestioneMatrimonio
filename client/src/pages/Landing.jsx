@@ -25,12 +25,6 @@ const TIPO_EMOJI = { cerimonia: '💍', ricevimento: '🥂', foto: '📷', viagg
 
 const mapsUrl = (nome, indirizzo) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([nome, indirizzo].filter(Boolean).join(', '))}`;
-const fineEvento = ev => {
-  if (!ev.durata || !ev.ora) return null;
-  const [h, m] = ev.ora.split(':').map(Number);
-  const t = (h * 60 + m + ev.durata) % 1440;
-  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-};
 
 // SVG ornamento floreale per divisori
 function BotanicalDivider({ color, small = false }) {
@@ -390,15 +384,16 @@ function LocationCard({ loc, tema }) {
   );
 }
 
-// Il programma: ora a sinistra, filo verticale con l'icona del momento al
-// centro, scheda a destra. La cerimonia è il momento clou e si distingue.
+// Il programma: ora indicativa a sinistra (niente ora di fine, per gli invitati
+// conta quando presentarsi), filo verticale con l'icona del momento al centro,
+// scheda a destra. Solo il nome del posto: le indicazioni stradali sono già
+// nelle schede "Dove ci troviamo". La cerimonia è il momento clou e si distingue.
 function Programma({ eventi, tema, bg }) {
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto' }}>
       {eventi.map((ev, i) => {
         const clou = ev.tipo === 'cerimonia';
         const ultimo = i === eventi.length - 1;
-        const fine = fineEvento(ev);
         return (
           <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '3.6rem 2.5rem 1fr', columnGap: '0.6rem' }}>
             {/* Ora */}
@@ -406,7 +401,6 @@ function Programma({ eventi, tema, bg }) {
               <div style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '1.0625rem', fontWeight: 600, color: tema.dark, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
                 {ev.ora?.slice(0, 5)}
               </div>
-              {fine && <div style={{ fontSize: '0.6875rem', color: '#9ca3af', marginTop: '0.15rem', fontVariantNumeric: 'tabular-nums' }}>fino {fine}</div>}
             </div>
             {/* Filo e icona */}
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
@@ -432,12 +426,7 @@ function Programma({ eventi, tema, bg }) {
                 {ev.luogo && (
                   <div style={{ fontSize: '0.8125rem', color: '#6b7280', display: 'flex', alignItems: 'flex-start', gap: '0.3rem', marginTop: '0.35rem' }}>
                     <MapPin size={13} style={{ color: tema.mid, flexShrink: 0, marginTop: '0.15rem' }} />
-                    <span>
-                      {ev.luogo}
-                      {ev.indirizzo && (
-                        <> · <a href={mapsUrl(ev.luogo, ev.indirizzo)} target="_blank" rel="noreferrer" style={{ color: tema.primary, textDecoration: 'none', fontWeight: 600 }}>Indicazioni</a></>
-                      )}
-                    </span>
+                    <span>{ev.luogo}</span>
                   </div>
                 )}
                 {ev.descrizione && (
