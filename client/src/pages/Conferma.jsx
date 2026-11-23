@@ -62,7 +62,12 @@ export default function Conferma() {
 
   const trova = async e => {
     e.preventDefault();
-    if (!nome.trim()) return;
+    // Il cognome serve: col solo nome la ricerca non trova nessuno e la
+    // risposta finiva registrata come un invitato nuovo, senza cognome.
+    if (!nome.trim() || !cognome.trim()) {
+      setErrore('Inserisci nome e cognome, come sull\'invito.');
+      return;
+    }
     setErrore('');
     setLoading(true);
     try {
@@ -100,6 +105,8 @@ export default function Conferma() {
     } catch (err) {
       if (err.response?.data?.disabilitata) {
         setDisabilitata(err.response.data.scaduta || true);
+      } else if (err.response?.status === 400 && err.response.data?.error) {
+        setErrore(err.response.data.error);
       } else {
         setErrore('Errore di connessione. Riprova.');
       }
@@ -363,13 +370,14 @@ export default function Conferma() {
                     autoFocus required />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Cognome</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Cognome *</label>
                   <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
                     placeholder="Es: Rossi"
-                    value={cognome} onChange={e => { setCognome(e.target.value); setErrore(''); }} />
+                    value={cognome} onChange={e => { setCognome(e.target.value); setErrore(''); }}
+                    required />
                 </div>
                 {errore && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{errore}</p>}
-                <button type="submit" disabled={loading || !nome.trim()}
+                <button type="submit" disabled={loading || !nome.trim() || !cognome.trim()}
                   className="w-full py-3 rounded-xl font-semibold text-white text-sm bg-rose-500 hover:bg-rose-600 transition-colors disabled:opacity-40">
                   {loading ? 'Ricerca...' : 'Continua'}
                 </button>

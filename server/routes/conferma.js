@@ -40,7 +40,9 @@ router.get('/info', (req, res) => {
 router.get('/trova', checkAbilitata, (req, res) => {
   const nome = (req.query.nome || '').trim();
   const cognome = (req.query.cognome || '').trim();
-  if (!nome) return res.status(400).json({ error: 'Nome richiesto' });
+  // Anche il cognome: col solo nome la ricerca falliva e la risposta finiva
+  // registrata come un invitato nuovo, senza cognome.
+  if (!nome || !cognome) return res.status(400).json({ error: 'Inserisci nome e cognome, come sull\'invito.' });
 
   const candidati = db.prepare(`
     SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id
@@ -127,6 +129,10 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
 
   if (id && !db.prepare('SELECT id FROM ospiti WHERE id = ? AND sposo IS NULL').get(id))
     return res.status(404).json({ error: 'Ospite non trovato' });
+
+  // Un invitato nuovo (non trovato in lista) si registra solo con nome e cognome.
+  if (!id && (!String(nome ?? '').trim() || !String(cognome ?? '').trim()))
+    return res.status(400).json({ error: 'Inserisci nome e cognome, come sull\'invito.' });
 
   // Ospite principale, partner e figli si salvano tutti o nessuno: un errore a
   // metà lascerebbe la famiglia con una risposta registrata solo in parte.
