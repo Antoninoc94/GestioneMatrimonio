@@ -363,16 +363,16 @@ export default function LandingEditor() {
               Mostra sulla pagina
             </label>
           </div>
-          <p className="text-xs text-gray-400 mb-4">Una sezione discreta, dopo il programma. Compare solo se è attiva e c'è almeno l'IBAN o il link.</p>
+          <p className="text-xs text-gray-400 mb-4">Discreta, dopo il programma: si vede solo il messaggio con "Vedi i dettagli", e IBAN e lista compaiono a chi lo apre. Serve almeno l'IBAN o il link.</p>
           <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${form.regalo_abilitato ? '' : 'opacity-60'}`}>
             <div className="space-y-3">
               <div>
                 <label className="form-label">Titolo</label>
-                <input className="form-input" placeholder="Il nostro regalo" {...campoRegalo('regalo_titolo')} />
+                <input className="form-input" placeholder="Facoltativo, es. Un pensiero per noi" {...campoRegalo('regalo_titolo')} />
               </div>
               <div>
                 <label className="form-label">Messaggio</label>
-                <textarea className="form-input" rows={4} placeholder="La vostra presenza è il regalo più bello. Se desiderate farci un pensiero, ci aiuterete a realizzare il nostro viaggio di nozze."
+                <textarea className="form-input" rows={4} placeholder="La vostra presenza è il regalo più bello. Se desiderate comunque farci un pensiero, qui trovate i dettagli."
                   {...campoRegalo('regalo_messaggio')} />
               </div>
               <div>

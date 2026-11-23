@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Gift, CheckCircle2, MessageCircle, Search, X, Users, PenLine, Undo2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Gift, CheckCircle2, MessageCircle, Search, X, Users, PenLine, Undo2, Download, ChevronDown, UserX } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../api';
 import { linkWhatsAppTesto } from '../publicUrl';
 
@@ -21,10 +23,21 @@ const MESSAGGIO_RINGRAZIAMENTO_DEFAULT =
   'Ciao {nomi}! Grazie di cuore per il {tuo} regalo e per aver condiviso con noi questo giorno speciale.\n\n' +
   'Un abbraccio,\n{sposi}';
 
-const formatEuro = n => n ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n) : '—';
+// "250 €", ma "250,50 €" e non "250,5 €" quando ci sono i centesimi.
+const formatEuro = n => {
+  if (!n) return '—';
+  const cent = Math.round(n * 100) % 100 !== 0;
+  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: cent ? 2 : 0, maximumFractionDigits: 2 }).format(n);
+};
 const oggi = () => new Date().toLocaleDateString('sv-SE');
 const dataBreve = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 const nomeCompleto = o => [o.nome, o.cognome].filter(Boolean).join(' ');
+// Per PDF e CSV: niente emoji (jsPDF/helvetica non le rende).
+const tipoTesto = { busta: 'Busta', bonifico: 'Bonifico', oggetto: 'Oggetto', lista_nozze: 'Lista nozze', altro: 'Altro' };
+const dataNumerica = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('it-IT') : '';
+const statoRingraziamento = r => r.ringraziamento_inviato
+  ? ['Fatto', canaleLabel[r.canale_ringraziamento], dataNumerica(r.data_ringraziamento)].filter(Boolean).join(' · ')
+  : 'Da fare';
 
 // "Mario Rossi e Anna Bianchi · 2 figli", oppure il mittente libero.
 function etichetta(r) {
@@ -59,6 +72,8 @@ export default function Regali() {
   const [filtroStato, setFiltroStato] = useState('');
   const [cerca, setCerca] = useState('');
   const [msgModal, setMsgModal] = useState(null);
+  const [menuExport, setMenuExport] = useState(false);
+  const [vediSenza, setVediSenza] = useState(false);
 
   const load = () => api.get('/regali').then(r => setItems(r.data));
   useEffect(() => {
@@ -75,7 +90,7 @@ export default function Regali() {
       .replaceAll('{regalo}', r.descrizione?.toLowerCase() || 'regalo').replaceAll('{sposi}', sposi);
   };
 
-  const openNew = () => { setForm(empty); setEditId(null); setErrore(''); setModal(true); };
+  const openNew = (ospiteId = '') => { setForm({ ...empty, ospite_id: ospiteId }); setEditId(null); setErrore(''); setModal(true); };
   const openEdit = r => {
     setForm({
       ...empty, ...r, ospite_id: r.ospite_id || '', mittente: r.mittente || '', note: r.note || '',
@@ -138,6 +153,90 @@ export default function Regali() {
   const ringraziati = items.filter(r => r.ringraziamento_inviato).length;
   const daRingraziare = items.length - ringraziati;
 
+  // Nuclei con almeno un confermato e nessun regalo registrato: per non
+  // dimenticare nessuno nei ringraziamenti. I regali scritti col nome libero
+  // non si possono abbinare a un ospite, quindi qui non contano.
+  const conRegalo = new Set(items.map(r => r.ospite_id).filter(Boolean));
+  const senzaRegalo = ospiti.filter(o => !o.parent_id && !conRegalo.has(o.id))
+    .map(capo => ({ capo, membri: [capo, ...ospiti.filter(o => o.parent_id === capo.id)] }))
+    .filter(n => n.membri.some(m => m.rsvp === 'confermato'))
+    .sort((a, b) => (a.capo.cognome || a.capo.nome).localeCompare(b.capo.cognome || b.capo.nome));
+
+  const ordinati = () => [...items].sort((a, b) => etichetta(a).localeCompare(etichetta(b)));
+
+  const exportPDF = () => {
+    setMenuExport(false);
+    if (!items.length) return alert('Nessun regalo da esportare.');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const rose = [225, 29, 72];
+    const gray = [107, 114, 128];
+    const data = new Date().toLocaleDateString('it-IT');
+    // Lo spazio fisso di Intl ("200 €") jsPDF lo stampa male: spazio normale.
+    const euro = n => n ? formatEuro(n).replace(/\s/g, ' ') : '-';
+
+    doc.setFillColor(...rose);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Regali Ricevuti', 14, 12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${items.length} regali · in denaro ${euro(totContanti)} · ringraziati ${ringraziati} di ${items.length}`, 14, 20);
+
+    autoTable(doc, {
+      startY: 34,
+      head: [['Da chi', 'Regalo', 'Importo', 'Ringraziamento']],
+      body: ordinati().map(r => [
+        r.membri?.length > 1 ? `${etichetta(r)}\n${r.membri.map(m => m.nome).join(', ')}` : etichetta(r),
+        [tipoTesto[r.tipo], r.descrizione !== DESCRIZIONE_DEFAULT[r.tipo] ? r.descrizione : null, r.note].filter(Boolean).join('\n'),
+        r.valore_stimato ? `${euro(r.valore_stimato)}${CONTANTI.includes(r.tipo) ? '' : '\n(stima)'}` : '-',
+        statoRingraziamento(r),
+      ]),
+      headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8.5, textColor: [55, 65, 81] },
+      alternateRowStyles: { fillColor: [255, 251, 252] },
+      columnStyles: { 0: { cellWidth: 58, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 24, halign: 'right' }, 3: { cellWidth: 42 } },
+      margin: { left: 14, right: 14 },
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let pg = 1; pg <= pageCount; pg++) {
+      doc.setPage(pg);
+      doc.setFontSize(7);
+      doc.setTextColor(...gray);
+      doc.text(`Pagina ${pg} di ${pageCount}`, 196, 290, { align: 'right' });
+      doc.text(`Regali Ricevuti - ${data}`, 14, 290);
+    }
+    doc.save('regali-matrimonio.pdf');
+  };
+
+  // CSV col punto e virgola e la virgola decimale: Excel in italiano lo apre
+  // già diviso in colonne. Il BOM serve perché legga bene gli accenti.
+  const exportCSV = () => {
+    setMenuExport(false);
+    if (!items.length) return alert('Nessun regalo da esportare.');
+    const cella = v => {
+      const t = v == null ? '' : String(v);
+      return /[";\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
+    };
+    const righe = [
+      ['Da chi', 'Membri', 'Tipo', 'Descrizione', 'Importo', 'In denaro', 'Ringraziato', 'Come', 'Data ringraziamento', 'Note'],
+      ...ordinati().map(r => [
+        etichetta(r), (r.membri || []).map(nomeCompleto).join(', '), tipoTesto[r.tipo],
+        r.descrizione !== DESCRIZIONE_DEFAULT[r.tipo] ? r.descrizione : '',
+        r.valore_stimato ? String(r.valore_stimato).replace('.', ',') : '', CONTANTI.includes(r.tipo) ? 'Sì' : 'No',
+        r.ringraziamento_inviato ? 'Sì' : 'No', canaleLabel[r.canale_ringraziamento] || '', dataNumerica(r.data_ringraziamento), r.note || '',
+      ]),
+    ];
+    const csv = '﻿' + righe.map(r => r.map(cella).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'regali-matrimonio.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const chip = (attivo, extra = 'bg-gray-100 text-gray-600') =>
     `badge px-3 py-1.5 cursor-pointer whitespace-nowrap ${attivo ? 'bg-rose-500 text-white' : extra}`;
 
@@ -148,9 +247,25 @@ export default function Regali() {
           <h1 className="page-title">Regali Ricevuti</h1>
           <p className="page-subtitle">{items.length} {items.length === 1 ? 'regalo' : 'regali'} · {daRingraziare === 0 ? 'nessun ringraziamento da fare' : `${daRingraziare} ${daRingraziare === 1 ? 'ringraziamento' : 'ringraziamenti'} da fare`}</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex gap-2">
+        <div className="grid grid-cols-3 sm:flex gap-2">
+          <div className="relative">
+            <button className="btn-secondary justify-center w-full" onClick={() => setMenuExport(!menuExport)}>
+              <Download size={15} /> Esporta <ChevronDown size={13} className="hidden sm:inline" />
+            </button>
+            {menuExport && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuExport(false)} />
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 z-20 w-52 bg-white rounded-xl border border-gray-200 shadow-lg py-1 text-sm">
+                  <button className="w-full text-left px-3 py-2 hover:bg-rose-50" onClick={exportPDF}>PDF</button>
+                  <button className="w-full text-left px-3 py-2 hover:bg-rose-50" onClick={exportCSV}>
+                    Excel <span className="text-xs text-gray-400">(CSV)</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button className="btn-secondary justify-center" onClick={() => setMsgModal(template)}><PenLine size={15} /> Messaggio</button>
-          <button className="btn-primary justify-center" onClick={openNew}><Plus size={16} /> Regalo</button>
+          <button className="btn-primary justify-center" onClick={() => openNew()}><Plus size={16} /> Regalo</button>
         </div>
       </div>
 
@@ -193,6 +308,38 @@ export default function Regali() {
           ))}
         </div>
       </div>
+
+      {senzaRegalo.length > 0 && (
+        <div className="card mb-4">
+          <button className="w-full flex items-center justify-between gap-2 text-left" onClick={() => setVediSenza(v => !v)}>
+            <span className="flex items-center gap-2 font-medium text-gray-800">
+              <UserX size={16} className="text-gray-400 shrink-0" /> Confermati senza regalo registrato
+              <span className="badge bg-gray-100 text-gray-600">{senzaRegalo.length}</span>
+            </span>
+            <ChevronDown size={16} className={`text-gray-400 shrink-0 transition-transform ${vediSenza ? 'rotate-180' : ''}`} />
+          </button>
+          {vediSenza && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-400 mb-2">
+                Famiglie con almeno un confermato e nessun regalo intestato. Magari hanno fatto un regalo insieme ad altri, o l'hai segnato con un nome libero: in quel caso collegalo all'ospite.
+              </p>
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {senzaRegalo.map(({ capo, membri }) => (
+                  <div key={capo.id} className="flex items-center justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800">{nomeCompleto(capo)}</p>
+                      {membri.length > 1 && <p className="text-xs text-gray-400 truncate">{membri.slice(1).map(m => m.nome).join(', ')}</p>}
+                    </div>
+                    <button className="text-xs px-2.5 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 shrink-0 flex items-center gap-1" onClick={() => openNew(capo.id)}>
+                      <Plus size={12} /> Regalo
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">

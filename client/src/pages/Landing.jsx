@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MapPin, Heart, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
+import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown } from 'lucide-react';
 import { formattaIban } from '../publicUrl';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -260,11 +260,7 @@ export default function Landing() {
         )}
 
         {/* Regalo: IBAN e lista nozze */}
-        {regalo && (
-          <Section title={regalo.titolo || 'Il nostro regalo'} tema={tema}>
-            <Regalo regalo={regalo} tema={tema} />
-          </Section>
-        )}
+        {regalo && <Regalo regalo={regalo} tema={tema} />}
 
         {/* Dress code + Info pratiche affiancate */}
         {(hasDressCode || hasInfo) && (
@@ -449,9 +445,13 @@ function Programma({ eventi, tema, bg }) {
   );
 }
 
-// Il messaggio, poi l'IBAN da copiare con un tocco (dal telefono si incolla
-// nell'app della banca) e il pulsante della lista nozze.
+// Discreta di proposito: niente titolo grande né IBAN in vista, solo una frase
+// gentile e "Vedi i dettagli". L'IBAN (da copiare con un tocco e incollare
+// nell'app della banca) e la lista nozze compaiono solo a chi li apre.
+const MESSAGGIO_REGALO_DEFAULT = 'La vostra presenza è il regalo più bello. Se desiderate comunque farci un pensiero, qui trovate i dettagli.';
+
 function Regalo({ regalo, tema }) {
+  const [aperto, setAperto] = useState(false);
   const [copiato, setCopiato] = useState(false);
   const copia = async () => {
     const testo = regalo.iban;
@@ -474,44 +474,68 @@ function Regalo({ regalo, tema }) {
     </div>
   );
 
+  // Solo il link, senza IBAN: il pulsante della lista basta, non serve aprire nulla.
+  const soloLink = !regalo.iban;
+  const pulsanteLista = regalo.link && (
+    <a href={regalo.link} target="_blank" rel="noreferrer" style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: regalo.iban ? '1.25rem' : 0,
+      padding: '0.75rem 1.75rem', borderRadius: '3rem', border: `1.5px solid ${tema.primary}`,
+      color: tema.primary, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '0.02em',
+    }}>
+      {regalo.link_testo || 'Vai alla lista nozze'} <ExternalLink size={15} />
+    </a>
+  );
+
   return (
-    <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center' }}>
-      {regalo.messaggio && (
-        <p style={{ fontFamily: '"Playfair Display", Georgia, serif', fontStyle: 'italic', color: '#4b5563', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: '1.75rem' }}>
-          {regalo.messaggio}
-        </p>
+    <section style={{ maxWidth: '560px', margin: '0 auto 3.5rem', textAlign: 'center' }}>
+      <div style={{ marginBottom: '1.25rem' }}><BotanicalDivider color={tema.border} small /></div>
+      {regalo.titolo && (
+        <h2 style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '1.125rem', fontWeight: 600, color: tema.dark, marginBottom: '0.75rem' }}>
+          {regalo.titolo}
+        </h2>
       )}
-      {regalo.iban && (
-        <div style={{ background: '#fff', border: `1px solid ${tema.border}`, borderRadius: '1rem', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 4px 16px -4px rgba(0,0,0,0.07)', textAlign: 'left' }}>
-          <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: tema.text, marginBottom: '0.4rem' }}>IBAN</div>
-          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 'clamp(0.9rem, 3.6vw, 1.05rem)', color: '#111827', letterSpacing: '0.02em', overflowWrap: 'anywhere', marginBottom: '0.9rem' }}>
-            {formattaIban(regalo.iban)}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
-            {riga('Intestato a', regalo.intestatario)}
-            {riga('Banca', regalo.banca)}
-            {riga('Causale', regalo.causale)}
-          </div>
-          <button type="button" onClick={copia} style={{
-            width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            padding: '0.7rem 1rem', borderRadius: '0.75rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem',
-            border: `1px solid ${copiato ? tema.primary : tema.border}`, background: copiato ? tema.primary : tema.light,
-            color: copiato ? '#fff' : tema.text, transition: 'all 0.15s',
+      <p style={{ fontFamily: '"Playfair Display", Georgia, serif', fontStyle: 'italic', color: '#4b5563', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: '1.25rem' }}>
+        {regalo.messaggio || MESSAGGIO_REGALO_DEFAULT}
+      </p>
+
+      {soloLink ? pulsanteLista : (
+        <>
+          <button type="button" onClick={() => setAperto(a => !a)} aria-expanded={aperto} style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.5rem', borderRadius: '3rem',
+            border: `1px solid ${tema.border}`, background: aperto ? tema.light : '#fff', color: tema.text,
+            fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', letterSpacing: '0.02em',
           }}>
-            {copiato ? <><Check size={16} /> IBAN copiato</> : <><Copy size={16} /> Copia IBAN</>}
+            <Gift size={15} /> {aperto ? 'Nascondi i dettagli' : 'Vedi i dettagli'}
+            <ChevronDown size={15} style={{ transform: aperto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
-        </div>
+
+          {aperto && (
+            <div style={{ marginTop: '1.25rem' }}>
+              <div style={{ background: '#fff', border: `1px solid ${tema.border}`, borderRadius: '1rem', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 4px 16px -4px rgba(0,0,0,0.07)', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: tema.text, marginBottom: '0.4rem' }}>IBAN</div>
+                <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 'clamp(0.9rem, 3.6vw, 1.05rem)', color: '#111827', letterSpacing: '0.02em', overflowWrap: 'anywhere', marginBottom: '0.9rem' }}>
+                  {formattaIban(regalo.iban)}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
+                  {riga('Intestato a', regalo.intestatario)}
+                  {riga('Banca', regalo.banca)}
+                  {riga('Causale', regalo.causale)}
+                </div>
+                <button type="button" onClick={copia} style={{
+                  width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  padding: '0.7rem 1rem', borderRadius: '0.75rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem',
+                  border: `1px solid ${copiato ? tema.primary : tema.border}`, background: copiato ? tema.primary : tema.light,
+                  color: copiato ? '#fff' : tema.text, transition: 'all 0.15s',
+                }}>
+                  {copiato ? <><Check size={16} /> IBAN copiato</> : <><Copy size={16} /> Copia IBAN</>}
+                </button>
+              </div>
+              {pulsanteLista}
+            </div>
+          )}
+        </>
       )}
-      {regalo.link && (
-        <a href={regalo.link} target="_blank" rel="noreferrer" style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: regalo.iban ? '1.25rem' : 0,
-          padding: '0.75rem 1.75rem', borderRadius: '3rem', border: `1.5px solid ${tema.primary}`,
-          color: tema.primary, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '0.02em',
-        }}>
-          {regalo.link_testo || 'Vai alla lista nozze'} <ExternalLink size={15} />
-        </a>
-      )}
-    </div>
+    </section>
   );
 }
 
