@@ -197,7 +197,11 @@ export default function Ospiti() {
     }
   };
 
-  const invitoBadge = o => o.invito_inviato
+  // Gli sposi (creati col tavolo sposi) non ricevono inviti: al posto dello
+  // stato dell'invito si vede chi sono.
+  const invitoBadge = o => o.sposo
+    ? <span className="badge bg-rose-100 text-rose-600 text-xs w-fit">💍 {o.sposo === 1 ? 'Sposo' : 'Sposa'}</span>
+    : o.invito_inviato
     ? <button type="button" onClick={() => toggleInvito(o)} title={`Consegnato ${o.invito_canale === 'whatsapp' ? 'su WhatsApp' : 'a mano'}: clic per annullare`}
         className="badge bg-emerald-50 text-emerald-700 text-xs flex items-center gap-1 w-fit">
         {o.invito_canale === 'whatsapp' ? <MessageCircle size={10} /> : <Mail size={10} />}
@@ -235,7 +239,7 @@ export default function Ospiti() {
   // Senza età il tipo di un figlio non viene ricalcolato al cambio di soglia.
   const figliSenzaEta = items.filter(i => i.relazione === 'figlio' && i.eta == null).length;
   // L'invito si consegna alla famiglia: conta solo sugli invitati principali.
-  const invitiDaInviare = items.filter(i => !i.parent_id && !i.invito_inviato).length;
+  const invitiDaInviare = items.filter(i => !i.parent_id && !i.sposo && !i.invito_inviato).length;
   // Hanno l'invito ma la famiglia non ha ancora risposto.
   const daSollecitare = o => !!o.invito_inviato && o.rsvp === 'attesa';
   const nDaSollecitare = items.filter(i => !i.parent_id && daSollecitare(i)).length;
@@ -254,7 +258,7 @@ export default function Ospiti() {
     const figliMatch = !filtroFigli
       || (filtroFigli === 'figli' && figli.length > 0)
       || (filtroFigli === 'senzaEta' && figli.some(c => c.eta == null));
-    const invitoMatch = !filtroInvito || !o.invito_inviato;
+    const invitoMatch = !filtroInvito || (!o.invito_inviato && !o.sposo);
     const sollecitoMatch = !filtroSollecito || daSollecitare(o);
     return rsvpMatch && sitoMatch && figliMatch && invitoMatch && sollecitoMatch && (!filtroLato || o.lato === filtroLato);
   });

@@ -232,7 +232,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
               <ul className="text-sm space-y-0.5 max-h-80 overflow-y-auto">
                 {sel.ospiti.map(o => (
                   <li key={o.id} className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs pl-3' : 'text-gray-800'}`}>
-                    {nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
+                    {o.sposo ? '💍 ' : ''}{nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
                   </li>
                 ))}
               </ul>

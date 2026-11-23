@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { aggiornaNomiSposi } = require('../sposi');
 
 // Pubblico: solo dati estetici (per login page)
 router.get('/public', (req, res) => {
@@ -96,6 +97,9 @@ router.put('/', auth, (req, res) => {
       WHERE relazione = 'figlio' AND eta IS NOT NULL
     `).run();
   }
+
+  // Gli sposi seduti al tavolo sposi portano i nomi delle Impostazioni.
+  if ('nome_sposo1' in b || 'nome_sposo2' in b) aggiornaNomiSposi();
 
   res.json(db.prepare('SELECT * FROM config LIMIT 1').get());
 });

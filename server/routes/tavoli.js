@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { assicuraSposi } = require('../sposi');
 
 const FORME = ['tondo', 'rettangolare'];
 const TIPI = ['normale', 'sposi', 'bambini'];
@@ -9,7 +10,7 @@ const PIANTA_W = 1200;
 const PIANTA_H = 800;
 
 const ORDINE = 'ORDER BY ordine IS NULL, ordine ASC, nome ASC';
-const COLONNE_OSPITI = 'id, nome, cognome, tavolo_id, rsvp, tipo, parent_id, relazione, eta, intolleranze';
+const COLONNE_OSPITI = 'id, nome, cognome, tavolo_id, rsvp, tipo, parent_id, relazione, eta, intolleranze, sposo';
 
 const ospitiDi = id => db.prepare(`SELECT ${COLONNE_OSPITI} FROM ospiti WHERE tavolo_id = ? ORDER BY cognome ASC, nome ASC`).all(id);
 
@@ -53,10 +54,14 @@ router.post('/', auth, (req, res) => {
   if (v.error) return res.status(400).json({ error: v.error });
   // In coda: un tavolo nuovo non deve scavalcare l'ordine già scelto.
   const { prossimo } = db.prepare('SELECT COALESCE(MAX(ordine), -1) + 1 AS prossimo FROM tavoli').get();
-  const r = db.prepare('INSERT INTO tavoli (nome, capienza, note, forma, tipo, rotazione, ordine) VALUES (?,?,?,?,?,?,?)')
-    .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, prossimo);
-  const t = db.prepare('SELECT * FROM tavoli WHERE id = ?').get(r.lastInsertRowid);
-  res.json({ ...t, ospiti: [] });
+  const id = db.transaction(() => {
+    const r = db.prepare('INSERT INTO tavoli (nome, capienza, note, forma, tipo, rotazione, ordine) VALUES (?,?,?,?,?,?,?)')
+      .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, prossimo);
+    if (v.tipo === 'sposi') assicuraSposi(r.lastInsertRowid);
+    return r.lastInsertRowid;
+  })();
+  const t = db.prepare('SELECT * FROM tavoli WHERE id = ?').get(id);
+  res.json({ ...t, ospiti: ospitiDi(id) });
 });
 
 // Nuovo ordine dei tavoli: l'elenco completo degli id, nell'ordine voluto.
@@ -86,8 +91,13 @@ router.put('/:id', auth, (req, res) => {
   if (!esistente) return res.status(404).json({ error: 'Tavolo non trovato' });
   const v = componi(esistente, req.body);
   if (v.error) return res.status(400).json({ error: v.error });
-  db.prepare('UPDATE tavoli SET nome=?, capienza=?, note=?, forma=?, tipo=?, rotazione=? WHERE id=?')
-    .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, req.params.id);
+  db.transaction(() => {
+    db.prepare('UPDATE tavoli SET nome=?, capienza=?, note=?, forma=?, tipo=?, rotazione=? WHERE id=?')
+      .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, req.params.id);
+    // Solo quando diventa il tavolo sposi: risalvarlo non deve rimettere a
+    // sedere chi gli sposi hanno tolto apposta.
+    if (v.tipo === 'sposi' && esistente.tipo !== 'sposi') assicuraSposi(esistente.id);
+  })();
   const t = db.prepare('SELECT * FROM tavoli WHERE id = ?').get(req.params.id);
   res.json({ ...t, ospiti: ospitiDi(t.id) });
 });

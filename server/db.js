@@ -404,6 +404,22 @@ if (!tavoliCols.includes('ordine')) {
   )`).run();
 }
 
+// Migrazione: gli sposi come ospiti (1 = nome_sposo1, 2 = nome_sposo2), creati
+// col tavolo sposi da server/sposi.js. Chi aveva già un tavolo sposi prima di
+// questa colonna li trova creati qui, una volta sola: se poi li elimina dalla
+// lista non ricompaiono a ogni riavvio.
+if (!ospCols.includes('sposo')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN sposo INTEGER').run();
+  const tavoloSposi = db.prepare("SELECT id FROM tavoli WHERE tipo = 'sposi' ORDER BY ordine IS NULL, ordine, id LIMIT 1").get();
+  if (tavoloSposi) {
+    const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2 FROM config LIMIT 1').get() || {};
+    const nomi = [cfg.nome_sposo1?.trim() || 'Sposo', cfg.nome_sposo2?.trim() || 'Sposa'];
+    const ins = db.prepare(`INSERT INTO ospiti (nome, lato, tipo, rsvp, tavolo_id, sposo, fonte)
+      VALUES (?, 'comune', 'adulto', 'confermato', ?, ?, 'lista')`);
+    nomi.forEach((nome, i) => ins.run(nome, tavoloSposi.id, i + 1));
+  }
+}
+
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
 if (!noteCols.includes('email_stato')) {

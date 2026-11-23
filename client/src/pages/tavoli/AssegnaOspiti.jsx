@@ -130,12 +130,14 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
     return (
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         <GripVertical size={12} className="text-gray-300 flex-shrink-0 hidden lg:block" />
-        {bambino
+        {o.sposo
+          ? <span className="text-xs flex-shrink-0" title={o.sposo === 1 ? 'Sposo' : 'Sposa'}>💍</span>
+          : bambino
           ? <span className="text-xs flex-shrink-0" title="Bambino">👶</span>
           : isPartner ? <span className="text-rose-300 text-xs flex-shrink-0">♥</span>
           : isChild ? <span className="text-purple-300 text-xs flex-shrink-0">↳</span> : null}
         <div className="min-w-0 flex-1">
-          <div className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : bambino || isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'} ${o.parent_id ? 'text-xs' : 'text-sm'}`}>
+          <div className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.sposo ? 'text-rose-700 font-semibold' : bambino || isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'} ${o.parent_id ? 'text-xs' : 'text-sm'}`}>
             {nomeOspite(o)}
             {o.eta != null && (bambino || isChild) ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
             {o.rsvp === 'declinato' && <span className="ml-1 text-[10px] font-semibold uppercase">declinato</span>}

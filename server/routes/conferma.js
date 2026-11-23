@@ -45,8 +45,9 @@ router.get('/trova', checkAbilitata, (req, res) => {
   const candidati = db.prepare(`
     SELECT id, nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id
     FROM ospiti
-    WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
-       OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
+    WHERE sposo IS NULL AND (
+          (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
+       OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?)))
   `).all(nome, cognome, cognome, nome);
 
   // Più invitati con lo stesso nome+cognome: non possiamo scegliere per loro,
@@ -93,8 +94,9 @@ router.get('/trova', checkAbilitata, (req, res) => {
 function upsertPartner({ nome, cognome, rsvp, intolleranze, messaggio_ospite, parent_id }) {
   const candidati = db.prepare(`
     SELECT id FROM ospiti
-    WHERE (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
-       OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
+    WHERE sposo IS NULL AND (
+          (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?))
+       OR (LOWER(nome) = LOWER(?) AND LOWER(COALESCE(cognome, '')) = LOWER(?)))
   `).all(nome, cognome || '', cognome || '', nome);
 
   // Se il nome+cognome è ambiguo (più ospiti omonimi), non aggiorniamo un record
@@ -123,7 +125,7 @@ router.post('/rispondi', checkAbilitata, (req, res) => {
   if (conPartner && !['confermato', 'declinato'].includes(partner.rsvp))
     return res.status(400).json({ error: 'Stato partner non valido' });
 
-  if (id && !db.prepare('SELECT id FROM ospiti WHERE id = ?').get(id))
+  if (id && !db.prepare('SELECT id FROM ospiti WHERE id = ? AND sposo IS NULL').get(id))
     return res.status(404).json({ error: 'Ospite non trovato' });
 
   // Ospite principale, partner e figli si salvano tutti o nessuno: un errore a
