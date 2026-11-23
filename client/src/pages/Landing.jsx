@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MapPin, Heart, Navigation } from 'lucide-react';
+import { MapPin, Heart, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
+import { formattaIban } from '../publicUrl';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -87,7 +88,7 @@ export default function Landing() {
     );
   }
 
-  const { config = {}, locations = [], cronologia = [] } = data || {};
+  const { config = {}, locations = [], cronologia = [], regalo = null } = data || {};
   const tema = TEMI[config.landing_tema] || TEMI.rose;
   const bg = tema.bg || bgBase;
 
@@ -255,6 +256,13 @@ export default function Landing() {
         {cronologia.length > 0 && (
           <Section title="Il programma del giorno" tema={tema}>
             <Programma eventi={cronologia} tema={tema} bg={bg} />
+          </Section>
+        )}
+
+        {/* Regalo: IBAN e lista nozze */}
+        {regalo && (
+          <Section title={regalo.titolo || 'Il nostro regalo'} tema={tema}>
+            <Regalo regalo={regalo} tema={tema} />
           </Section>
         )}
 
@@ -437,6 +445,72 @@ function Programma({ eventi, tema, bg }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Il messaggio, poi l'IBAN da copiare con un tocco (dal telefono si incolla
+// nell'app della banca) e il pulsante della lista nozze.
+function Regalo({ regalo, tema }) {
+  const [copiato, setCopiato] = useState(false);
+  const copia = async () => {
+    const testo = regalo.iban;
+    try {
+      await navigator.clipboard.writeText(testo);
+    } catch {
+      // Senza HTTPS o con permessi negati: copia alla vecchia maniera.
+      const t = document.createElement('textarea');
+      t.value = testo; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } finally { t.remove(); }
+    }
+    setCopiato(true);
+    setTimeout(() => setCopiato(false), 2200);
+  };
+  const riga = (etichetta, valore) => valore && (
+    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
+      <span style={{ color: '#9ca3af', minWidth: '5.5rem' }}>{etichetta}</span>
+      <span style={{ color: '#374151', fontWeight: 500, minWidth: 0, overflowWrap: 'anywhere' }}>{valore}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center' }}>
+      {regalo.messaggio && (
+        <p style={{ fontFamily: '"Playfair Display", Georgia, serif', fontStyle: 'italic', color: '#4b5563', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: '1.75rem' }}>
+          {regalo.messaggio}
+        </p>
+      )}
+      {regalo.iban && (
+        <div style={{ background: '#fff', border: `1px solid ${tema.border}`, borderRadius: '1rem', padding: '1.25rem 1.25rem 1rem', boxShadow: '0 4px 16px -4px rgba(0,0,0,0.07)', textAlign: 'left' }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: tema.text, marginBottom: '0.4rem' }}>IBAN</div>
+          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 'clamp(0.9rem, 3.6vw, 1.05rem)', color: '#111827', letterSpacing: '0.02em', overflowWrap: 'anywhere', marginBottom: '0.9rem' }}>
+            {formattaIban(regalo.iban)}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
+            {riga('Intestato a', regalo.intestatario)}
+            {riga('Banca', regalo.banca)}
+            {riga('Causale', regalo.causale)}
+          </div>
+          <button type="button" onClick={copia} style={{
+            width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            padding: '0.7rem 1rem', borderRadius: '0.75rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem',
+            border: `1px solid ${copiato ? tema.primary : tema.border}`, background: copiato ? tema.primary : tema.light,
+            color: copiato ? '#fff' : tema.text, transition: 'all 0.15s',
+          }}>
+            {copiato ? <><Check size={16} /> IBAN copiato</> : <><Copy size={16} /> Copia IBAN</>}
+          </button>
+        </div>
+      )}
+      {regalo.link && (
+        <a href={regalo.link} target="_blank" rel="noreferrer" style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: regalo.iban ? '1.25rem' : 0,
+          padding: '0.75rem 1.75rem', borderRadius: '3rem', border: `1.5px solid ${tema.primary}`,
+          color: tema.primary, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '0.02em',
+        }}>
+          {regalo.link_testo || 'Vai alla lista nozze'} <ExternalLink size={15} />
+        </a>
+      )}
     </div>
   );
 }

@@ -46,7 +46,15 @@ router.get('/info', (req, res) => {
     id: e.id, ora: e.ora, titolo: e.titolo, descrizione: e.descrizione, tipo: e.tipo,
     luogo: e.location_nome || e.luogo,
   }));
-  res.json({ config, locations, cronologia });
+  // La sezione regalo solo se attivata e con almeno un IBAN o un link.
+  const r = db.prepare(`SELECT regalo_abilitato, regalo_titolo, regalo_messaggio, regalo_iban, regalo_intestatario,
+    regalo_banca, regalo_causale, regalo_link, regalo_link_testo FROM config LIMIT 1`).get();
+  const regalo = r?.regalo_abilitato === 1 && (r.regalo_iban || r.regalo_link) ? {
+    titolo: r.regalo_titolo || '', messaggio: r.regalo_messaggio || '', iban: r.regalo_iban || '',
+    intestatario: r.regalo_intestatario || '', banca: r.regalo_banca || '', causale: r.regalo_causale || '',
+    link: r.regalo_link || '', link_testo: r.regalo_link_testo || '',
+  } : null;
+  res.json({ config, locations, cronologia, regalo });
 });
 
 const rimuovi = filename => {

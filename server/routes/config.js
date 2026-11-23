@@ -3,6 +3,16 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 const { aggiornaNomiSposi } = require('../sposi');
 
+const normalizzaIban = v => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+// Controllo ISO 13616 (mod 97): le prime quattro cifre in coda, lettere → numeri.
+function ibanValido(iban) {
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
+  const numerico = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, c => c.charCodeAt(0) - 55);
+  let resto = 0;
+  for (const ch of numerico) resto = (resto * 10 + Number(ch)) % 97;
+  return resto === 1;
+}
+
 // Pubblico: solo dati estetici (per login page)
 router.get('/public', (req, res) => {
   const cfg = db.prepare('SELECT app_name, app_emoji, login_subtitle FROM config LIMIT 1').get();
@@ -15,6 +25,18 @@ router.get('/', auth, (req, res) => {
 
 router.put('/', auth, (req, res) => {
   const b = req.body;
+  // Un IBAN sbagliato di una cifra manda i bonifici degli invitati a vuoto:
+  // si accetta solo se la cifra di controllo torna.
+  if ('regalo_iban' in b) {
+    b.regalo_iban = normalizzaIban(b.regalo_iban);
+    if (b.regalo_iban && !ibanValido(b.regalo_iban)) {
+      return res.status(400).json({ error: "L'IBAN non è valido: controlla di averlo copiato per intero" });
+    }
+  }
+  if ('regalo_link' in b) {
+    const l = String(b.regalo_link ?? '').trim();
+    b.regalo_link = !l || /^https?:\/\//i.test(l) ? l : `https://${l}`;
+  }
   // Ritorna il valore trasformato se la chiave è presente nel body,
   // altrimenti undefined → SQLite lo tratta come NULL → COALESCE preserva il valore esistente
   const p = (k, fn) => k in b ? fn(b[k]) : undefined;
@@ -39,6 +61,15 @@ router.put('/', auth, (req, res) => {
     url_pubblico=COALESCE(?,url_pubblico),
     messaggio_whatsapp=COALESCE(?,messaggio_whatsapp),
     messaggio_ringraziamento=COALESCE(?,messaggio_ringraziamento),
+    regalo_abilitato=COALESCE(?,regalo_abilitato),
+    regalo_titolo=COALESCE(?,regalo_titolo),
+    regalo_messaggio=COALESCE(?,regalo_messaggio),
+    regalo_iban=COALESCE(?,regalo_iban),
+    regalo_intestatario=COALESCE(?,regalo_intestatario),
+    regalo_banca=COALESCE(?,regalo_banca),
+    regalo_causale=COALESCE(?,regalo_causale),
+    regalo_link=COALESCE(?,regalo_link),
+    regalo_link_testo=COALESCE(?,regalo_link_testo),
     conferma_scadenza=COALESCE(?,conferma_scadenza),
     invito_tema=COALESCE(?,invito_tema),
     invito_ora_cerimonia=COALESCE(?,invito_ora_cerimonia),
@@ -71,6 +102,15 @@ router.put('/', auth, (req, res) => {
       p('url_pubblico', v => (v ?? '').trim()),
       p('messaggio_whatsapp', v => v ?? ''),
       p('messaggio_ringraziamento', v => v ?? ''),
+      p('regalo_abilitato', v => (v === true || v === 1 ? 1 : 0)),
+      p('regalo_titolo', v => v ?? ''),
+      p('regalo_messaggio', v => v ?? ''),
+      p('regalo_iban', v => v ?? ''),
+      p('regalo_intestatario', v => v ?? ''),
+      p('regalo_banca', v => v ?? ''),
+      p('regalo_causale', v => v ?? ''),
+      p('regalo_link', v => v ?? ''),
+      p('regalo_link_testo', v => v ?? ''),
       // '' e non NULL quando si toglie la data, altrimenti COALESCE la terrebbe.
       p('conferma_scadenza', v => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '')),
       p('invito_tema', v => v || 'classico'),

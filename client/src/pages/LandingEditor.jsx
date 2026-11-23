@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop } from 'lucide-react';
+import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop, Gift } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api';
 import PhotoCropper from '../components/PhotoCropper';
-import { baseUrlPubblico, MESSAGGIO_WHATSAPP_DEFAULT } from '../publicUrl';
+import { baseUrlPubblico, MESSAGGIO_WHATSAPP_DEFAULT, ibanValido, normalizzaIban } from '../publicUrl';
 
 const TEMI = [
   { key: 'rose',    label: 'Rosa',      primary: '#e11d48', light: '#fff1f2', border: '#fecdd3' },
@@ -20,7 +20,17 @@ const empty = {
   landing_dress_code: '',
   landing_info_pratiche: '',
   landing_tema: 'rose',
+  regalo_abilitato: false,
+  regalo_titolo: '',
+  regalo_messaggio: '',
+  regalo_iban: '',
+  regalo_intestatario: '',
+  regalo_banca: '',
+  regalo_causale: '',
+  regalo_link: '',
+  regalo_link_testo: '',
 };
+const CAMPI_REGALO = ['regalo_titolo', 'regalo_messaggio', 'regalo_iban', 'regalo_intestatario', 'regalo_banca', 'regalo_causale', 'regalo_link', 'regalo_link_testo'];
 
 export default function LandingEditor() {
   const [form, setForm] = useState(empty);
@@ -85,6 +95,8 @@ export default function LandingEditor() {
         landing_dress_code: d.landing_dress_code || '',
         landing_info_pratiche: d.landing_info_pratiche || '',
         landing_tema: d.landing_tema || 'rose',
+        regalo_abilitato: d.regalo_abilitato === 1,
+        ...Object.fromEntries(CAMPI_REGALO.map(k => [k, d[k] || ''])),
       });
       setUrlPubblico(d.url_pubblico || '');
       setMessaggioWa(d.messaggio_whatsapp || '');
@@ -94,12 +106,21 @@ export default function LandingEditor() {
     });
   }, []);
 
+  const [erroreSave, setErroreSave] = useState('');
   const save = async e => {
     e.preventDefault();
-    await api.put('/config', form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setErroreSave('');
+    try {
+      await api.put('/config', form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setErroreSave(err.response?.data?.error || 'Errore nel salvataggio');
+    }
   };
+  const ibanScritto = normalizzaIban(form.regalo_iban);
+  const ibanSbagliato = ibanScritto.length > 0 && !ibanValido(ibanScritto);
+  const campoRegalo = k => ({ value: form[k], onChange: e => setForm(f => ({ ...f, [k]: e.target.value })) });
 
   const saveCondivisione = async () => {
     await api.put('/config', { url_pubblico: urlPubblico, messaggio_whatsapp: messaggioWa });
@@ -332,6 +353,62 @@ export default function LandingEditor() {
           />
         )}
 
+        {/* Regalo: IBAN e lista nozze */}
+        <div className="card">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h2 className="font-bold text-gray-800 flex items-center gap-2"><Gift size={17} className="text-rose-500" /> Regalo: IBAN e lista nozze</h2>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer shrink-0">
+              <input type="checkbox" className="w-4 h-4 accent-rose-500" checked={form.regalo_abilitato}
+                onChange={e => setForm(f => ({ ...f, regalo_abilitato: e.target.checked }))} />
+              Mostra sulla pagina
+            </label>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">Una sezione discreta, dopo il programma. Compare solo se è attiva e c'è almeno l'IBAN o il link.</p>
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${form.regalo_abilitato ? '' : 'opacity-60'}`}>
+            <div className="space-y-3">
+              <div>
+                <label className="form-label">Titolo</label>
+                <input className="form-input" placeholder="Il nostro regalo" {...campoRegalo('regalo_titolo')} />
+              </div>
+              <div>
+                <label className="form-label">Messaggio</label>
+                <textarea className="form-input" rows={4} placeholder="La vostra presenza è il regalo più bello. Se desiderate farci un pensiero, ci aiuterete a realizzare il nostro viaggio di nozze."
+                  {...campoRegalo('regalo_messaggio')} />
+              </div>
+              <div>
+                <label className="form-label">Link lista nozze o viaggio</label>
+                <input className="form-input" placeholder="www.listanozze.it/mario-e-anna" {...campoRegalo('regalo_link')} />
+              </div>
+              <div>
+                <label className="form-label">Testo del pulsante</label>
+                <input className="form-input" placeholder="Vai alla lista nozze" {...campoRegalo('regalo_link_testo')} />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="form-label">IBAN</label>
+                <input className={`form-input font-mono ${ibanSbagliato ? 'border-red-300 focus:border-red-400' : ''}`} placeholder="IT60 X054 2811 1010 0000 0123 456"
+                  {...campoRegalo('regalo_iban')} />
+                {ibanSbagliato
+                  ? <p className="text-xs text-red-600 mt-1">IBAN non valido: manca un carattere o ce n'è uno sbagliato.</p>
+                  : ibanScritto && <p className="text-xs text-green-600 mt-1">IBAN valido.</p>}
+              </div>
+              <div>
+                <label className="form-label">Intestatario</label>
+                <input className="form-input" placeholder="Mario Rossi e Anna Bianchi" {...campoRegalo('regalo_intestatario')} />
+              </div>
+              <div>
+                <label className="form-label">Banca</label>
+                <input className="form-input" placeholder="Facoltativo" {...campoRegalo('regalo_banca')} />
+              </div>
+              <div>
+                <label className="form-label">Causale suggerita</label>
+                <input className="form-input" placeholder="Regalo di nozze" {...campoRegalo('regalo_causale')} />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Tema colore */}
         <div className="card">
           <h2 className="font-bold text-gray-800 mb-4">Tema colore</h2>
@@ -368,6 +445,7 @@ export default function LandingEditor() {
           <a href="/wedding" target="_blank" rel="noopener noreferrer" className="btn-secondary">
             <ExternalLink size={15} /> Visualizza pagina
           </a>
+          {erroreSave && <p className="text-sm text-red-600">{erroreSave}</p>}
         </div>
 
       </form>

@@ -44,3 +44,16 @@ export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
     .replaceAll('{link_conferma}', `${base}/conferma`);
   return linkWhatsAppTesto(telefono, testo);
 };
+
+// IBAN: stesso controllo del server (ISO 13616, mod 97), per avvisare mentre si scrive.
+export const normalizzaIban = v => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+export const ibanValido = v => {
+  const iban = normalizzaIban(v);
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
+  const numerico = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, c => c.charCodeAt(0) - 55);
+  let resto = 0;
+  for (const ch of numerico) resto = (resto * 10 + Number(ch)) % 97;
+  return resto === 1;
+};
+// A gruppi di quattro, come sulla carta: più facile da ricopiare a mano.
+export const formattaIban = v => normalizzaIban(v).replace(/(.{4})/g, '$1 ').trim();

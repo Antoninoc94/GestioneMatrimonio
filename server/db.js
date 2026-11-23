@@ -285,6 +285,16 @@ for (const col of [
     db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
   }
 }
+// Sezione regalo della pagina Wedding: IBAN e lista nozze. Spenta finché
+// non la si attiva dall'editor della Landing.
+if (!configCols.find(c => c.name === 'regalo_abilitato')) {
+  db.prepare('ALTER TABLE config ADD COLUMN regalo_abilitato INTEGER DEFAULT 0').run();
+}
+for (const col of ['regalo_titolo', 'regalo_messaggio', 'regalo_iban', 'regalo_intestatario', 'regalo_banca', 'regalo_causale', 'regalo_link', 'regalo_link_testo']) {
+  if (!configCols.find(c => c.name === col)) {
+    db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
+  }
+}
 if (!configCols.find(c => c.name === 'invito_tema')) {
   db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
 }
