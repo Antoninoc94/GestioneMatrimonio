@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Plane, MapPin, ExternalLink, Phone, Mail, AlertTriangle, CalendarDays, LayoutList, LogOut } from 'lucide-react';
+import { Plus, Pencil, Trash2, Plane, MapPin, ExternalLink, Phone, Mail, AlertTriangle, CalendarDays, LayoutList, LogOut, ListChecks, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../api';
+import Checklist from './viaggio/Checklist';
+import { documentiInScadenza } from './viaggio/util';
 
 const TIPI = ['volo', 'hotel', 'escursione', 'trasporto', 'ristorante', 'altro'];
 const STATI = ['da_prenotare', 'prenotato', 'pagato', 'completato'];
@@ -61,6 +65,33 @@ function controlli(items, partenza, ritorno) {
   return out;
 }
 
+// Riga del PDF: niente emoji né frecce, che jsPDF/helvetica non ha (la "→"
+// dei titoli dei voli usciva come caratteri spaiati).
+const testoPdf = t => String(t).replace(/\s*→\s*/g, ' - ');
+function rigaPdf(i, ora, checkout) {
+  return rigaPdfGrezza(i, ora, checkout).map(testoPdf);
+}
+function rigaPdfGrezza(i, ora, checkout) {
+  if (checkout) return [ora || '', `Check-out: ${i.titolo}`, ''];
+  const cosa = [`${tipoLabel[i.tipo]}: ${i.titolo}`];
+  if (i.tipo === 'volo') {
+    const v = [[i.numero_volo, i.compagnia].filter(Boolean).join(' '), i.ora_fine ? `arrivo ${i.ora_fine}${i.data_fine && i.data_fine !== i.data_inizio ? ` del ${fmt(i.data_fine)}` : ''}` : ''].filter(Boolean).join(' - ');
+    if (v) cosa.push(v);
+  } else if (i.tipo === 'hotel' && i.data_fine && i.data_fine > i.data_inizio) {
+    const n = giorniTra(i.data_inizio, i.data_fine);
+    cosa.push(`${n} ${n === 1 ? 'notte' : 'notti'}, check-out ${fmt(i.data_fine)}${i.ora_fine ? ` ore ${i.ora_fine}` : ''}`);
+  }
+  if (i.luogo) cosa.push(i.luogo);
+  if (i.note) cosa.push(i.note);
+  const info = [
+    i.numero_prenotazione && `Prenotazione: ${i.numero_prenotazione}`,
+    i.contatto && `Contatto: ${i.contatto}`,
+    i.stato === 'da_prenotare' && 'DA PRENOTARE',
+    i.costo > 0 && i.stato !== 'da_prenotare' && (i.pagato || 0) < i.costo && `Da saldare: ${formatEuro(i.costo - (i.pagato || 0)).replace(/\s/g, ' ')}`,
+  ].filter(Boolean);
+  return [ora || '', cosa.join('\n'), info.join('\n')];
+}
+
 // Saldi e prenotazioni scaduti o in arrivo nei prossimi 14 giorni.
 function scadenze(items) {
   const out = [];
@@ -97,21 +128,40 @@ export default function Viaggio() {
   const [editId, setEditId] = useState(null);
   const [errore, setErrore] = useState('');
   const [modViaggio, setModViaggio] = useState(null);
+  const [checklist, setChecklist] = useState([]);
+  const [nomi, setNomi] = useState({ 1: 'Sposo', 2: 'Sposa' });
   const [vista, setVista] = useState(() => {
     try { return localStorage.getItem('viaggio_vista') || 'giorni'; } catch { return 'giorni'; }
   });
 
   const load = () => api.get('/viaggio').then(r => setItems(r.data));
+  const loadChecklist = () => api.get('/viaggio/checklist').then(r => setChecklist(r.data));
   useEffect(() => {
     load();
-    api.get('/config').then(r => setViaggio({
-      destinazione: r.data.viaggio_destinazione || '', partenza: r.data.viaggio_partenza || '',
-      ritorno: r.data.viaggio_ritorno || '', budget: r.data.viaggio_budget || '',
-    }));
+    loadChecklist();
+    api.get('/config').then(r => {
+      setViaggio({
+        destinazione: r.data.viaggio_destinazione || '', partenza: r.data.viaggio_partenza || '',
+        ritorno: r.data.viaggio_ritorno || '', budget: r.data.viaggio_budget || '',
+      });
+      setNomi({ 1: r.data.nome_sposo1 || 'Sposo', 2: r.data.nome_sposo2 || 'Sposa' });
+    });
     // Buste e bonifici ricevuti: quanto del viaggio coprono.
     api.get('/regali').then(r => setRegaliDenaro(r.data
       .filter(g => ['busta', 'bonifico'].includes(g.tipo)).reduce((t, g) => t + (g.valore_stimato || 0), 0)));
   }, []);
+  const salvaVoce = async v => {
+    if (v.id) await api.put(`/viaggio/checklist/${v.id}`, v);
+    else await api.post('/viaggio/checklist', v);
+    loadChecklist();
+  };
+  const eliminaVoce = async id => {
+    if (!confirm('Eliminare questa voce?')) return;
+    await api.delete(`/viaggio/checklist/${id}`);
+    loadChecklist();
+  };
+  const suggerita = async () => setChecklist((await api.post('/viaggio/checklist/suggerita')).data);
+
   const cambiaVista = v => { setVista(v); try { localStorage.setItem('viaggio_vista', v); } catch { /* solo comodità */ } };
 
   const openNew = (preset = {}) => { setForm({ ...empty, ...preset }); setEditId(null); setErrore(''); setModal(true); };
@@ -156,10 +206,73 @@ export default function Viaggio() {
   const totalePagato = items.reduce((s, i) => s + (i.pagato || 0), 0);
   const daPagare = items.filter(i => i.stato !== 'da_prenotare').reduce((s, i) => s + Math.max(0, (i.costo || 0) - (i.pagato || 0)), 0);
   const scadenzeSoldi = scadenze(items);
+  const documenti = documentiInScadenza(checklist, viaggio.ritorno, nomi);
   const budget = parseFloat(viaggio.budget) || 0;
   const notti = partenza && ritorno ? giorniTra(partenza, ritorno) : null;
   const { scoperte, sovrapposti } = controlli(items, partenza, ritorno);
   const daPrenotare = items.filter(i => i.stato === 'da_prenotare').length;
+
+  // L'itinerario da portare in viaggio: giorno per giorno con orari, luoghi,
+  // numeri di prenotazione e contatti, poi le prenotazioni senza data.
+  const exportPDF = () => {
+    if (!items.length) return alert('Nessuna prenotazione da esportare.');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const rose = [225, 29, 72];
+    const gray = [107, 114, 128];
+    const titolo = viaggio.destinazione ? `Viaggio di nozze - ${viaggio.destinazione}` : 'Viaggio di nozze';
+    const date = partenza ? `${fmt(partenza, { day: 'numeric', month: 'long' })}${ritorno ? ` - ${fmt(ritorno, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : '';
+
+    doc.setFillColor(...rose);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(titolo, 14, 12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text([date, notti > 0 ? `${notti} notti` : '', `${items.length} prenotazioni`].filter(Boolean).join(' · '), 14, 20);
+
+    // Una riga per evento, con l'intestazione del giorno come riga a tutta larghezza.
+    const righe = [];
+    const perGiorno = {};
+    for (const i of items) {
+      if (!i.data_inizio) continue;
+      (perGiorno[i.data_inizio] ||= []).push({ i, ora: i.ora_inizio });
+      if (i.tipo === 'hotel' && i.data_fine && i.data_fine > i.data_inizio) (perGiorno[i.data_fine] ||= []).push({ i, ora: i.ora_fine, checkout: true });
+    }
+    for (const d of Object.keys(perGiorno).sort()) {
+      const nel = partenza && ritorno && d >= partenza && d <= ritorno;
+      righe.push([{ content: `${nel ? `Giorno ${giorniTra(partenza, d) + 1} - ` : ''}${fmtGiorno(d)}`, colSpan: 3,
+        styles: { fillColor: [255, 241, 242], textColor: [159, 18, 57], fontStyle: 'bold' } }]);
+      perGiorno[d].sort((a, b) => (a.checkout ? 0 : 1) - (b.checkout ? 0 : 1) || (a.ora || '99').localeCompare(b.ora || '99'))
+        .forEach(({ i, ora, checkout }) => righe.push(rigaPdf(i, ora, checkout)));
+    }
+    const senzaData = items.filter(i => !i.data_inizio);
+    if (senzaData.length) {
+      righe.push([{ content: 'Senza data', colSpan: 3, styles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: 'bold' } }]);
+      senzaData.forEach(i => righe.push(rigaPdf(i, null, false)));
+    }
+
+    autoTable(doc, {
+      startY: 34,
+      head: [['Ora', 'Cosa', 'Prenotazione e contatti']],
+      body: righe,
+      headStyles: { fillColor: rose, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8.5, textColor: [55, 65, 81], valign: 'top' },
+      columnStyles: { 0: { cellWidth: 16, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 62 } },
+      margin: { left: 14, right: 14 },
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let pg = 1; pg <= pageCount; pg++) {
+      doc.setPage(pg);
+      doc.setFontSize(7);
+      doc.setTextColor(...gray);
+      doc.text(`Pagina ${pg} di ${pageCount}`, 196, 290, { align: 'right' });
+      doc.text(`${titolo} - ${new Date().toLocaleDateString('it-IT')}`, 14, 290);
+    }
+    doc.save('itinerario-viaggio-di-nozze.pdf');
+  };
 
   let quando = null;
   if (partenza) {
@@ -178,7 +291,10 @@ export default function Viaggio() {
           <h1 className="page-title">Viaggio di Nozze</h1>
           <p className="page-subtitle">{items.length} prenotazioni{daPrenotare > 0 && ` · ${daPrenotare} da prenotare`}</p>
         </div>
-        <button className="btn-primary justify-center" onClick={() => openNew()}><Plus size={16} /> Aggiungi</button>
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          <button className="btn-secondary justify-center" onClick={exportPDF}><Download size={15} /> Itinerario PDF</button>
+          <button className="btn-primary justify-center" onClick={() => openNew()}><Plus size={16} /> Aggiungi</button>
+        </div>
       </div>
 
       {/* Il viaggio */}
@@ -230,8 +346,15 @@ export default function Viaggio() {
       </div>
 
       {/* Avvisi */}
-      {(scoperte.length > 0 || sovrapposti.length > 0 || scadenzeSoldi.length > 0) && (
+      {(scoperte.length > 0 || sovrapposti.length > 0 || scadenzeSoldi.length > 0 || documenti.length > 0) && (
         <div className="card mb-4 border-amber-200 bg-amber-50/60 space-y-2">
+          {documenti.map(d => (
+            <div key={d.key} className={`flex items-center gap-2 text-sm flex-wrap ${d.grave ? 'text-red-700' : 'text-amber-800'}`}>
+              <AlertTriangle size={15} className="shrink-0" />
+              <span className="flex-1 min-w-0">{d.testo}</span>
+              <button className="text-xs px-2.5 py-1 rounded-lg bg-white border border-amber-200 hover:border-amber-400" onClick={() => cambiaVista('checklist')}>Checklist</button>
+            </div>
+          ))}
           {scadenzeSoldi.map(s => (
             <div key={s.key} className={`flex items-center gap-2 text-sm flex-wrap ${s.scaduta ? 'text-red-700' : 'text-amber-800'}`}>
               <AlertTriangle size={15} className="shrink-0" />
@@ -260,26 +383,28 @@ export default function Viaggio() {
         </div>
       )}
 
-      {items.length === 0 ? (
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto">
+        {[
+          ['giorni', CalendarDays, 'Giorni', 'Giorno per giorno'],
+          ['tipo', LayoutList, 'Per tipo', 'Per tipo'],
+          ['checklist', ListChecks, 'Checklist', `Checklist${checklist.length ? ` ${checklist.filter(c => c.fatto).length}/${checklist.length}` : ''}`],
+        ].map(([k, Icona, corta, lunga]) => (
+          <button key={k} onClick={() => cambiaVista(k)}
+            className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 whitespace-nowrap ${vista === k ? 'bg-white shadow-sm text-gray-900 font-medium' : 'text-gray-500'}`}>
+            <Icona size={14} /> <span className="sm:hidden">{corta}</span><span className="hidden sm:inline">{lunga}</span>
+          </button>
+        ))}
+      </div>
+      {vista === 'checklist' ? (
+        <Checklist voci={checklist} nomi={nomi} ritorno={ritorno} onSalva={salvaVoce} onElimina={eliminaVoce} onSuggerita={suggerita} />
+      ) : items.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
           <Plane size={40} className="mx-auto mb-2 opacity-30" />
           <p>Nessuna prenotazione. Inizia dal volo!</p>
         </div>
-      ) : (
-        <>
-          <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
-            {[['giorni', CalendarDays, 'Giorno per giorno'], ['tipo', LayoutList, 'Per tipo']].map(([k, Icona, label]) => (
-              <button key={k} onClick={() => cambiaVista(k)}
-                className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 ${vista === k ? 'bg-white shadow-sm text-gray-900 font-medium' : 'text-gray-500'}`}>
-                <Icona size={14} /> {label}
-              </button>
-            ))}
-          </div>
-          {vista === 'giorni'
-            ? <GiornoPerGiorno items={items} partenza={partenza} ritorno={ritorno} onEdit={openEdit} onDel={del} />
-            : <PerTipo items={items} onEdit={openEdit} onDel={del} />}
-        </>
-      )}
+      ) : vista === 'tipo'
+        ? <PerTipo items={items} onEdit={openEdit} onDel={del} />
+        : <GiornoPerGiorno items={items} partenza={partenza} ritorno={ritorno} onEdit={openEdit} onDel={del} />}
 
       {modViaggio && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModViaggio(null)}>

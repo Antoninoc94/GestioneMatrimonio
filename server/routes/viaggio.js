@@ -81,4 +81,76 @@ router.delete('/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Checklist ────────────────────────────────────────────────────────────
+const CATEGORIE = ['documenti', 'salute', 'soldi', 'bagaglio', 'casa', 'altro'];
+
+// La lista di partenza, da cui togliere quello che non serve. I documenti
+// personali sono uno per ciascuno degli sposi (persona 1 e 2).
+const SUGGERITA = [
+  ['documenti', 'Passaporto', [1, 2]],
+  ["documenti", "Carta d'identità", [1, 2]],
+  ['documenti', 'Visto, ESTA o autorizzazione di ingresso (se serve)', [null]],
+  ['documenti', 'Copie digitali dei documenti sul telefono e via email', [null]],
+  ['salute', 'Assicurazione sanitaria di viaggio', [null]],
+  ['salute', 'Vaccinazioni consigliate per la destinazione', [null]],
+  ['salute', 'Farmaci personali e kit di primo soccorso', [null]],
+  ['soldi', 'Carte abilitate all\'estero e avviso alla banca', [null]],
+  ['soldi', 'Un po\' di contanti in valuta locale', [null]],
+  ['bagaglio', 'Adattatore per le prese', [null]],
+  ['bagaglio', 'Caricabatterie e power bank', [null]],
+  ['bagaglio', 'Check-in online dei voli', [null]],
+  ['casa', 'Chi bada a casa, piante e animali', [null]],
+  ['casa', 'Chiudere gas e acqua, svuotare il frigo', [null]],
+];
+
+const voceChecklist = b => {
+  const voce = testo(b.testo);
+  if (!voce) return { error: 'Scrivi la voce' };
+  return {
+    testo: voce,
+    categoria: CATEGORIE.includes(b.categoria) ? b.categoria : 'altro',
+    persona: [1, 2].includes(Number(b.persona)) ? Number(b.persona) : null,
+    data: data(b.data),
+    fatto: b.fatto ? 1 : 0,
+    note: testo(b.note),
+  };
+};
+
+router.get('/checklist', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM viaggio_checklist ORDER BY fatto ASC, data IS NULL, data ASC, id ASC').all());
+});
+
+router.post('/checklist', auth, (req, res) => {
+  const v = voceChecklist(req.body);
+  if (v.error) return res.status(400).json({ error: v.error });
+  const r = db.prepare('INSERT INTO viaggio_checklist (testo, categoria, persona, data, fatto, note) VALUES (@testo, @categoria, @persona, @data, @fatto, @note)').run(v);
+  res.json(db.prepare('SELECT * FROM viaggio_checklist WHERE id = ?').get(r.lastInsertRowid));
+});
+
+// Aggiunge le voci suggerite che mancano: si può ripetere senza doppioni.
+router.post('/checklist/suggerita', auth, (req, res) => {
+  const esiste = db.prepare('SELECT 1 FROM viaggio_checklist WHERE testo = ? AND persona IS ?');
+  const ins = db.prepare('INSERT INTO viaggio_checklist (testo, categoria, persona) VALUES (?, ?, ?)');
+  db.transaction(() => {
+    for (const [categoria, t, persone] of SUGGERITA) {
+      for (const p of persone) if (!esiste.get(t, p)) ins.run(t, categoria, p);
+    }
+  })();
+  res.json(db.prepare('SELECT * FROM viaggio_checklist ORDER BY fatto ASC, data IS NULL, data ASC, id ASC').all());
+});
+
+router.put('/checklist/:id', auth, (req, res) => {
+  if (!db.prepare('SELECT 1 FROM viaggio_checklist WHERE id = ?').get(req.params.id)) return res.status(404).json({ error: 'Voce non trovata' });
+  const v = voceChecklist(req.body);
+  if (v.error) return res.status(400).json({ error: v.error });
+  db.prepare('UPDATE viaggio_checklist SET testo=@testo, categoria=@categoria, persona=@persona, data=@data, fatto=@fatto, note=@note WHERE id=@id')
+    .run({ ...v, id: req.params.id });
+  res.json(db.prepare('SELECT * FROM viaggio_checklist WHERE id = ?').get(req.params.id));
+});
+
+router.delete('/checklist/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM viaggio_checklist WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;

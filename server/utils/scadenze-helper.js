@@ -49,6 +49,21 @@ function getAllScadenze(db) {
       costo - COALESCE(pagato, 0) AS importo
     FROM viaggio
     WHERE data_saldo IS NOT NULL AND costo > COALESCE(pagato, 0) AND stato != 'da_prenotare'
+    UNION ALL
+    -- Le cose da fare prima di partire, con una data entro cui farle. Per i
+    -- documenti la data è la loro scadenza, non un compito: restano fuori.
+    SELECT
+      'viag_check_' || id    AS id,
+      'Viaggio: ' || testo   AS titolo,
+      'viaggio'              AS categoria,
+      data                   AS data_scadenza,
+      'media'                AS priorita,
+      0                      AS completata,
+      'viaggio'              AS source,
+      id                     AS source_id,
+      NULL                   AS importo
+    FROM viaggio_checklist
+    WHERE data IS NOT NULL AND fatto = 0 AND categoria != 'documenti'
     ORDER BY data_scadenza ASC
   `).all();
 

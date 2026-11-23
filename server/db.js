@@ -489,6 +489,21 @@ if (!viaggioCols.includes('pagato')) {
 for (const col of ['data_saldo', 'prenotare_entro']) {
   if (!viaggioCols.includes(col)) db.prepare(`ALTER TABLE viaggio ADD COLUMN ${col} TEXT`).run();
 }
+// Checklist del viaggio: documenti, salute, soldi, bagaglio, casa. `persona`
+// è 1/2 (config.nome_sposo1/2) o NULL per entrambi; `data` per i documenti è
+// la scadenza del documento, per il resto la data entro cui farlo.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS viaggio_checklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    testo TEXT NOT NULL,
+    categoria TEXT DEFAULT 'altro',
+    persona INTEGER,
+    data TEXT,
+    fatto INTEGER DEFAULT 0,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
 
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
