@@ -24,13 +24,17 @@ export const MESSAGGIO_SOLLECITO_DEFAULT =
 // passando dal link, WhatsApp Web/desktop le può mostrare come "�". Per lo
 // stesso motivo si usa api.whatsapp.com/send e non wa.me, che reindirizza lì.
 // Numeri italiani senza prefisso (3xx…) ricevono +39; "00" iniziale vale come "+". null se il numero manca.
-export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
+export const linkWhatsAppTesto = (telefono, testo) => {
   let n = (telefono || '').replace(/[^\d+]/g, '');
   if (n.startsWith('+')) n = n.slice(1);
   else if (n.startsWith('00')) n = n.slice(2);
   else if (n.length === 10 && n.startsWith('3')) n = `39${n}`;
   n = n.replace(/\D/g, '');
   if (n.length < 8) return null;
+  return `https://api.whatsapp.com/send?phone=${n}&text=${encodeURIComponent(testo)}`;
+};
+
+export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
   const testo = (template || MESSAGGIO_WHATSAPP_DEFAULT)
     .replaceAll('{nome}', nome || '')
     .replaceAll('{scadenza}', scadenza
@@ -38,5 +42,5 @@ export const linkWhatsApp = (telefono, { nome, template, base, scadenza }) => {
       : '')
     .replaceAll('{link_wedding}', `${base}/wedding`)
     .replaceAll('{link_conferma}', `${base}/conferma`);
-  return `https://api.whatsapp.com/send?phone=${n}&text=${encodeURIComponent(testo)}`;
+  return linkWhatsAppTesto(telefono, testo);
 };

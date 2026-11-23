@@ -440,6 +440,19 @@ db.exec(`
   )
 `);
 
+// Migrazione: come e quando si è ringraziato per un regalo, e il testo del
+// ringraziamento su WhatsApp (NULL = testo predefinito del client).
+const regaliCols = db.prepare('PRAGMA table_info(regali)').all().map(c => c.name);
+if (!regaliCols.includes('canale_ringraziamento')) {
+  db.prepare('ALTER TABLE regali ADD COLUMN canale_ringraziamento TEXT').run();
+}
+if (!regaliCols.includes('data_ringraziamento')) {
+  db.prepare('ALTER TABLE regali ADD COLUMN data_ringraziamento TEXT').run();
+}
+if (!db.prepare('PRAGMA table_info(config)').all().some(c => c.name === 'messaggio_ringraziamento')) {
+  db.prepare('ALTER TABLE config ADD COLUMN messaggio_ringraziamento TEXT').run();
+}
+
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
 if (!noteCols.includes('email_stato')) {

@@ -38,6 +38,7 @@ router.put('/', auth, (req, res) => {
     soglia_eta_bambino=COALESCE(?,soglia_eta_bambino),
     url_pubblico=COALESCE(?,url_pubblico),
     messaggio_whatsapp=COALESCE(?,messaggio_whatsapp),
+    messaggio_ringraziamento=COALESCE(?,messaggio_ringraziamento),
     conferma_scadenza=COALESCE(?,conferma_scadenza),
     invito_tema=COALESCE(?,invito_tema),
     invito_ora_cerimonia=COALESCE(?,invito_ora_cerimonia),
@@ -69,6 +70,7 @@ router.put('/', auth, (req, res) => {
       p('soglia_eta_bambino', v => parseInt(v) || 12),
       p('url_pubblico', v => (v ?? '').trim()),
       p('messaggio_whatsapp', v => v ?? ''),
+      p('messaggio_ringraziamento', v => v ?? ''),
       // '' e non NULL quando si toglie la data, altrimenti COALESCE la terrebbe.
       p('conferma_scadenza', v => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '')),
       p('invito_tema', v => v || 'classico'),
