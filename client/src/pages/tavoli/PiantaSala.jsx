@@ -8,6 +8,21 @@ const COLORI = {
   bambini: { fill: '#f3e8ff', stroke: '#c084fc' },
 };
 
+// Si ruota ciò che non è simmetrico: il rettangolare, e il tavolo sposi
+// anche tondo, perché le sue sedie stanno su un lato solo. Le sedie sono
+// disegnate dentro lo stesso gruppo ruotato, quindi girano col tavolo; i
+// quattro versi servono a scegliere verso dove guardano.
+const ruotabile = t => t.forma === 'rettangolare' || t.tipo === 'sposi';
+// Per il tavolo sposi: dove stanno le sedie e quindi verso dove guardano
+// gli sposi (oltre il tavolo, cioè dal lato opposto). rotate() in SVG gira
+// in senso orario: le sedie partono in alto e passano a destra, in basso, a sinistra.
+const ORIENTAMENTO = {
+  0: 'Sedie sul lato in alto: gli sposi guardano verso il basso.',
+  90: 'Sedie sul lato destro: gli sposi guardano verso sinistra.',
+  180: "Sedie sul lato in basso: gli sposi guardano verso l'alto.",
+  270: 'Sedie sul lato sinistro: gli sposi guardano verso destra.',
+};
+
 // Ingombro dopo la rotazione (solo 0/90/180/270 hanno senso in una sala).
 const ingombro = t => {
   const m = misure(t);
@@ -19,15 +34,16 @@ const ingombro = t => {
 function posti(t) {
   const n = Math.max(1, t.capienza || 1);
   const m = misure(t);
-  // Tavolo sposi: tutti sullo stesso lato, rivolti verso la sala (in basso,
-  // poi si ruota il tavolo), mai uno di fronte all'altro.
+  // Tavolo sposi: tutti sullo stesso lato, mai uno di fronte all'altro. Le
+  // sedie partono dal lato in alto, così gli sposi guardano verso il basso
+  // della pianta; con "Ruota" si sceglie il lato.
   if (t.tipo === 'sposi') {
     if (t.forma === 'rettangolare') {
-      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: m.h / 2 + 15 }));
+      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: -m.h / 2 - 15 }));
     }
     const passo = Math.min(0.55, Math.PI / Math.max(1, n - 1));
     return Array.from({ length: n }, (_, i) => {
-      const a = Math.PI / 2 + (i - (n - 1) / 2) * passo;
+      const a = -Math.PI / 2 + (i - (n - 1) / 2) * passo;
       return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
     });
   }
@@ -151,7 +167,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                   onPointerMove={e => onPointerMove(e, t)}
                   onPointerUp={() => onPointerUp(t)}
                   onPointerCancel={() => setDrag(null)}>
-                  <g transform={`rotate(${t.forma === 'rettangolare' ? t.rotazione || 0 : 0})`}>
+                  <g transform={`rotate(${ruotabile(t) ? t.rotazione || 0 : 0})`}>
                     {posti(t).map((p, i) => (
                       <circle key={i} cx={p.x} cy={p.y} r="9"
                         fill={i < adulti ? '#fb7185' : i < occupati ? '#c084fc' : '#ffffff'}
@@ -201,12 +217,15 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                 onClick={() => salvaTavolo(sel.id, { forma: sel.forma === 'rettangolare' ? 'tondo' : 'rettangolare' })}>
                 {sel.forma === 'rettangolare' ? <><Circle size={13} /> Rendi tondo</> : <><RectangleHorizontal size={13} /> Rendi rettangolare</>}
               </button>
-              {sel.forma === 'rettangolare' && (
-                <button className="btn-secondary text-xs py-1" onClick={() => salvaTavolo(sel.id, { rotazione: ((sel.rotazione || 0) + 90) % 180 })}>
+              {ruotabile(sel) && (
+                <button className="btn-secondary text-xs py-1" onClick={() => salvaTavolo(sel.id, { rotazione: ((sel.rotazione || 0) + 90) % 360 })}>
                   <RotateCw size={13} /> Ruota
                 </button>
               )}
             </div>
+            {sel.tipo === 'sposi' && (
+              <p className="text-xs text-gray-400 -mt-1.5 mb-3">{ORIENTAMENTO[sel.rotazione || 0] || ORIENTAMENTO[0]} Usa "Ruota" per girarle verso la sala.</p>
+            )}
             {sel.ospiti.length === 0 ? (
               <p className="text-xs text-gray-400">Nessun ospite seduto.</p>
             ) : (
