@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import api from '../api';
 import PhotoCropper from '../components/PhotoCropper';
 import { baseUrlPubblico, MESSAGGIO_WHATSAPP_DEFAULT } from '../publicUrl';
@@ -38,12 +38,42 @@ export default function LandingEditor() {
   const qrWeddingRef = useRef();
   const qrConfermaRef = useRef();
 
-  const downloadQR = (canvasRef, filename) => {
-    const canvas = canvasRef.current?.querySelector('canvas');
-    if (!canvas) return;
-    const url = canvas.toDataURL('image/png');
+  // Il QR è disegnato in SVG: l'SVG si scarica così com'è (vettoriale, nitido
+  // a qualsiasi dimensione di stampa), il PNG si ricava dallo stesso SVG a
+  // 2048 px invece dei 160 px dell'anteprima.
+  const scarica = (href, filename) => {
     const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
+    a.href = href; a.download = filename; a.click();
+  };
+  const svgQR = ref => {
+    const svg = ref.current?.querySelector('svg');
+    if (!svg) return null;
+    const copia = svg.cloneNode(true);
+    copia.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    copia.removeAttribute('class');
+    return new XMLSerializer().serializeToString(copia);
+  };
+  const downloadSVG = (ref, nome) => {
+    const testo = svgQR(ref);
+    if (!testo) return;
+    const url = URL.createObjectURL(new Blob([testo], { type: 'image/svg+xml' }));
+    scarica(url, `${nome}.svg`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const downloadPNG = (ref, nome) => {
+    const testo = svgQR(ref);
+    if (!testo) return;
+    const LATO = 2048;
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = LATO;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, LATO, LATO);
+      scarica(canvas.toDataURL('image/png'), `${nome}.png`);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(testo);
   };
 
   useEffect(() => {
@@ -368,24 +398,30 @@ export default function LandingEditor() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {[
-            { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding.png' },
-            { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma.png' },
+            { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding' },
+            { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma' },
           ].map(({ label, path, ref, file }) => {
             const url = `${baseQR}${path}`;
             return (
               <div key={path} className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-sm font-semibold text-gray-700">{label}</p>
-                <div ref={ref} className="p-3 bg-white rounded-xl shadow-sm">
-                  <QRCodeCanvas value={url} size={160} fgColor="#1f2937" bgColor="#ffffff" level="M" />
+                {/* Il margine bianco (4 moduli) fa parte del file: senza, i telefoni
+                    faticano a leggere un QR stampato a filo di un bordo colorato. */}
+                <div ref={ref} className="p-1 bg-white rounded-xl shadow-sm">
+                  <QRCodeSVG value={url} size={176} marginSize={4} fgColor="#1f2937" bgColor="#ffffff" level="M" />
                 </div>
                 <p className="text-xs text-gray-400 text-center break-all">{url}</p>
-                <button
-                  type="button"
-                  className="btn-secondary text-sm w-full justify-center"
-                  onClick={() => downloadQR(ref, file)}
-                >
-                  <Download size={13} /> Scarica PNG
-                </button>
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  <button type="button" className="btn-secondary text-sm justify-center" onClick={() => downloadSVG(ref, file)}
+                    title="Vettoriale: ideale per la stampa e i programmi di grafica">
+                    <Download size={13} /> SVG
+                  </button>
+                  <button type="button" className="btn-secondary text-sm justify-center" onClick={() => downloadPNG(ref, file)}
+                    title="Immagine 2048×2048 pixel">
+                    <Download size={13} /> PNG
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 text-center -mt-1">Per il biglietto stampato usa l'SVG: resta nitido a qualsiasi dimensione.</p>
               </div>
             );
           })}
