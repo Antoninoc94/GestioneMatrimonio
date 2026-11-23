@@ -1,0 +1,210 @@
+import { useRef, useState } from 'react';
+import { RotateCw, LayoutGrid, Circle, RectangleHorizontal, MousePointerClick } from 'lucide-react';
+import { PIANTA_W, PIANTA_H, misure, posizioneDefault, nomeOspite, tipoTavolo } from './util';
+
+const COLORI = {
+  normale: { fill: '#ffffff', stroke: '#d1d5db' },
+  sposi: { fill: '#ffe4e6', stroke: '#fb7185' },
+  bambini: { fill: '#f3e8ff', stroke: '#c084fc' },
+};
+
+// Ingombro dopo la rotazione (solo 0/90/180/270 hanno senso in una sala).
+const ingombro = t => {
+  const m = misure(t);
+  const verticale = t.forma === 'rettangolare' && (t.rotazione || 0) % 180 === 90;
+  return verticale ? { w: m.h, h: m.w } : { w: m.w, h: m.h };
+};
+
+// Posti attorno al tavolo, in coordinate locali (prima della rotazione).
+function posti(t) {
+  const n = Math.max(1, t.capienza || 1);
+  const m = misure(t);
+  if (t.forma === 'rettangolare') {
+    const sopra = Math.ceil(n / 2), sotto = n - sopra;
+    return [
+      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 11 })),
+      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 11 })),
+    ];
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return { x: Math.cos(a) * (m.r + 11), y: Math.sin(a) * (m.r + 11) };
+  });
+}
+
+export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
+  const svgRef = useRef(null);
+  const [drag, setDrag] = useState(null); // { id, dx, dy, x, y, mosso }
+  const [selId, setSelId] = useState(null);
+
+  const nonPiazzati = tavoli.filter(t => t.pos_x == null || t.pos_y == null);
+  const posizione = t => {
+    if (drag?.id === t.id) return { x: drag.x, y: drag.y };
+    if (t.pos_x != null && t.pos_y != null) return { x: t.pos_x, y: t.pos_y };
+    const p = posizioneDefault(tavoli.indexOf(t), tavoli.length);
+    return limita(t, p.x, p.y);
+  };
+
+  const puntoSvg = e => {
+    const svg = svgRef.current;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  };
+  const limita = (t, x, y) => {
+    const { w, h } = ingombro(t);
+    const mw = w / 2 + 14, mh = h / 2 + 14; // posti compresi
+    return {
+      x: Math.round(Math.min(Math.max(x, mw), PIANTA_W - mw)),
+      y: Math.round(Math.min(Math.max(y, mh), PIANTA_H - mh)),
+    };
+  };
+
+  const onPointerDown = (e, t) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const p = puntoSvg(e);
+    const cur = posizione(t);
+    setDrag({ id: t.id, dx: p.x - cur.x, dy: p.y - cur.y, x: cur.x, y: cur.y, mosso: false });
+  };
+  const onPointerMove = (e, t) => {
+    if (drag?.id !== t.id) return;
+    const p = puntoSvg(e);
+    const n = limita(t, p.x - drag.dx, p.y - drag.dy);
+    // Qualche unità di tolleranza: un tocco col dito non deve diventare uno spostamento.
+    const mosso = drag.mosso || Math.hypot(n.x - drag.x, n.y - drag.y) > 3;
+    setDrag(d => ({ ...d, ...(mosso ? n : {}), mosso }));
+  };
+  const onPointerUp = t => {
+    if (drag?.id !== t.id) return;
+    if (drag.mosso) salvaPosizioni([{ id: t.id, x: drag.x, y: drag.y }]);
+    else setSelId(s => (s === t.id ? null : t.id));
+    setDrag(null);
+  };
+
+  const disponiInGriglia = () => {
+    if (tavoli.length > nonPiazzati.length && !confirm('Riposizionare tutti i tavoli in griglia? Le posizioni attuali andranno perse.')) return;
+    salvaPosizioni(tavoli.map((t, i) => {
+      const p = posizioneDefault(i, tavoli.length);
+      return { id: t.id, ...limita(t, p.x, p.y) };
+    }));
+  };
+
+  const sel = tavoli.find(t => t.id === selId);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_280px] items-start">
+      <div className="card p-2 sm:p-3">
+        <div className="flex flex-wrap items-center gap-2 mb-2 px-1">
+          <p className="text-xs text-gray-500 mr-auto flex items-center gap-1">
+            <MousePointerClick size={13} /> Trascina i tavoli per disporli · tocca un tavolo per i dettagli
+          </p>
+          <button className="btn-secondary text-xs py-1" onClick={disponiInGriglia} disabled={tavoli.length === 0}>
+            <LayoutGrid size={13} /> Disponi in griglia
+          </button>
+        </div>
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+          <svg ref={svgRef} viewBox={`0 0 ${PIANTA_W} ${PIANTA_H}`} className="w-full min-w-[640px] block select-none bg-gray-50" role="img" aria-label="Pianta della sala">
+            <defs>
+              <pattern id="griglia-sala" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#eceef1" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width={PIANTA_W} height={PIANTA_H} fill="url(#griglia-sala)" />
+            {tavoli.length === 0 && (
+              <text x={PIANTA_W / 2} y={PIANTA_H / 2} textAnchor="middle" fill="#9ca3af" fontSize="22">Nessun tavolo: creane uno da "Gestisci"</text>
+            )}
+            {tavoli.map(t => {
+              const { x, y } = posizione(t);
+              const m = misure(t);
+              const c = COLORI[t.tipo] || COLORI.normale;
+              const occupati = t.ospiti.length;
+              const oltre = occupati > t.capienza;
+              const piazzato = t.pos_x != null && t.pos_y != null;
+              const selezionato = selId === t.id;
+              const { w: larghezza } = ingombro(t);
+              const maxCar = Math.max(7, Math.floor(larghezza / 8.5));
+              const nome = t.nome.length > maxCar ? `${t.nome.slice(0, maxCar - 1)}…` : t.nome;
+              const stroke = selezionato ? '#e11d48' : oltre ? '#ef4444' : c.stroke;
+              const emoji = tipoTavolo[t.tipo]?.emoji;
+              return (
+                <g key={t.id} transform={`translate(${x} ${y})`}
+                  style={{ touchAction: 'none', cursor: drag?.id === t.id ? 'grabbing' : 'grab' }}
+                  className="cursor-grab"
+                  onPointerDown={e => onPointerDown(e, t)}
+                  onPointerMove={e => onPointerMove(e, t)}
+                  onPointerUp={() => onPointerUp(t)}
+                  onPointerCancel={() => setDrag(null)}>
+                  <g transform={`rotate(${t.forma === 'rettangolare' ? t.rotazione || 0 : 0})`}>
+                    {posti(t).map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r="7"
+                        fill={i < occupati ? '#fb7185' : '#ffffff'} stroke={i < occupati ? '#e11d48' : '#d1d5db'} strokeWidth="1.5" />
+                    ))}
+                    {t.forma === 'rettangolare'
+                      ? <rect x={-m.w / 2} y={-m.h / 2} width={m.w} height={m.h} rx="8" fill={c.fill} stroke={stroke}
+                          strokeWidth={selezionato ? 3 : 2} strokeDasharray={piazzato ? undefined : '6 4'} />
+                      : <circle r={m.r} fill={c.fill} stroke={stroke} strokeWidth={selezionato ? 3 : 2} strokeDasharray={piazzato ? undefined : '6 4'} />}
+                  </g>
+                  <text y={emoji ? -4 : -2} textAnchor="middle" fontSize="14" fontWeight="700" fill="#111827" pointerEvents="none">
+                    {emoji ? `${emoji} ` : ''}{nome}
+                  </text>
+                  <text y="16" textAnchor="middle" fontSize="12" fontWeight="600" fill={oltre ? '#ef4444' : '#6b7280'} pointerEvents="none">
+                    {occupati}/{t.capienza}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 px-1 text-[11px] text-gray-500">
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-400 border border-rose-600" /> posto occupato</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-300" /> posto libero</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full border-2 border-dashed border-gray-300" /> non ancora posizionato</span>
+          <span>💍 sposi · 🧸 bambini</span>
+        </div>
+        {nonPiazzati.length > 0 && tavoli.length > nonPiazzati.length && (
+          <p className="text-xs text-amber-600 mt-1 px-1">{nonPiazzati.length} tavoli non ancora posizionati (bordo tratteggiato): trascinali dove vuoi.</p>
+        )}
+      </div>
+
+      <div className="card lg:sticky lg:top-0">
+        {!sel ? (
+          <p className="text-sm text-gray-400 text-center py-6">Seleziona un tavolo sulla pianta per vederne gli ospiti.</p>
+        ) : (
+          <>
+            <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
+              {tipoTavolo[sel.tipo]?.emoji} {sel.nome}
+            </h3>
+            <p className={`text-xs mb-3 ${sel.ospiti.length > sel.capienza ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+              {sel.ospiti.length}/{sel.capienza} posti occupati
+            </p>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              <button className="btn-secondary text-xs py-1"
+                onClick={() => salvaTavolo(sel.id, { forma: sel.forma === 'rettangolare' ? 'tondo' : 'rettangolare' })}>
+                {sel.forma === 'rettangolare' ? <><Circle size={13} /> Rendi tondo</> : <><RectangleHorizontal size={13} /> Rendi rettangolare</>}
+              </button>
+              {sel.forma === 'rettangolare' && (
+                <button className="btn-secondary text-xs py-1" onClick={() => salvaTavolo(sel.id, { rotazione: ((sel.rotazione || 0) + 90) % 180 })}>
+                  <RotateCw size={13} /> Ruota
+                </button>
+              )}
+            </div>
+            {sel.ospiti.length === 0 ? (
+              <p className="text-xs text-gray-400">Nessun ospite seduto.</p>
+            ) : (
+              <ul className="text-sm space-y-0.5 max-h-80 overflow-y-auto">
+                {sel.ospiti.map(o => (
+                  <li key={o.id} className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs pl-3' : 'text-gray-800'}`}>
+                    {nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

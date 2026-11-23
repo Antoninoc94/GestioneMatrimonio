@@ -26,6 +26,14 @@ a, button, [role="button"], summary,
   cursor: pointer !important;
 }
 
+/* Elementi trascinabili (ospiti e tavoli in Tavoli.jsx) */
+[draggable="true"], .cursor-grab {
+  cursor: grab !important;
+}
+[draggable="true"]:active, .cursor-grab:active {
+  cursor: grabbing !important;
+}
+
 /* ── Base ───────────────────────────────────────────────────── */
 @layer base {
   body {

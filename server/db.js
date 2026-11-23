@@ -378,6 +378,32 @@ db.prepare(`
   WHERE relazione = 'figlio' AND eta IS NOT NULL
 `).run();
 
+// Migrazione: tavoli con forma, tipo (sposi/bambini), ordine scelto dagli sposi
+// e posizione sulla pianta della sala. pos_x/pos_y NULL = non ancora piazzato.
+const tavoliCols = db.prepare('PRAGMA table_info(tavoli)').all().map(c => c.name);
+if (!tavoliCols.includes('forma')) {
+  db.prepare("ALTER TABLE tavoli ADD COLUMN forma TEXT DEFAULT 'tondo'").run();
+}
+if (!tavoliCols.includes('tipo')) {
+  db.prepare("ALTER TABLE tavoli ADD COLUMN tipo TEXT DEFAULT 'normale'").run();
+}
+if (!tavoliCols.includes('pos_x')) {
+  db.prepare('ALTER TABLE tavoli ADD COLUMN pos_x REAL').run();
+}
+if (!tavoliCols.includes('pos_y')) {
+  db.prepare('ALTER TABLE tavoli ADD COLUMN pos_y REAL').run();
+}
+if (!tavoliCols.includes('rotazione')) {
+  db.prepare('ALTER TABLE tavoli ADD COLUMN rotazione INTEGER DEFAULT 0').run();
+}
+if (!tavoliCols.includes('ordine')) {
+  db.prepare('ALTER TABLE tavoli ADD COLUMN ordine INTEGER').run();
+  // Finora l'ordine era alfabetico: si parte da lì, così nulla si sposta.
+  db.prepare(`UPDATE tavoli SET ordine = (
+    SELECT COUNT(*) FROM tavoli t2 WHERE t2.nome < tavoli.nome OR (t2.nome = tavoli.nome AND t2.id < tavoli.id)
+  )`).run();
+}
+
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
 if (!noteCols.includes('email_stato')) {

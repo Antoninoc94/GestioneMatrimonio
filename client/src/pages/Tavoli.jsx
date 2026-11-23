@@ -1,10 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, UserX, Download, Tag, LayoutGrid, List, Search, ChevronDown, X, UtensilsCrossed } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Download, Tag, UtensilsCrossed, AlertTriangle, ChevronDown, Users, Map as MapIcon, Settings2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../api';
+import AssegnaOspiti from './tavoli/AssegnaOspiti';
+import PiantaSala from './tavoli/PiantaSala';
+import GestioneTavoli from './tavoli/GestioneTavoli';
+import { calcolaAvvisi, tipoTavolo, formaTavolo } from './tavoli/util';
 
-const empty = { nome: '', capienza: 8, note: '' };
+const empty = { nome: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale' };
+
+const VISTE = [
+  { id: 'assegna', label: 'Assegna ospiti', icon: Users },
+  { id: 'pianta', label: 'Pianta sala', icon: MapIcon },
+  { id: 'gestisci', label: 'Gestisci tavoli', icon: Settings2 },
+];
 
 export default function Tavoli() {
   const [tavoli, setTavoli] = useState([]);
@@ -12,6 +23,11 @@ export default function Tavoli() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
+  const [avvisiAperti, setAvvisiAperti] = useState(true);
+  // La scheda sta nell'URL: un ricaricamento o il tasto indietro non la perdono.
+  const [params, setParams] = useSearchParams();
+  const vista = VISTE.some(v => v.id === params.get('vista')) ? params.get('vista') : 'assegna';
+  const setVista = id => setParams(p => { p.set('vista', id); return p; }, { replace: true });
 
   const load = () => {
     api.get('/tavoli').then(r => setTavoli(r.data));
@@ -19,15 +35,59 @@ export default function Tavoli() {
   };
   useEffect(() => { load(); }, []);
 
+  const errore = (err, msg) => alert(err.response?.data?.error || msg);
+
   const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
-  const openEdit = t => { setForm({ nome: t.nome, capienza: t.capienza, note: t.note || '' }); setEditId(t.id); setModal(true); };
+  const openEdit = t => {
+    setForm({ nome: t.nome, capienza: t.capienza, note: t.note || '', forma: t.forma || 'tondo', tipo: t.tipo || 'normale' });
+    setEditId(t.id);
+    setModal(true);
+  };
 
   const save = async e => {
     e.preventDefault();
-    if (editId) await api.put(`/tavoli/${editId}`, form);
-    else await api.post('/tavoli', form);
-    setModal(false);
+    try {
+      if (editId) await api.put(`/tavoli/${editId}`, form);
+      else await api.post('/tavoli', form);
+      setModal(false);
+    } catch (err) {
+      errore(err, 'Salvataggio del tavolo non riuscito');
+    }
     load();
+  };
+
+  // Modifica parziale (solo i campi in `patch`), mostrata subito e poi salvata.
+  const salvaTavolo = async (id, patch) => {
+    setTavoli(ts => ts.map(t => (t.id === id ? { ...t, ...patch } : t)));
+    try {
+      await api.put(`/tavoli/${id}`, patch);
+    } catch (err) {
+      errore(err, 'Salvataggio del tavolo non riuscito');
+    }
+    load();
+  };
+
+  const riordina = async ids => {
+    setTavoli(ts => ids.map(id => ts.find(t => t.id === id)).filter(Boolean));
+    try {
+      await api.post('/tavoli/ordine', { ids });
+    } catch (err) {
+      errore(err, 'Riordino non riuscito');
+      load();
+    }
+  };
+
+  // Niente ricaricamento a buon fine: la pianta ha già la posizione giusta e
+  // un refetch durante una serie di trascinamenti farebbe solo sfarfallare.
+  const salvaPosizioni = async posizioni => {
+    const byId = new Map(posizioni.map(p => [p.id, p]));
+    setTavoli(ts => ts.map(t => (byId.has(t.id) ? { ...t, pos_x: byId.get(t.id).x, pos_y: byId.get(t.id).y } : t)));
+    try {
+      await api.post('/tavoli/posizioni', { posizioni });
+    } catch (err) {
+      errore(err, 'Posizione del tavolo non salvata');
+      load();
+    }
   };
 
   const del = async id => {
@@ -77,32 +137,11 @@ export default function Tavoli() {
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
   const totaleAssegnati = ospiti.filter(o => o.tavolo_id).length;
-  const parentName = parentId => {
-    const p = ospiti.find(o => o.id === parentId);
-    return p ? (p.cognome ? `${p.cognome} ${p.nome}` : p.nome) : null;
-  };
-  // Occupazione a fianco del nome: evita di assegnare a un tavolo già pieno.
-  const tavoloLabel = t => `${t.nome} ${t.ospiti.length >= t.capienza ? '(pieno)' : `(${t.ospiti.length}/${t.capienza})`}`;
-  const guestLabel = o => {
-    const base = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
-    if (!o.parent_id) return base;
-    const pn = parentName(o.parent_id);
-    const rel = o.relazione === 'figlio' ? 'figlio' : 'partner';
-    return pn ? `${base} (${rel} di ${pn})` : base;
-  };
-  const [collapsedTavoli, setCollapsedTavoli] = useState(new Set());
-  const toggleCollapse = id => setCollapsedTavoli(prev => {
-    const n = new Set(prev);
-    if (n.has(id)) n.delete(id); else n.add(id);
-    return n;
-  });
+  const avvisi = calcolaAvvisi(tavoli, ospiti);
 
   const [exporting, setExporting] = useState(false);
   const [exportingCards, setExportingCards] = useState(false);
   const [exportingCatering, setExportingCatering] = useState(false);
-  const [vistaCompatta, setVistaCompatta] = useState(false);
-  const [filtroTipo, setFiltroTipo] = useState('');
-  const [searchSenza, setSearchSenza] = useState('');
 
   const exportSegnaposti = () => {
     // Tutti i confermati con un tavolo, partner e figli compresi
@@ -511,328 +550,52 @@ export default function Tavoli() {
         </div>
       </div>
 
-      {senzaTavolo.length > 0 && (
-        <div className="card mb-5 border-yellow-200 bg-yellow-50/40">
-          {/* Header */}
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <div className="flex items-center gap-2 mr-auto">
-              <UserX size={16} className="text-yellow-500" />
-              <span className="text-sm font-semibold text-yellow-700">{senzaTavolo.length} ospiti senza tavolo</span>
-            </div>
-            {/* Toggle vista */}
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-              <button
-                onClick={() => setVistaCompatta(false)}
-                className={`px-3 py-1.5 text-xs flex items-center gap-1 transition-colors ${!vistaCompatta ? 'bg-rose-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-              >
-                <LayoutGrid size={13} /> Carte
-              </button>
-              <button
-                onClick={() => setVistaCompatta(true)}
-                className={`px-3 py-1.5 text-xs flex items-center gap-1 transition-colors ${vistaCompatta ? 'bg-rose-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-              >
-                <List size={13} /> Lista
-              </button>
-            </div>
-          </div>
-
-          {/* Ricerca + filtro tipo */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <div className="relative flex-1 min-w-40">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              <input
-                className="form-input pl-9 py-1.5 text-sm"
-                placeholder="Cerca ospite…"
-                value={searchSenza}
-                onChange={e => setSearchSenza(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-1">
-              {[['', 'Tutti'], ['adulto', 'Adulti'], ['bambino', 'Bambini 👶']].map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setFiltroTipo(val)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filtroTipo === val ? 'bg-rose-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                >
-                  {label}
-                </button>
+      {avvisi.length > 0 && (
+        <div className="card mb-4 border-amber-200 bg-amber-50/50">
+          <button className="w-full flex items-center gap-2 text-left" onClick={() => setAvvisiAperti(a => !a)}>
+            <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
+            <span className="text-sm font-semibold text-amber-800 flex-1">
+              {avvisi.length === 1 ? '1 cosa da sistemare' : `${avvisi.length} cose da sistemare`}
+            </span>
+            <ChevronDown size={14} className={`text-amber-500 transition-transform ${avvisiAperti ? '' : '-rotate-90'}`} />
+          </button>
+          {avvisiAperti && (
+            <ul className="mt-2 space-y-1.5">
+              {avvisi.map(a => (
+                <li key={a.key} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.livello === 'errore' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  <span className="flex-1 min-w-0 text-gray-700">{a.testo}</span>
+                  {a.azione && (
+                    <button className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2 py-0.5 rounded border border-rose-200 bg-white hover:bg-rose-50"
+                      onClick={() => assignGuests(a.azione.ids, a.azione.tavoloId)}>
+                      {a.azione.label}
+                    </button>
+                  )}
+                </li>
               ))}
-            </div>
-          </div>
-
-          {(() => {
-            // Filtro + ricerca
-            const q = searchSenza.toLowerCase().trim();
-            const senzaFiltrati = senzaTavolo.filter(o => {
-              if (filtroTipo === 'bambino' && o.tipo !== 'bambino') return false;
-              if (filtroTipo === 'adulto' && o.tipo === 'bambino') return false;
-              if (q) return (o.nome || '').toLowerCase().includes(q) || (o.cognome || '').toLowerCase().includes(q);
-              return true;
-            });
-
-            const nessunRisultato = senzaFiltrati.length === 0;
-
-            const AssegnaSelect = ({ o }) => (
-              <select
-                className="w-24 text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1.5 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
-                value=""
-                onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}
-              >
-                <option value="">Assegna…</option>
-                {tavoli.map(t => <option key={t.id} value={t.id}>{tavoloLabel(t)}</option>)}
-              </select>
-            );
-
-            if (nessunRisultato) {
-              return <p className="text-sm text-gray-400 text-center py-4">Nessun ospite trovato</p>;
-            }
-
-            // ── Vista LISTA compatta ──────────────────────────────────
-            if (vistaCompatta) {
-              // Ordine: main guests con i propri figli/partner subito dopo
-              const mains = senzaFiltrati.filter(o => !o.parent_id);
-              const byParent = {};
-              senzaTavolo.filter(o => o.parent_id).forEach(o => {
-                (byParent[o.parent_id] = byParent[o.parent_id] || []).push(o);
-              });
-              const flat = [];
-              for (const m of mains) {
-                flat.push(m);
-                for (const c of (byParent[m.id] || []).filter(c => senzaFiltrati.includes(c))) flat.push(c);
-              }
-              // Orfani filtrati (parent già assegnato)
-              senzaFiltrati.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id))
-                .forEach(o => flat.push(o));
-
-              return (
-                <div className="bg-white rounded-lg border border-gray-100 divide-y divide-gray-50 overflow-hidden">
-                  {flat.map(o => {
-                    const isChild = o.relazione === 'figlio';
-                    const isPartner = !!o.parent_id && !isChild;
-                    const parent = o.parent_id ? ospiti.find(p => p.id === o.parent_id) : null;
-                    return (
-                      <div key={o.id} className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${o.parent_id ? 'pl-7' : ''}`}>
-                        {isChild   && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
-                        {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
-                        <div className="flex-1 min-w-0">
-                          <span className={`text-sm truncate ${isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'}`}>
-                            {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                            {isChild && o.eta != null ? <span className="ml-1 text-xs opacity-50">({o.eta}a)</span> : null}
-                          </span>
-                          {parent && (
-                            <span className="text-xs text-gray-400 ml-1.5">
-                              — {isChild ? 'figlio' : 'partner'} di {parent.cognome ? `${parent.cognome} ${parent.nome}` : parent.nome}
-                            </span>
-                          )}
-                        </div>
-                        <AssegnaSelect o={o} />
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            }
-
-            // ── Vista CARTE (default) ─────────────────────────────────
-            const mainGuests = senzaTavolo.filter(o => !o.parent_id)
-              .filter(mg => senzaFiltrati.find(f => f.id === mg.id || f.parent_id === mg.id));
-            const familyOf = id => senzaTavolo.filter(o => o.parent_id === id && senzaFiltrati.includes(o));
-            const orphans = senzaFiltrati.filter(o => o.parent_id && !senzaTavolo.find(mg => mg.id === o.parent_id));
-
-            return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-                {mainGuests.map(mg => {
-                  const family = familyOf(mg.id);
-                  return (
-                    <div key={mg.id} className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
-                      <div className="flex items-center gap-3 px-3 py-2.5">
-                        <span className="flex-1 text-sm font-semibold text-gray-800 truncate">
-                          {mg.cognome ? `${mg.cognome} ${mg.nome}` : mg.nome}
-                        </span>
-                        <AssegnaSelect o={mg} />
-                      </div>
-                      {family.length > 0 && (
-                        <div className="border-t border-gray-50 divide-y divide-gray-50">
-                          {family.map(f => {
-                            const isChild = f.relazione === 'figlio';
-                            return (
-                              <div key={f.id} className={`flex items-center gap-3 pl-5 pr-3 py-2 ${isChild ? 'bg-purple-50/50' : 'bg-rose-50/50'}`}>
-                                <span className={`text-xs flex-shrink-0 ${isChild ? 'text-purple-300' : 'text-rose-300'}`}>
-                                  {isChild ? '↳' : '♥'}
-                                </span>
-                                <span className={`flex-1 text-xs truncate ${isChild ? 'text-purple-700' : 'text-rose-600'}`}>
-                                  {f.cognome ? `${f.cognome} ${f.nome}` : f.nome}
-                                  {isChild && f.eta != null ? <span className="ml-1 opacity-60">({f.eta}a)</span> : null}
-                                </span>
-                                <AssegnaSelect o={f} />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {orphans.map(o => {
-                  const isChild = o.relazione === 'figlio';
-                  return (
-                    <div key={o.id} className={`flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border ${isChild ? 'border-purple-100' : 'border-rose-100'}`}>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-semibold truncate ${isChild ? 'text-purple-700' : 'text-rose-600'}`}>
-                          {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          <span className={isChild ? 'text-purple-400' : 'text-rose-400'}>{isChild ? '↳ Figlio' : '♥ Partner'}</span>
-                          {' '}di {parentName(o.parent_id)}
-                        </div>
-                      </div>
-                      <AssegnaSelect o={o} />
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+            </ul>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {tavoli.map(t => {
-          const pct = Math.round((t.ospiti.length / t.capienza) * 100);
-          const pieno = t.ospiti.length >= t.capienza;
-          const collapsed = collapsedTavoli.has(t.id);
-          return (
-            <div key={t.id} className={`card ${pieno ? 'border-orange-200' : ''}`}>
-              {/* Header — cliccabile per collapse */}
-              <div
-                className="flex items-center gap-2 mb-2 cursor-pointer select-none"
-                onClick={() => toggleCollapse(t.id)}
-              >
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
-                    {t.nome}
-                    <ChevronDown
-                      size={14}
-                      className={`text-gray-400 transition-transform duration-200 flex-shrink-0 ${collapsed ? '-rotate-90' : ''}`}
-                    />
-                  </h3>
-                  <div className="text-xs text-gray-400">Capienza: {t.capienza} posti</div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" onClick={() => openEdit(t)}><Pencil size={13} /></button>
-                  <button className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" onClick={() => del(t.id)}><Trash2 size={13} /></button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex-1 bg-gray-100 rounded-full h-2">
-                  <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: pieno ? '#f97316' : '#34d399' }} />
-                </div>
-                <span className={`text-xs font-bold ${pieno ? 'text-orange-500' : 'text-gray-500'}`}>{t.ospiti.length}/{t.capienza}</span>
-              </div>
-
-              {!collapsed && t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
-
-              {!collapsed && <div className="space-y-1.5">
-                {(() => {
-                  const mainGuests = t.ospiti.filter(o => !o.parent_id);
-                  const getFamily = id => t.ospiti.filter(o => o.parent_id === id);
-                  const orphans = t.ospiti.filter(o => o.parent_id && !t.ospiti.find(mg => mg.id === o.parent_id));
-
-                  // Spostare un ospite altrove era impossibile: i menu di assegnazione
-                  // elencano solo chi è ancora senza tavolo.
-                  const SpostaSelect = ({ o }) => (
-                    <select
-                      className="w-20 text-xs border border-gray-200 rounded-md text-gray-500 px-1.5 py-1 bg-white cursor-pointer hover:border-rose-300 hover:text-rose-600"
-                      value=""
-                      title="Sposta ad un altro tavolo"
-                      onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}
-                    >
-                      <option value="">Sposta…</option>
-                      {tavoli.filter(x => x.id !== t.id).map(x => (
-                        <option key={x.id} value={x.id}>{tavoloLabel(x)}</option>
-                      ))}
-                    </select>
-                  );
-
-                  const rowJsx = (o, showParentHint = false) => {
-                    const isChild = o.relazione === 'figlio';
-                    const isPartner = !!o.parent_id && !isChild;
-                    const pName = showParentHint && o.parent_id ? parentName(o.parent_id) : null;
-                    return (
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
-                          {isChild   && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
-                          <div className="min-w-0 flex-1">
-                            <div className={`truncate ${isChild ? 'text-purple-700 text-xs' : isPartner ? 'text-rose-600 text-xs' : 'text-gray-800 font-medium'}`}>
-                              {o.cognome ? `${o.cognome} ${o.nome}` : o.nome}
-                              {isChild && o.eta != null ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
-                            </div>
-                            {pName && (
-                              <div className="text-gray-400 text-xs">{isChild ? 'figlio' : 'partner'} di {pName}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                          {tavoli.length > 1 && <SpostaSelect o={o} />}
-                          <button
-                            className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
-                            title="Togli dal tavolo"
-                            aria-label={`Togli ${o.nome} dal tavolo`}
-                            onClick={() => assignWithFamily(o, null)}
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  };
-
-                  return (
-                    <>
-                      {mainGuests.map(mg => {
-                        const family = getFamily(mg.id);
-                        return (
-                          <div key={mg.id}>
-                            {rowJsx(mg)}
-                            {family.length > 0 && (
-                              <div className="ml-2 mt-0.5 pl-2 border-l-2 border-gray-100 space-y-0.5">
-                                {family.map(f => <div key={f.id}>{rowJsx(f)}</div>)}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {orphans.map(o => <div key={o.id}>{rowJsx(o, true)}</div>)}
-                    </>
-                  );
-                })()}
-                {!pieno && (
-                  <select
-                    className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1"
-                    value=""
-                    onChange={e => {
-                      const o = ospiti.find(x => x.id === parseInt(e.target.value));
-                      if (o) assignWithFamily(o, t.id);
-                    }}
-                  >
-                    <option value="">+ Aggiungi ospite…</option>
-                    {senzaTavolo.map(o => <option key={o.id} value={o.id}>{guestLabel(o)}</option>)}
-                  </select>
-                )}
-              </div>}
-            </div>
-          );
-        })}
-
-        {tavoli.length === 0 && (
-          <div className="col-span-full card text-center py-12 text-gray-400">
-            <Users size={40} className="mx-auto mb-2 opacity-30" />
-            <p>Nessun tavolo ancora. Creane uno!</p>
-          </div>
-        )}
+      <div role="tablist" aria-label="Sezioni tavoli" className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
+        {VISTE.map(({ id, label, icon: Icon }) => (
+          <button key={id} role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${vista === id ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+            <Icon size={15} /> {label}
+          </button>
+        ))}
       </div>
+
+      {vista === 'assegna' && (
+        <AssegnaOspiti tavoli={tavoli} ospiti={ospiti} assignWithFamily={assignWithFamily} openEdit={openEdit} del={del} />
+      )}
+      {vista === 'pianta' && (
+        <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} />
+      )}
+      {vista === 'gestisci' && (
+        <GestioneTavoli tavoli={tavoli} ospiti={ospiti} salvaTavolo={salvaTavolo} del={del} riordina={riordina} openNew={openNew} />
+      )}
 
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
@@ -854,6 +617,18 @@ export default function Tavoli() {
                     <button type="button" className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-100 flex-shrink-0"
                       onClick={() => setForm({ ...form, capienza: (form.capienza || 1) + 1 })}>+</button>
                   </div>
+                </div>
+                <div>
+                  <label className="form-label">Tipo</label>
+                  <select className="form-input" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
+                    {Object.entries(tipoTavolo).map(([k, v]) => <option key={k} value={k}>{v.emoji ? `${v.emoji} ` : ''}{v.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Forma</label>
+                  <select className="form-input" value={form.forma} onChange={e => setForm({ ...form, forma: e.target.value })}>
+                    {Object.entries(formaTavolo).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
                 </div>
               </div>
               <div>
