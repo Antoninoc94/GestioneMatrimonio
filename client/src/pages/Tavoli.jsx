@@ -135,7 +135,9 @@ export default function Tavoli() {
       const nota = bambini.length
         ? `\n\n${bambini.length === 1 ? 'Il bambino resta' : `I ${bambini.length} bambini restano`} da assegnare a parte.`
         : '';
-      if (confirm(`${azione} anche ${chi} di ${o.nome}?${nota}`)) ids.push(...seguono.map(f => f.id));
+      if (confirm(`${azione} anche ${chi} di ${o.nome}?${nota}
+
+OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.id));
     }
     return assignGuests(ids, tavoloId);
   };

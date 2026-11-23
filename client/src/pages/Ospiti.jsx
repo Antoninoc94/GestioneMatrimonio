@@ -338,12 +338,19 @@ export default function Ospiti() {
 
   const bulkSetTavolo = async val => {
     const tavolo_id = val === '' ? null : parseInt(val);
-    const ids = [...selected].flatMap(id => {
+    // Come nella pagina Tavoli, i familiari si spostano solo se lo si conferma:
+    // spostare "solo lui" è una scelta legittima, e non va fatta in silenzio.
+    const seguono = [...selected].flatMap(id => {
       const o = items.find(i => i.id === id);
       if (!o) return [];
-      const seguono = childrenOf(id).filter(c => c.tipo !== 'bambino' && (c.tavolo_id || null) === (o.tavolo_id || null));
-      return [id, ...seguono.map(c => c.id)];
+      return childrenOf(id).filter(c => c.tipo !== 'bambino' && !selected.has(c.id) && (c.tavolo_id || null) === (o.tavolo_id || null));
     });
+    const ids = [...selected];
+    if (seguono.length && confirm(`Spostare anche ${seguono.length === 1 ? 'il familiare' : `i ${seguono.length} familiari`} adulti che oggi siedono con ${ids.length === 1 ? 'lui' : 'loro'} (${seguono.map(c => c.nome).join(', ')})?
+
+OK = sì, spostali insieme. Annulla = sposta solo ${ids.length === 1 ? 'la persona selezionata' : 'le persone selezionate'}.`)) {
+      ids.push(...seguono.map(c => c.id));
+    }
     await esegui(() => api.post('/ospiti/bulk/aggiorna', { ids, tavolo_id: isNaN(tavolo_id) ? null : tavolo_id }), 'Assegnazione del tavolo non riuscita. Riprova.');
     setSelected(new Set());
   };
