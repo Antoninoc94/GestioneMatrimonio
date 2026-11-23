@@ -20,7 +20,8 @@ export const nomeOspite = o => (o.cognome ? `${o.cognome} ${o.nome}` : o.nome);
 export function misure(t) {
   const n = Math.max(1, t.capienza || 1);
   if (t.forma === 'rettangolare') {
-    const perLato = Math.ceil(n / 2);
+    // Il tavolo sposi ha i posti su un lato solo: serve lungo il doppio.
+    const perLato = t.tipo === 'sposi' ? n : Math.ceil(n / 2);
     return { w: Math.max(110, perLato * 40 + 14), h: 72 };
   }
   const r = Math.min(120, 42 + n * 4);

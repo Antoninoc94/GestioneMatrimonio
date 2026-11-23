@@ -19,6 +19,18 @@ const ingombro = t => {
 function posti(t) {
   const n = Math.max(1, t.capienza || 1);
   const m = misure(t);
+  // Tavolo sposi: tutti sullo stesso lato, rivolti verso la sala (in basso,
+  // poi si ruota il tavolo), mai uno di fronte all'altro.
+  if (t.tipo === 'sposi') {
+    if (t.forma === 'rettangolare') {
+      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: m.h / 2 + 15 }));
+    }
+    const passo = Math.min(0.55, Math.PI / Math.max(1, n - 1));
+    return Array.from({ length: n }, (_, i) => {
+      const a = Math.PI / 2 + (i - (n - 1) / 2) * passo;
+      return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
+    });
+  }
   if (t.forma === 'rettangolare') {
     const sopra = Math.ceil(n / 2), sotto = n - sopra;
     return [
