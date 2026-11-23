@@ -96,10 +96,10 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_280px] items-start">
-      <div className="card p-2 sm:p-3">
+      <div className="card p-2 sm:p-3 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-2 px-1">
           <p className="text-xs text-gray-500 mr-auto flex items-center gap-1">
-            <MousePointerClick size={13} /> Trascina i tavoli per disporli · tocca un tavolo per i dettagli
+            <MousePointerClick size={13} className="flex-shrink-0" /> Trascina i tavoli per disporli · tocca un tavolo per i dettagli
           </p>
           <button className="btn-secondary text-xs py-1" onClick={disponiInGriglia} disabled={tavoli.length === 0}>
             <LayoutGrid size={13} /> Disponi in griglia
@@ -121,6 +121,8 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
               const m = misure(t);
               const c = COLORI[t.tipo] || COLORI.normale;
               const occupati = t.ospiti.length;
+              // Posti colorati: prima gli adulti, poi i bambini in viola come nella legenda.
+              const adulti = t.ospiti.filter(o => o.tipo !== 'bambino').length;
               const oltre = occupati > t.capienza;
               const piazzato = t.pos_x != null && t.pos_y != null;
               const selezionato = selId === t.id;
@@ -140,7 +142,8 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                   <g transform={`rotate(${t.forma === 'rettangolare' ? t.rotazione || 0 : 0})`}>
                     {posti(t).map((p, i) => (
                       <circle key={i} cx={p.x} cy={p.y} r="9"
-                        fill={i < occupati ? '#fb7185' : '#ffffff'} stroke={i < occupati ? '#e11d48' : '#d1d5db'} strokeWidth="1.5" />
+                        fill={i < adulti ? '#fb7185' : i < occupati ? '#c084fc' : '#ffffff'}
+                        stroke={i < adulti ? '#e11d48' : i < occupati ? '#9333ea' : '#d1d5db'} strokeWidth="1.5" />
                     ))}
                     {t.forma === 'rettangolare'
                       ? <rect x={-m.w / 2} y={-m.h / 2} width={m.w} height={m.h} rx="8" fill={c.fill} stroke={stroke}
@@ -159,17 +162,18 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
           </svg>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 px-1 text-[11px] text-gray-500">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-400 border border-rose-600" /> posto occupato</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-400 border border-rose-600" /> adulto</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-400 border border-purple-600" /> bambino 👶</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-300" /> posto libero</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full border-2 border-dashed border-gray-300" /> non ancora posizionato</span>
-          <span>💍 sposi · 🧸 bambini</span>
+          <span>💍 tavolo sposi · 🧸 tavolo bambini</span>
         </div>
         {nonPiazzati.length > 0 && tavoli.length > nonPiazzati.length && (
           <p className="text-xs text-amber-600 mt-1 px-1">{nonPiazzati.length} tavoli non ancora posizionati (bordo tratteggiato): trascinali dove vuoi.</p>
         )}
       </div>
 
-      <div className="card lg:sticky lg:top-0">
+      <div className="card min-w-0 lg:sticky lg:top-0">
         {!sel ? (
           <p className="text-sm text-gray-400 text-center py-6">Seleziona un tavolo sulla pianta per vederne gli ospiti.</p>
         ) : (

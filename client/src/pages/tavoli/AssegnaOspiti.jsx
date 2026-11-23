@@ -1,28 +1,75 @@
 import { useState } from 'react';
-import { Pencil, Trash2, Users, UserX, Search, ChevronDown, X, GripVertical, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { Pencil, Trash2, Users, UserX, Search, ChevronDown, X, GripVertical, ChevronsDownUp, ChevronsUpDown, ArrowRightLeft, Plus } from 'lucide-react';
 import { nomeOspite, tipoTavolo } from './util';
+
+// Elenco dei tavoli tra cui scegliere, dal basso sul telefono e al centro su
+// schermi grandi. Sostituisce i menu a tendina, illeggibili su un telefono.
+function SceltaTavolo({ ospite, tavoli, onScegli, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-400">{ospite.tavolo_id ? 'Sposta' : 'Assegna'}</p>
+            <p className="font-bold text-gray-900 truncate">{nomeOspite(ospite)}{ospite.tipo === 'bambino' ? ' 👶' : ''}</p>
+          </div>
+          <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-100" aria-label="Chiudi" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="overflow-y-auto p-2">
+          {tavoli.map(t => {
+            const attuale = t.id === ospite.tavolo_id;
+            const pieno = t.ospiti.length >= t.capienza;
+            const emoji = tipoTavolo[t.tipo]?.emoji;
+            return (
+              <button key={t.id} disabled={attuale} onClick={() => onScegli(t.id)}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left ${attuale ? 'bg-rose-50 opacity-70' : 'hover:bg-gray-50 active:bg-gray-100'}`}>
+                <span className="w-6 text-center">{emoji || '🍽️'}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-semibold text-gray-800 truncate">{t.nome}</span>
+                  {attuale && <span className="block text-xs text-rose-500">Tavolo attuale</span>}
+                </span>
+                <span className={`text-sm font-bold ${pieno ? 'text-orange-500' : 'text-gray-500'}`}>
+                  {pieno ? 'pieno' : `${t.capienza - t.ospiti.length} liberi`}
+                </span>
+              </button>
+            );
+          })}
+          {tavoli.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Nessun tavolo: creane uno.</p>}
+        </div>
+        {ospite.tavolo_id && (
+          <div className="p-3 border-t border-gray-100">
+            <button className="btn-secondary w-full justify-center text-red-600" onClick={() => onScegli(null)}>
+              <X size={15} /> Togli dal tavolo
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Scheda "Assegna": ospiti senza tavolo in una colonna fissa a sinistra,
 // tavoli a destra. Si trascina un ospite su un tavolo (o di nuovo nella
-// colonna per toglierlo); i menu restano per il telefono, dove il drag & drop
-// HTML5 non è affidabile.
+// colonna per toglierlo); sul telefono, dove il drag & drop HTML5 non è
+// affidabile, si tocca il pulsante e si sceglie il tavolo da un elenco.
 export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEdit, del }) {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState(new Set());
   const [trascinato, setTrascinato] = useState(null);
   const [sopra, setSopra] = useState(null); // id tavolo o 'senza'
+  const [scelta, setScelta] = useState(null); // ospite per cui si sceglie il tavolo
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
   const parentName = id => {
     const p = ospiti.find(o => o.id === id);
     return p ? nomeOspite(p) : null;
   };
-  const tavoloLabel = t => `${t.nome} ${t.ospiti.length >= t.capienza ? '(pieno)' : `(${t.ospiti.length}/${t.capienza})`}`;
   const guestLabel = o => {
-    if (!o.parent_id) return nomeOspite(o);
+    const base = `${nomeOspite(o)}${o.tipo === 'bambino' ? ' 👶' : ''}`;
+    if (!o.parent_id) return base;
     const pn = parentName(o.parent_id);
-    return pn ? `${nomeOspite(o)} (${o.relazione === 'figlio' ? 'figlio' : 'partner'} di ${pn})` : nomeOspite(o);
+    return pn ? `${base} (${o.relazione === 'figlio' ? 'figlio' : 'partner'} di ${pn})` : base;
   };
 
   const toggleCollapse = id => setCollapsed(prev => {
@@ -32,7 +79,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
   });
   const tuttiChiusi = tavoli.length > 0 && tavoli.every(t => collapsed.has(t.id));
 
-  // ── Drag & drop ─────────────────────────────────────────────
+  // ── Assegnazione (drag & drop o elenco) ─────────────────────
   const sposta = (id, target) => {
     const o = ospiti.find(x => x.id === id);
     if (!o) return;
@@ -73,20 +120,25 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
     },
   });
 
-  const nomeRiga = (o, { showParent = false, small = false } = {}) => {
+  // 👶 segue l'età (`tipo`), come il filtro e la legenda; ♥ e ↳ la parentela,
+  // per i familiari adulti.
+  const nomeRiga = (o, { showParent = false } = {}) => {
     const isChild = o.relazione === 'figlio';
     const isPartner = !!o.parent_id && !isChild;
+    const bambino = o.tipo === 'bambino';
     const pName = showParent && o.parent_id ? parentName(o.parent_id) : null;
     return (
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <GripVertical size={12} className="text-gray-300 flex-shrink-0" />
-        {isPartner && <span className="text-rose-300 text-xs flex-shrink-0">♥</span>}
-        {isChild && <span className="text-purple-300 text-xs flex-shrink-0">↳</span>}
+        <GripVertical size={12} className="text-gray-300 flex-shrink-0 hidden lg:block" />
+        {bambino
+          ? <span className="text-xs flex-shrink-0" title="Bambino">👶</span>
+          : isPartner ? <span className="text-rose-300 text-xs flex-shrink-0">♥</span>
+          : isChild ? <span className="text-purple-300 text-xs flex-shrink-0">↳</span> : null}
         <div className="min-w-0 flex-1">
-          <div className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'} ${small || o.parent_id ? 'text-xs' : 'text-sm'}`}>
+          <div className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : bambino || isChild ? 'text-purple-700' : isPartner ? 'text-rose-600' : 'text-gray-800 font-medium'} ${o.parent_id ? 'text-xs' : 'text-sm'}`}>
             {nomeOspite(o)}
-            {isChild && o.eta != null ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
-            {o.rsvp === 'declinato' && <span className="ml-1 no-underline text-[10px] font-semibold uppercase">declinato</span>}
+            {o.eta != null && (bambino || isChild) ? <span className="ml-1 opacity-60">({o.eta}a)</span> : null}
+            {o.rsvp === 'declinato' && <span className="ml-1 text-[10px] font-semibold uppercase">declinato</span>}
           </div>
           {pName && <div className="text-gray-400 text-xs truncate">{isChild ? 'figlio' : 'partner'} di {pName}</div>}
         </div>
@@ -102,30 +154,27 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
     if (q) return (o.nome || '').toLowerCase().includes(q) || (o.cognome || '').toLowerCase().includes(q);
     return true;
   });
-  // Invitato principale seguito dai suoi familiari; poi chi ha il principale già seduto.
+  // Invitato principale seguito dai suoi familiari. Se il principale è escluso
+  // dal filtro (es. "Bambini", o la ricerca di un figlio per nome) i familiari
+  // restano comunque, da soli e con "figlio di …".
+  const inFiltro = new Set(filtrati.map(o => o.id));
   const flat = [];
-  for (const m of filtrati.filter(o => !o.parent_id)) {
-    flat.push(m);
-    flat.push(...filtrati.filter(c => c.parent_id === m.id));
+  for (const m of senzaTavolo.filter(o => !o.parent_id)) {
+    const familiari = filtrati.filter(c => c.parent_id === m.id);
+    if (inFiltro.has(m.id)) {
+      flat.push({ o: m, indent: false });
+      familiari.forEach(c => flat.push({ o: c, indent: true }));
+    } else {
+      familiari.forEach(c => flat.push({ o: c, indent: false }));
+    }
   }
-  filtrati.filter(o => o.parent_id && !senzaTavolo.some(m => m.id === o.parent_id)).forEach(o => flat.push(o));
-
-  const AssegnaSelect = ({ o }) => (
-    <select
-      draggable={false}
-      className="w-24 text-xs border border-gray-200 rounded-md text-rose-600 font-semibold px-2 py-1 bg-white flex-shrink-0 cursor-pointer hover:border-rose-300"
-      value=""
-      onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}
-    >
-      <option value="">Assegna…</option>
-      {tavoli.map(t => <option key={t.id} value={t.id}>{tavoloLabel(t)}</option>)}
-    </select>
-  );
+  filtrati.filter(o => o.parent_id && !senzaTavolo.some(m => m.id === o.parent_id))
+    .forEach(o => flat.push({ o, indent: false }));
 
   const colonna = (
     <div
       {...dropProps('senza')}
-      className={`card lg:sticky lg:top-0 flex flex-col lg:max-h-[calc(100vh-3rem)] transition-colors ${sopra === 'senza' ? 'ring-2 ring-yellow-300 bg-yellow-50' : senzaTavolo.length ? 'border-yellow-200 bg-yellow-50/40' : ''}`}
+      className={`card min-w-0 lg:sticky lg:top-0 flex flex-col lg:max-h-[calc(100vh-3rem)] transition-colors ${sopra === 'senza' ? 'ring-2 ring-yellow-300 bg-yellow-50' : senzaTavolo.length ? 'border-yellow-200 bg-yellow-50/40' : ''}`}
     >
       <div className="flex items-center gap-2 mb-3">
         <UserX size={16} className={senzaTavolo.length ? 'text-yellow-500' : 'text-gray-300'} />
@@ -150,16 +199,16 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
           <p className="hidden lg:block text-[11px] text-gray-400 mb-2">Trascina un ospite su un tavolo. Riportalo qui per toglierlo.</p>
           <div className="bg-white rounded-lg border border-gray-100 divide-y divide-gray-50 overflow-y-auto max-h-[45vh] lg:max-h-none lg:flex-1 lg:min-h-0">
             {flat.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nessun ospite trovato</p>}
-            {flat.map(o => {
-              const indent = o.parent_id && senzaTavolo.some(m => m.id === o.parent_id);
-              return (
-                <div key={o.id} {...dragProps(o)}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 ${indent ? 'pl-6' : ''} ${trascinato === o.id ? 'opacity-40' : ''}`}>
-                  {nomeRiga(o, { showParent: !indent })}
-                  <AssegnaSelect o={o} />
-                </div>
-              );
-            })}
+            {flat.map(({ o, indent }) => (
+              <div key={o.id} {...dragProps(o)}
+                className={`flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 ${indent ? 'pl-6' : ''} ${trascinato === o.id ? 'opacity-40' : ''}`}>
+                {nomeRiga(o, { showParent: !indent })}
+                <button draggable={false} onClick={() => setScelta(o)}
+                  className="flex items-center gap-1 text-xs font-semibold text-rose-600 border border-rose-200 bg-white rounded-md px-2 py-1 flex-shrink-0 hover:bg-rose-50">
+                  <Plus size={12} /> Tavolo
+                </button>
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -176,21 +225,17 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
     const famiglia = id => t.ospiti.filter(o => o.parent_id === id);
     const orfani = t.ospiti.filter(o => o.parent_id && !t.ospiti.some(m => m.id === o.parent_id));
     const tipo = tipoTavolo[t.tipo] || tipoTavolo.normale;
+    const bambini = t.ospiti.filter(o => o.tipo === 'bambino').length;
 
     const riga = (o, showParent = false) => (
-      <div {...dragProps(o)} className={`flex items-center justify-between rounded px-1 -mx-1 hover:bg-gray-50 ${trascinato === o.id ? 'opacity-40' : ''}`}>
+      <div {...dragProps(o)} className={`flex items-center justify-between rounded px-1 -mx-1 py-0.5 hover:bg-gray-50 ${trascinato === o.id ? 'opacity-40' : ''}`}>
         {nomeRiga(o, { showParent })}
-        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-          {tavoli.length > 1 && (
-            <select draggable={false}
-              className="w-20 text-xs border border-gray-200 rounded-md text-gray-500 px-1.5 py-1 bg-white cursor-pointer hover:border-rose-300 hover:text-rose-600"
-              value="" title="Sposta ad un altro tavolo"
-              onChange={e => e.target.value && assignWithFamily(o, parseInt(e.target.value))}>
-              <option value="">Sposta…</option>
-              {tavoli.filter(x => x.id !== t.id).map(x => <option key={x.id} value={x.id}>{tavoloLabel(x)}</option>)}
-            </select>
-          )}
-          <button className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500" title="Togli dal tavolo"
+        <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
+          <button draggable={false} className="p-1.5 rounded text-gray-400 hover:bg-gray-100 hover:text-rose-600" title="Sposta ad un altro tavolo"
+            aria-label={`Sposta ${o.nome}`} onClick={() => setScelta(o)}>
+            <ArrowRightLeft size={14} />
+          </button>
+          <button draggable={false} className="p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-500" title="Togli dal tavolo"
             aria-label={`Togli ${o.nome} dal tavolo`} onClick={() => assignWithFamily(o, null)}>
             <X size={14} />
           </button>
@@ -200,7 +245,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
 
     return (
       <div key={t.id} {...dropProps(t.id)}
-        className={`card transition-shadow ${sopra === t.id ? 'ring-2 ring-rose-300 shadow-md' : ''} ${oltre ? 'border-red-300' : pieno ? 'border-orange-200' : ''} ${t.tipo === 'sposi' ? 'bg-rose-50/40' : ''}`}>
+        className={`card min-w-0 transition-shadow ${sopra === t.id ? 'ring-2 ring-rose-300 shadow-md' : ''} ${oltre ? 'border-red-300' : pieno ? 'border-orange-200' : ''} ${t.tipo === 'sposi' ? 'bg-rose-50/40' : ''}`}>
         <div className="flex items-center gap-2 mb-2 cursor-pointer select-none" onClick={() => toggleCollapse(t.id)}>
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
@@ -219,15 +264,18 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
           <div className="flex-1 bg-gray-100 rounded-full h-2">
             <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: oltre ? '#ef4444' : pieno ? '#f97316' : '#34d399' }} />
           </div>
+          {bambini > 0 && <span className="text-xs text-purple-600" title="Bambini">👶 {bambini}</span>}
           <span className={`text-xs font-bold ${oltre ? 'text-red-500' : pieno ? 'text-orange-500' : 'text-gray-500'}`}>{t.ospiti.length}/{t.capienza}</span>
         </div>
 
         {!chiuso && t.note && <p className="text-xs text-gray-400 mb-2 italic">{t.note}</p>}
 
         {!chiuso && (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {t.ospiti.length === 0 && (
-              <p className="text-xs text-gray-300 text-center py-3 border border-dashed border-gray-200 rounded-lg">Trascina qui gli ospiti</p>
+              <p className="text-xs text-gray-300 text-center py-3 border border-dashed border-gray-200 rounded-lg">
+                <span className="hidden lg:inline">Trascina qui gli ospiti</span><span className="lg:hidden">Nessun ospite</span>
+              </p>
             )}
             {mains.map(m => (
               <div key={m.id}>
@@ -241,7 +289,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
             ))}
             {orfani.map(o => <div key={o.id}>{riga(o, true)}</div>)}
             {!pieno && senzaTavolo.length > 0 && (
-              <select className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1" value=""
+              <select className="text-xs text-rose-500 font-semibold border-0 bg-transparent mt-1 max-w-full" value=""
                 onChange={e => {
                   const o = ospiti.find(x => x.id === parseInt(e.target.value));
                   if (o) assignWithFamily(o, t.id);
@@ -259,7 +307,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr] items-start">
       {colonna}
-      <div>
+      <div className="min-w-0">
         {tavoli.length > 0 && (
           <div className="flex justify-end mb-2">
             <button className="text-xs text-gray-500 hover:text-rose-600 flex items-center gap-1"
@@ -278,6 +326,11 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
           )}
         </div>
       </div>
+
+      {scelta && (
+        <SceltaTavolo ospite={scelta} tavoli={tavoli} onClose={() => setScelta(null)}
+          onScegli={id => { const o = scelta; setScelta(null); sposta(o.id, id === null ? 'senza' : id); }} />
+      )}
     </div>
   );
 }

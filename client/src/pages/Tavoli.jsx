@@ -12,9 +12,9 @@ import { calcolaAvvisi, tipoTavolo, formaTavolo } from './tavoli/util';
 const empty = { nome: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale' };
 
 const VISTE = [
-  { id: 'assegna', label: 'Assegna ospiti', icon: Users },
-  { id: 'pianta', label: 'Pianta sala', icon: MapIcon },
-  { id: 'gestisci', label: 'Gestisci tavoli', icon: Settings2 },
+  { id: 'assegna', label: 'Assegna ospiti', corto: 'Assegna', icon: Users },
+  { id: 'pianta', label: 'Pianta sala', corto: 'Pianta', icon: MapIcon },
+  { id: 'gestisci', label: 'Gestisci tavoli', corto: 'Gestisci', icon: Settings2 },
 ];
 
 export default function Tavoli() {
@@ -23,7 +23,10 @@ export default function Tavoli() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
-  const [avvisiAperti, setAvvisiAperti] = useState(true);
+  // Chiusi sul telefono: aperti occuperebbero mezzo schermo prima dei tavoli.
+  const [avvisiAperti, setAvvisiAperti] = useState(() => {
+    try { return window.matchMedia('(min-width: 640px)').matches; } catch { return true; }
+  });
   // La scheda sta nell'URL: un ricaricamento o il tasto indietro non la perdono.
   const [params, setParams] = useSearchParams();
   const vista = VISTE.some(v => v.id === params.get('vista')) ? params.get('vista') : 'assegna';
@@ -536,17 +539,20 @@ export default function Tavoli() {
           <h1 className="page-title">Disposizione Tavoli</h1>
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary" onClick={exportSegnaposti} disabled={exportingCards}>
+        {/* Sul telefono una riga sola, icona sopra al testo */}
+        <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
+          <button className="btn-secondary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={exportSegnaposti} disabled={exportingCards}>
             <Tag size={15} /> {exportingCards ? 'Esporto…' : 'Segnaposti'}
           </button>
-          <button className="btn-secondary" onClick={exportCateringPDF} disabled={exportingCatering}>
+          <button className="btn-secondary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={exportCateringPDF} disabled={exportingCatering}>
             <UtensilsCrossed size={15} /> {exportingCatering ? 'Esporto…' : 'Catering'}
           </button>
-          <button className="btn-secondary" onClick={exportSeatingPDF} disabled={exporting}>
+          <button className="btn-secondary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={exportSeatingPDF} disabled={exporting}>
             <Download size={15} /> {exporting ? 'Esporto…' : 'PDF'}
           </button>
-          <button className="btn-primary" onClick={openNew}><Plus size={16} /> Nuovo Tavolo</button>
+          <button className="btn-primary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={openNew}>
+            <Plus size={16} /> <span className="sm:hidden">Nuovo</span><span className="hidden sm:inline">Nuovo Tavolo</span>
+          </button>
         </div>
       </div>
 
@@ -578,11 +584,11 @@ export default function Tavoli() {
         </div>
       )}
 
-      <div role="tablist" aria-label="Sezioni tavoli" className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
-        {VISTE.map(({ id, label, icon: Icon }) => (
-          <button key={id} role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${vista === id ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
-            <Icon size={15} /> {label}
+      <div role="tablist" aria-label="Sezioni tavoli" className="grid grid-cols-3 sm:flex gap-1 mb-4 border-b border-gray-200">
+        {VISTE.map(({ id, label, corto, icon: Icon }) => (
+          <button key={id} role="tab" aria-selected={vista === id} aria-label={label} onClick={() => setVista(id)}
+            className={`flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${vista === id ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+            <Icon size={15} /> <span className="sm:hidden">{corto}</span><span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>
