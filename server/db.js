@@ -406,6 +406,20 @@ if (!tavoliCols.includes('pos_y')) {
 if (!tavoliCols.includes('rotazione')) {
   db.prepare('ALTER TABLE tavoli ADD COLUMN rotazione INTEGER DEFAULT 0').run();
 }
+if (!tavoliCols.includes('elle_posti')) {
+  db.prepare("ALTER TABLE tavoli ADD COLUMN elle_posti TEXT DEFAULT 'entrambi'").run();
+}
+// Disposizioni salvate: una fotografia dei tavoli (forma, posizione, ordine) e
+// di chi siede dove, in JSON, da riapplicare senza rifare tutto.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tavoli_preset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    dati TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+`);
 if (!tavoliCols.includes('ordine')) {
   db.prepare('ALTER TABLE tavoli ADD COLUMN ordine INTEGER').run();
   // Finora l'ordine era alfabetico: si parte da lì, così nulla si sposta.

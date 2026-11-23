@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowDownAZ } from 'lucide-react';
-import { tipoTavolo, formaTavolo } from './util';
+import { tipoTavolo, formaTavolo, ellePosti } from './util';
 
 // Campo di testo che salva quando si esce (o con Invio), e solo se è cambiato.
 function TestoInline({ valore, onSalva, obbligatorio = false, className = '', placeholder = '' }) {
@@ -99,9 +99,16 @@ export default function GestioneTavoli({ tavoli, ospiti, salvaTavolo, del, riord
                   <select className="form-input py-1.5 text-sm" value={t.tipo || 'normale'} onChange={e => salvaTavolo(t.id, { tipo: e.target.value })}>
                     {Object.entries(tipoTavolo).map(([k, v]) => <option key={k} value={k}>{v.emoji ? `${v.emoji} ` : ''}{v.label}</option>)}
                   </select>
-                  <select className="form-input py-1.5 text-sm" value={t.forma || 'tondo'} onChange={e => salvaTavolo(t.id, { forma: e.target.value })}>
-                    {Object.entries(formaTavolo).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <select className="form-input py-1.5 text-sm" aria-label="Forma" value={t.forma || 'tondo'} onChange={e => salvaTavolo(t.id, { forma: e.target.value })}>
+                      {Object.entries(formaTavolo).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                    {t.forma === 'elle' && t.tipo !== 'sposi' && (
+                      <select className="form-input py-1.5 text-xs" aria-label="Posti del tavolo a L" value={t.elle_posti || 'entrambi'} onChange={e => salvaTavolo(t.id, { elle_posti: e.target.value })}>
+                        {Object.entries(ellePosti).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    )}
+                  </div>
                 </div>
 
                 <div className="col-span-2 md:col-span-1 flex md:contents items-center gap-3">

@@ -11,6 +11,13 @@ export const tipoTavolo = {
 export const formaTavolo = {
   tondo: 'Tondo',
   rettangolare: 'Rettangolare',
+  elle: 'A L',
+};
+// Dove siedono gli ospiti attorno al tavolo a L.
+export const ellePosti = {
+  entrambi: 'Dentro e fuori',
+  esterno: 'Solo fuori',
+  interno: 'Solo dentro',
 };
 
 export const nomeOspite = o => (o.cognome ? `${o.cognome} ${o.nome}` : o.nome);
@@ -19,6 +26,19 @@ export const nomeOspite = o => (o.cognome ? `${o.cognome} ${o.nome}` : o.nome);
 // w è il lato lungo, prima della rotazione.
 export function misure(t) {
   const n = Math.max(1, t.capienza || 1);
+  if (t.forma === 'elle') {
+    // Quadrato di lato `S` con due bracci spessi `T`: lo si fa crescere finché
+    // i lati scelti per i posti bastano per `n` sedie a ~40 unità l'una.
+    // Lunghezza utile: fuori 2S, dentro 2S-2T, entrambi 4S-2T.
+    const T = ELLE_T;
+    const config = t.tipo === 'sposi' ? 'esterno' : t.elle_posti;
+    const necessaria = n * 40;
+    const daS = config === 'interno' ? (necessaria + 2 * T) / 2
+      : config === 'esterno' ? necessaria / 2
+      : (necessaria + 2 * T) / 4;
+    const S = Math.min(320, Math.max(170, Math.ceil(daS)));
+    return { w: S, h: S, S, T };
+  }
   if (t.forma === 'rettangolare') {
     // Il tavolo sposi ha i posti su un lato solo: serve lungo il doppio.
     const perLato = t.tipo === 'sposi' ? n : Math.ceil(n / 2);
@@ -88,4 +108,52 @@ export function calcolaAvvisi(tavoli, ospiti) {
   }
 
   return avvisi;
+}
+
+// ── Tavolo a L ──────────────────────────────────────────────────────────────
+// Coordinate locali centrate sull'origine, prima della rotazione. Il braccio
+// verticale sta a sinistra e quello orizzontale in basso: l'angolo è in basso
+// a sinistra e "Ruota" lo porta negli altri tre.
+export const ELLE_T = 64;
+
+// Contorno della L (senso orario, a partire da in alto a sinistra).
+export function contornoElle(S, T) {
+  const m = S / 2;
+  return [[-m, -m], [-m + T, -m], [-m + T, m - T], [m, m - T], [m, m], [-m, m]];
+}
+
+// I lati su cui possono sedere gli ospiti: `n` è la normale uscente dal
+// tavolo. I lati corti delle estremità restano liberi.
+export function elleLati(config, S, T) {
+  const m = S / 2;
+  const esterni = [
+    { a: [-m, -m], b: [-m, m], n: [-1, 0] }, // lato sinistro, lungo
+    { a: [-m, m], b: [m, m], n: [0, 1] },    // lato in basso, lungo
+  ];
+  const interni = [
+    { a: [-m + T, -m], b: [-m + T, m - T], n: [1, 0] }, // destra del braccio verticale
+    { a: [-m + T, m - T], b: [m, m - T], n: [0, -1] },  // sopra il braccio orizzontale
+  ];
+  const lati = config === 'interno' ? interni : config === 'esterno' ? esterni : [...esterni, ...interni];
+  return lati.map(l => ({ ...l, len: Math.hypot(l.b[0] - l.a[0], l.b[1] - l.a[1]) }));
+}
+
+// Posti sui lati scelti, ripartiti in proporzione alla lunghezza (resti ai
+// lati più lunghi) e distribuiti a passo regolare, a `distanza` dal bordo.
+export function postiElle(t, distanza = 15) {
+  const n = Math.max(1, t.capienza || 1);
+  const { S, T } = misure(t);
+  const lati = elleLati(t.tipo === 'sposi' ? 'esterno' : t.elle_posti, S, T);
+  const totale = lati.reduce((s, l) => s + l.len, 0);
+  const quote = lati.map(l => (n * l.len) / totale);
+  const conta = quote.map(Math.floor);
+  let resto = n - conta.reduce((s, c) => s + c, 0);
+  [...quote.keys()].sort((i, j) => (quote[j] - conta[j]) - (quote[i] - conta[i])).forEach(i => { if (resto-- > 0) conta[i]++; });
+  return lati.flatMap((l, i) => Array.from({ length: conta[i] }, (_, j) => {
+    const f = (j + 0.5) / conta[i];
+    return {
+      x: l.a[0] + (l.b[0] - l.a[0]) * f + l.n[0] * distanza,
+      y: l.a[1] + (l.b[1] - l.a[1]) * f + l.n[1] * distanza,
+    };
+  }));
 }

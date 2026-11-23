@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Download, Tag, UtensilsCrossed, AlertTriangle, ChevronDown, Users, Map as MapIcon, Settings2 } from 'lucide-react';
+import { Plus, Download, Tag, UtensilsCrossed, AlertTriangle, ChevronDown, Users, Map as MapIcon, Settings2, BookmarkCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../api';
 import AssegnaOspiti from './tavoli/AssegnaOspiti';
 import PiantaSala from './tavoli/PiantaSala';
 import GestioneTavoli from './tavoli/GestioneTavoli';
-import { calcolaAvvisi, tipoTavolo, formaTavolo } from './tavoli/util';
+import Preset from './tavoli/Preset';
+import { calcolaAvvisi, tipoTavolo, formaTavolo, ellePosti } from './tavoli/util';
 
-const empty = { nome: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale' };
+const empty = { nome: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale', elle_posti: 'entrambi' };
 
 const VISTE = [
   { id: 'assegna', label: 'Assegna ospiti', corto: 'Assegna', icon: Users },
@@ -21,6 +22,7 @@ export default function Tavoli() {
   const [tavoli, setTavoli] = useState([]);
   const [ospiti, setOspiti] = useState([]);
   const [modal, setModal] = useState(false);
+  const [presetAperti, setPresetAperti] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   // Chiusi sul telefono: aperti occuperebbero mezzo schermo prima dei tavoli.
@@ -42,7 +44,7 @@ export default function Tavoli() {
 
   const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
   const openEdit = t => {
-    setForm({ nome: t.nome, capienza: t.capienza, note: t.note || '', forma: t.forma || 'tondo', tipo: t.tipo || 'normale' });
+    setForm({ nome: t.nome, capienza: t.capienza, note: t.note || '', forma: t.forma || 'tondo', tipo: t.tipo || 'normale', elle_posti: t.elle_posti || 'entrambi' });
     setEditId(t.id);
     setModal(true);
   };
@@ -540,7 +542,10 @@ export default function Tavoli() {
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
         </div>
         {/* Sul telefono una riga sola, icona sopra al testo */}
-        <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
+        <div className="grid grid-cols-5 gap-2 sm:flex sm:flex-wrap">
+          <button className="btn-secondary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={() => setPresetAperti(true)}>
+            <BookmarkCheck size={15} /> Preset
+          </button>
           <button className="btn-secondary flex-col sm:flex-row justify-center gap-0.5 sm:gap-2 px-1 sm:px-4 text-[11px] sm:text-sm" onClick={exportSegnaposti} disabled={exportingCards}>
             <Tag size={15} /> {exportingCards ? 'Esporto…' : 'Segnaposti'}
           </button>
@@ -603,6 +608,8 @@ export default function Tavoli() {
         <GestioneTavoli tavoli={tavoli} ospiti={ospiti} salvaTavolo={salvaTavolo} del={del} riordina={riordina} openNew={openNew} />
       )}
 
+      {presetAperti && <Preset tavoli={tavoli} onClose={() => setPresetAperti(false)} onApplicato={load} />}
+
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal">
@@ -636,6 +643,14 @@ export default function Tavoli() {
                     {Object.entries(formaTavolo).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
+                {form.forma === 'elle' && form.tipo !== 'sposi' && (
+                  <div>
+                    <label className="form-label">Posti del tavolo a L</label>
+                    <select className="form-input" value={form.elle_posti} onChange={e => setForm({ ...form, elle_posti: e.target.value })}>
+                      {Object.entries(ellePosti).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">Note</label>
