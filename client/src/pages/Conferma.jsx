@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, CheckCircle, XCircle, ArrowLeft, Plus, Trash2, Users, User } from 'lucide-react';
 import axios from 'axios';
 
@@ -30,6 +30,10 @@ export default function Conferma() {
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
   const [errore, setErrore] = useState('');
+  // Quale campo manca: si colora di rosso e ci si porta il cursore.
+  const [manca, setManca] = useState(null);
+  const refNome = useRef(null);
+  const refCognome = useRef(null);
   const [loading, setLoading] = useState(false);
 
   // Step 2
@@ -64,10 +68,16 @@ export default function Conferma() {
     e.preventDefault();
     // Il cognome serve: col solo nome la ricerca non trova nessuno e la
     // risposta finiva registrata come un invitato nuovo, senza cognome.
+    // Il pulsante resta attivo apposta: disattivato, il browser ignorava
+    // anche il tasto Invio e la pagina non diceva niente.
     if (!nome.trim() || !cognome.trim()) {
-      setErrore('Inserisci nome e cognome, come sull\'invito.');
+      const campo = !nome.trim() ? 'nome' : 'cognome';
+      setManca(campo);
+      setErrore(campo === 'nome' ? 'Inserisci il tuo nome.' : 'Inserisci anche il cognome, come sull\'invito.');
+      (campo === 'nome' ? refNome : refCognome).current?.focus();
       return;
     }
+    setManca(null);
     setErrore('');
     setLoading(true);
     try {
@@ -364,20 +374,19 @@ export default function Conferma() {
               <form onSubmit={trova} className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
-                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                    placeholder="Es: Mario"
-                    value={nome} onChange={e => { setNome(e.target.value); setErrore(''); }}
-                    autoFocus required />
+                  <input ref={refNome} className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${manca === 'nome' ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-rose-300'}`}
+                    placeholder="Es: Mario" aria-invalid={manca === 'nome'}
+                    value={nome} onChange={e => { setNome(e.target.value); setErrore(''); setManca(null); }}
+                    autoFocus />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Cognome *</label>
-                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-                    placeholder="Es: Rossi"
-                    value={cognome} onChange={e => { setCognome(e.target.value); setErrore(''); }}
-                    required />
+                  <input ref={refCognome} className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${manca === 'cognome' ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-rose-300'}`}
+                    placeholder="Es: Rossi" aria-invalid={manca === 'cognome'}
+                    value={cognome} onChange={e => { setCognome(e.target.value); setErrore(''); setManca(null); }} />
                 </div>
-                {errore && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{errore}</p>}
-                <button type="submit" disabled={loading || !nome.trim() || !cognome.trim()}
+                {errore && <p role="alert" className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{errore}</p>}
+                <button type="submit" disabled={loading}
                   className="w-full py-3 rounded-xl font-semibold text-white text-sm bg-rose-500 hover:bg-rose-600 transition-colors disabled:opacity-40">
                   {loading ? 'Ricerca...' : 'Continua'}
                 </button>
