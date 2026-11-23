@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { eventi } = require('../cronologia');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -39,7 +40,12 @@ router.get('/info', (req, res) => {
   // Solo i campi rilevanti per un invitato: referente/telefono/email/costo/note
   // sono dati interni per trattare con il fornitore, non vanno esposti pubblicamente.
   const locations = db.prepare("SELECT id, tipo, nome, indirizzo FROM location WHERE stato = 'confermato' ORDER BY tipo ASC").all();
-  const cronologia = db.prepare('SELECT * FROM cronologia ORDER BY ora ASC').all();
+  // Solo gli eventi segnati come visibili, e solo i campi che servono a un
+  // invitato: i preparativi a casa degli sposi restano nella gestione.
+  const cronologia = eventi('WHERE c.pubblico = 1').map(e => ({
+    id: e.id, ora: e.ora, durata: e.durata, titolo: e.titolo, descrizione: e.descrizione, tipo: e.tipo,
+    luogo: e.location_nome || e.luogo, indirizzo: e.location_id ? e.location_indirizzo : null,
+  }));
   res.json({ config, locations, cronologia });
 });
 

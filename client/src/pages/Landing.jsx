@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MapPin, Heart } from 'lucide-react';
+import { MapPin, Heart, Navigation } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -21,7 +21,16 @@ const TEMI = {
 // perché Location.jsx salva 'Chiesa'/'Ricevimento' (maiuscolo) mentre qui serve
 // solo distinguere le categorie, non riprodurre esattamente il valore in DB.
 const TIPO_LABEL = { chiesa: 'Cerimonia', ricevimento: 'Ricevimento', altro: 'Location' };
-const TIPO_EMOJI = { cerimonia: '💍', ricevimento: '🥂', foto: '📷', viaggio: '🚗', preparativi: '💄', altro: '📌' };
+const TIPO_EMOJI = { cerimonia: '💍', ricevimento: '🥂', foto: '📷', viaggio: '🚗', preparativi: '💄', altro: '✦' };
+
+const mapsUrl = (nome, indirizzo) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([nome, indirizzo].filter(Boolean).join(', '))}`;
+const fineEvento = ev => {
+  if (!ev.durata || !ev.ora) return null;
+  const [h, m] = ev.ora.split(':').map(Number);
+  const t = (h * 60 + m + ev.durata) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 
 // SVG ornamento floreale per divisori
 function BotanicalDivider({ color, small = false }) {
@@ -251,36 +260,7 @@ export default function Landing() {
         {/* Cronologia */}
         {cronologia.length > 0 && (
           <Section title="Il programma del giorno" tema={tema}>
-            <div style={{ position: 'relative', paddingLeft: '3rem' }}>
-              {/* Linea verticale */}
-              <div style={{ position: 'absolute', left: '0.875rem', top: '0.5rem', bottom: '0.5rem', width: '1px', background: `linear-gradient(to bottom, ${tema.border}, transparent)` }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-                {cronologia.map((ev, i) => (
-                  <div key={ev.id} style={{ position: 'relative' }}>
-                    {/* Dot */}
-                    <div style={{ position: 'absolute', left: '-2.25rem', top: '0.125rem', width: '1.75rem', height: '1.75rem', borderRadius: '50%', background: i === 0 ? tema.primary : '#fff', border: `2px solid ${i === 0 ? tema.primary : tema.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', boxShadow: '0 0 0 3px ' + bg }}>
-                      <span>{TIPO_EMOJI[ev.tipo] || '✦'}</span>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.15rem' }}>
-                        <span style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '0.8125rem', color: tema.text, fontWeight: 600, letterSpacing: '0.05em' }}>
-                          {ev.ora?.slice(0, 5)}
-                        </span>
-                        <span style={{ fontFamily: '"Playfair Display", Georgia, serif', fontWeight: 600, color: '#1f2937', fontSize: '1rem' }}>{ev.titolo}</span>
-                      </div>
-                      {ev.luogo && (
-                        <p style={{ fontSize: '0.8125rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
-                          <MapPin size={12} style={{ color: tema.mid }} /> {ev.luogo}
-                        </p>
-                      )}
-                      {ev.descrizione && (
-                        <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '0.15rem', fontStyle: 'italic' }}>{ev.descrizione}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Programma eventi={cronologia} tema={tema} bg={bg} />
           </Section>
         )}
 
@@ -401,7 +381,73 @@ function LocationCard({ loc, tema }) {
             {loc.indirizzo}
           </p>
         )}
+        <a href={mapsUrl(loc.nome, loc.indirizzo)} target="_blank" rel="noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.85rem', fontSize: '0.8125rem', fontWeight: 600, color: tema.primary, textDecoration: 'none', letterSpacing: '0.02em' }}>
+          <Navigation size={13} /> Indicazioni
+        </a>
       </div>
+    </div>
+  );
+}
+
+// Il programma: ora a sinistra, filo verticale con l'icona del momento al
+// centro, scheda a destra. La cerimonia è il momento clou e si distingue.
+function Programma({ eventi, tema, bg }) {
+  return (
+    <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+      {eventi.map((ev, i) => {
+        const clou = ev.tipo === 'cerimonia';
+        const ultimo = i === eventi.length - 1;
+        const fine = fineEvento(ev);
+        return (
+          <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '3.6rem 2.5rem 1fr', columnGap: '0.6rem' }}>
+            {/* Ora */}
+            <div style={{ textAlign: 'right', paddingTop: '0.7rem' }}>
+              <div style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '1.0625rem', fontWeight: 600, color: tema.dark, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+                {ev.ora?.slice(0, 5)}
+              </div>
+              {fine && <div style={{ fontSize: '0.6875rem', color: '#9ca3af', marginTop: '0.15rem', fontVariantNumeric: 'tabular-nums' }}>fino {fine}</div>}
+            </div>
+            {/* Filo e icona */}
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+              {!ultimo && <div style={{ position: 'absolute', top: '1.5rem', bottom: 0, width: '1px', background: tema.border }} />}
+              <div style={{
+                position: 'relative', marginTop: '0.45rem', width: '2.25rem', height: '2.25rem', borderRadius: '50%',
+                background: clou ? tema.primary : '#fff', border: `1.5px solid ${clou ? tema.primary : tema.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.95rem',
+                color: tema.mid, boxShadow: `0 0 0 4px ${bg}`,
+              }}>
+                {TIPO_EMOJI[ev.tipo] || '✦'}
+              </div>
+            </div>
+            {/* Scheda */}
+            <div style={{ paddingBottom: ultimo ? 0 : '1.25rem', minWidth: 0 }}>
+              <div style={{
+                background: clou ? tema.light : '#fff', border: `1px solid ${clou ? tema.border : '#f1ece6'}`,
+                borderRadius: '0.875rem', padding: '0.8rem 1rem', boxShadow: '0 2px 10px -4px rgba(0,0,0,0.06)',
+              }}>
+                <div style={{ fontFamily: '"Playfair Display", Georgia, serif', fontWeight: 600, color: '#1f2937', fontSize: clou ? '1.125rem' : '1rem', lineHeight: 1.35 }}>
+                  {ev.titolo}
+                </div>
+                {ev.luogo && (
+                  <div style={{ fontSize: '0.8125rem', color: '#6b7280', display: 'flex', alignItems: 'flex-start', gap: '0.3rem', marginTop: '0.35rem' }}>
+                    <MapPin size={13} style={{ color: tema.mid, flexShrink: 0, marginTop: '0.15rem' }} />
+                    <span>
+                      {ev.luogo}
+                      {ev.indirizzo && (
+                        <> · <a href={mapsUrl(ev.luogo, ev.indirizzo)} target="_blank" rel="noreferrer" style={{ color: tema.primary, textDecoration: 'none', fontWeight: 600 }}>Indicazioni</a></>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {ev.descrizione && (
+                  <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '0.3rem', fontStyle: 'italic', lineHeight: 1.5 }}>{ev.descrizione}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

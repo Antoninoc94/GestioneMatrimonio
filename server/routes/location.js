@@ -108,7 +108,12 @@ router.put('/:id', auth, (req, res) => {
 });
 
 router.delete('/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM location WHERE id = ?').run(req.params.id);
+  // Gli eventi della cronologia che la usavano tengono il nome come testo.
+  db.transaction(() => {
+    db.prepare(`UPDATE cronologia SET luogo = COALESCE(NULLIF(luogo, ''), (SELECT nome FROM location WHERE id = ?)), location_id = NULL
+                WHERE location_id = ?`).run(req.params.id, req.params.id);
+    db.prepare('DELETE FROM location WHERE id = ?').run(req.params.id);
+  })();
   res.json({ ok: true });
 });
 

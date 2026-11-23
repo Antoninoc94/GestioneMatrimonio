@@ -420,6 +420,18 @@ if (!ospCols.includes('sposo')) {
   }
 }
 
+// Migrazione: cronologia collegata alle location e visibilità sulla pagina Wedding.
+// location_id senza vincolo REFERENCES: se la location si elimina, location.js
+// copia prima il nome in `luogo`, così l'evento non resta senza posto.
+// pubblico parte da 1: finora la landing mostrava tutti gli eventi.
+const cronCols = db.prepare('PRAGMA table_info(cronologia)').all().map(c => c.name);
+if (!cronCols.includes('location_id')) {
+  db.prepare('ALTER TABLE cronologia ADD COLUMN location_id INTEGER').run();
+}
+if (!cronCols.includes('pubblico')) {
+  db.prepare('ALTER TABLE cronologia ADD COLUMN pubblico INTEGER DEFAULT 1').run();
+}
+
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
 if (!noteCols.includes('email_stato')) {

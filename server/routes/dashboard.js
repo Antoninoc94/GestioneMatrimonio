@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
+const { eventi } = require('../cronologia');
 const auth = require('../middleware/auth');
 const { getAllScadenze } = require('../utils/scadenze-helper');
 
@@ -63,7 +64,7 @@ router.get('/', auth, (req, res) => {
   ).all();
 
   // Cronologia del giorno (se data matrimonio impostata)
-  const cronologia = db.prepare('SELECT * FROM cronologia ORDER BY ora ASC').all();
+  const cronologia = eventi();
 
   // Tavoli
   const tavoliStats = db.prepare(`
