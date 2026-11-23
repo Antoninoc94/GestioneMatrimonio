@@ -21,9 +21,9 @@ export function misure(t) {
   const n = Math.max(1, t.capienza || 1);
   if (t.forma === 'rettangolare') {
     const perLato = Math.ceil(n / 2);
-    return { w: Math.max(70, perLato * 30 + 10), h: 56 };
+    return { w: Math.max(110, perLato * 40 + 14), h: 72 };
   }
-  const r = Math.min(100, 30 + n * 2.5);
+  const r = Math.min(120, 42 + n * 4);
   return { w: r * 2, h: r * 2, r };
 }
 

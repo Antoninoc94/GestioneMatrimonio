@@ -22,13 +22,13 @@ function posti(t) {
   if (t.forma === 'rettangolare') {
     const sopra = Math.ceil(n / 2), sotto = n - sopra;
     return [
-      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 11 })),
-      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 11 })),
+      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 15 })),
+      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 15 })),
     ];
   }
   return Array.from({ length: n }, (_, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    return { x: Math.cos(a) * (m.r + 11), y: Math.sin(a) * (m.r + 11) };
+    return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
   });
 }
 
@@ -54,7 +54,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   };
   const limita = (t, x, y) => {
     const { w, h } = ingombro(t);
-    const mw = w / 2 + 14, mh = h / 2 + 14; // posti compresi
+    const mw = w / 2 + 26, mh = h / 2 + 26; // posti compresi
     return {
       x: Math.round(Math.min(Math.max(x, mw), PIANTA_W - mw)),
       y: Math.round(Math.min(Math.max(y, mh), PIANTA_H - mh)),
@@ -125,7 +125,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
               const piazzato = t.pos_x != null && t.pos_y != null;
               const selezionato = selId === t.id;
               const { w: larghezza } = ingombro(t);
-              const maxCar = Math.max(7, Math.floor(larghezza / 8.5));
+              const maxCar = Math.max(12, Math.floor(larghezza / 9.5));
               const nome = t.nome.length > maxCar ? `${t.nome.slice(0, maxCar - 1)}…` : t.nome;
               const stroke = selezionato ? '#e11d48' : oltre ? '#ef4444' : c.stroke;
               const emoji = tipoTavolo[t.tipo]?.emoji;
@@ -139,7 +139,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                   onPointerCancel={() => setDrag(null)}>
                   <g transform={`rotate(${t.forma === 'rettangolare' ? t.rotazione || 0 : 0})`}>
                     {posti(t).map((p, i) => (
-                      <circle key={i} cx={p.x} cy={p.y} r="7"
+                      <circle key={i} cx={p.x} cy={p.y} r="9"
                         fill={i < occupati ? '#fb7185' : '#ffffff'} stroke={i < occupati ? '#e11d48' : '#d1d5db'} strokeWidth="1.5" />
                     ))}
                     {t.forma === 'rettangolare'
@@ -147,10 +147,10 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                           strokeWidth={selezionato ? 3 : 2} strokeDasharray={piazzato ? undefined : '6 4'} />
                       : <circle r={m.r} fill={c.fill} stroke={stroke} strokeWidth={selezionato ? 3 : 2} strokeDasharray={piazzato ? undefined : '6 4'} />}
                   </g>
-                  <text y={emoji ? -4 : -2} textAnchor="middle" fontSize="14" fontWeight="700" fill="#111827" pointerEvents="none">
+                  <text y={-2} textAnchor="middle" fontSize="17" fontWeight="700" fill="#111827" pointerEvents="none">
                     {emoji ? `${emoji} ` : ''}{nome}
                   </text>
-                  <text y="16" textAnchor="middle" fontSize="12" fontWeight="600" fill={oltre ? '#ef4444' : '#6b7280'} pointerEvents="none">
+                  <text y="19" textAnchor="middle" fontSize="14" fontWeight="600" fill={oltre ? '#ef4444' : '#6b7280'} pointerEvents="none">
                     {occupati}/{t.capienza}
                   </text>
                 </g>
