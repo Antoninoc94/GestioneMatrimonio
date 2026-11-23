@@ -89,10 +89,15 @@ router.get('/', auth, (req, res) => {
     FROM regali
   `).get();
 
+  // Giorni di calendario, con "oggi" in ora italiana (il container gira in
+  // UTC): lo stesso conto di client/src/giorni.js usato dalle altre pagine.
+  // Prima era un Math.ceil sulle ore e la pagina Wedding segnava un giorno in meno.
   let giorniAlMatrimonio = null;
   if (config?.data_matrimonio) {
-    const diff = new Date(config.data_matrimonio) - new Date();
-    giorniAlMatrimonio = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    let oggiIt;
+    try { oggiIt = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }); } catch { oggiIt = new Date().toISOString().slice(0, 10); }
+    const t = d => Date.parse(`${String(d).slice(0, 10)}T12:00:00Z`);
+    giorniAlMatrimonio = Math.round((t(config.data_matrimonio) - t(oggiIt)) / 86400000);
   }
 
   res.json({

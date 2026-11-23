@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckSquare, Square, Plus, Trash2, CheckCheck, AlertTriangle, Clock, Calendar } from 'lucide-react';
 import api from '../api';
+import { giorniA } from '../giorni';
 
 const FASI = [
   { key: '12mesi',    label: '12+ mesi prima',           emoji: '🗓️', minGiorni: 365 },
@@ -37,9 +38,7 @@ export default function Checklist() {
   }, []);
 
   // Giorni al matrimonio (negativo = già passato)
-  const giorniAlMatrimonio = dataMatrimonio
-    ? Math.floor((new Date(dataMatrimonio) - new Date()) / 86400000)
-    : null;
+  const giorniAlMatrimonio = giorniA(dataMatrimonio);
 
   const faseCorrenteKey = giorniAlMatrimonio !== null
     ? (FASI.find(f => giorniAlMatrimonio >= f.minGiorni)?.key || 'giorno')

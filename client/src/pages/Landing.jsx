@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown } from 'lucide-react';
 import { formattaIban } from '../publicUrl';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { giorniA } from '../giorni';
 import { it } from 'date-fns/locale';
 
 const toUtc = s => s && !s.endsWith('Z') ? s.replace(' ', 'T') + 'Z' : s;
@@ -106,7 +107,7 @@ export default function Landing() {
   const nome2 = config.nome_sposo2 || '';
   const sposi = [nome1, nome2].filter(Boolean).join(' & ');
   const dataMatrimonio = config.data_matrimonio ? parseISO(toUtc(config.data_matrimonio + 'T00:00:00Z')) : null;
-  const giorniMancanti = dataMatrimonio ? differenceInDays(dataMatrimonio, new Date()) : null;
+  const giorniMancanti = giorniA(config.data_matrimonio);
 
   const chiesa = locations.find(l => l.tipo?.toLowerCase() === 'chiesa');
   const ricevimento = locations.find(l => l.tipo?.toLowerCase() === 'ricevimento');

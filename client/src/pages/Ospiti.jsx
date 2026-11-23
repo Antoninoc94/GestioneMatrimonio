@@ -1,6 +1,7 @@
 import { useEffect, useState, Fragment } from 'react';
 import { Plus, Pencil, Trash2, Users, Download, Check, X, Clock, Globe, Heart, Search, ChevronUp, ChevronDown, ChevronsUpDown, MessageCircle, Mail } from 'lucide-react';
 import api from '../api';
+import { giorniA } from '../giorni';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { baseUrlPubblico, linkWhatsApp, MESSAGGIO_SOLLECITO_DEFAULT } from '../publicUrl';
@@ -244,9 +245,7 @@ export default function Ospiti() {
   const daSollecitare = o => !!o.invito_inviato && o.rsvp === 'attesa';
   const nDaSollecitare = items.filter(i => !i.parent_id && daSollecitare(i)).length;
   // Giorni all'ultimo giorno utile per rispondere (0 = oggi, negativo = chiuse).
-  const giorniAllaChiusura = condivisione.scadenza
-    ? Math.round((new Date(condivisione.scadenza) - new Date(new Date().toISOString().slice(0, 10))) / 86400000)
-    : null;
+  const giorniAllaChiusura = giorniA(condivisione.scadenza);
 
   // filtering + sort pipeline
   const mainGuests = items.filter(i => !i.parent_id);
