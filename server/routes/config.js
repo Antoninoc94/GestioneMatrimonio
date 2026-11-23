@@ -61,6 +61,10 @@ router.put('/', auth, (req, res) => {
     url_pubblico=COALESCE(?,url_pubblico),
     messaggio_whatsapp=COALESCE(?,messaggio_whatsapp),
     messaggio_ringraziamento=COALESCE(?,messaggio_ringraziamento),
+    viaggio_destinazione=COALESCE(?,viaggio_destinazione),
+    viaggio_partenza=COALESCE(?,viaggio_partenza),
+    viaggio_ritorno=COALESCE(?,viaggio_ritorno),
+    viaggio_budget=COALESCE(?,viaggio_budget),
     regalo_abilitato=COALESCE(?,regalo_abilitato),
     regalo_titolo=COALESCE(?,regalo_titolo),
     regalo_messaggio=COALESCE(?,regalo_messaggio),
@@ -102,6 +106,12 @@ router.put('/', auth, (req, res) => {
       p('url_pubblico', v => (v ?? '').trim()),
       p('messaggio_whatsapp', v => v ?? ''),
       p('messaggio_ringraziamento', v => v ?? ''),
+      p('viaggio_destinazione', v => (v ?? '').trim()),
+      // '' e non NULL quando si toglie la data, altrimenti COALESCE la terrebbe.
+      p('viaggio_partenza', v => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '')),
+      p('viaggio_ritorno', v => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '')),
+      // 0 = nessun budget (COALESCE non permetterebbe di tornare a NULL).
+      p('viaggio_budget', v => Math.max(parseFloat(v) || 0, 0)),
       p('regalo_abilitato', v => (v === true || v === 1 ? 1 : 0)),
       p('regalo_titolo', v => v ?? ''),
       p('regalo_messaggio', v => v ?? ''),

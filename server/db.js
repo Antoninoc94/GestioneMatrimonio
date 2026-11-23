@@ -463,6 +463,22 @@ if (!db.prepare('PRAGMA table_info(config)').all().some(c => c.name === 'messagg
   db.prepare('ALTER TABLE config ADD COLUMN messaggio_ringraziamento TEXT').run();
 }
 
+// Migrazione: viaggio di nozze. I dati del viaggio (destinazione, date,
+// budget) stanno in config: il viaggio è uno. Le prenotazioni guadagnano gli
+// orari, i dettagli dei voli, il link alla prenotazione e un contatto.
+for (const col of ['viaggio_destinazione', 'viaggio_partenza', 'viaggio_ritorno']) {
+  if (!db.prepare('PRAGMA table_info(config)').all().some(c => c.name === col)) {
+    db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
+  }
+}
+if (!db.prepare('PRAGMA table_info(config)').all().some(c => c.name === 'viaggio_budget')) {
+  db.prepare('ALTER TABLE config ADD COLUMN viaggio_budget REAL').run();
+}
+const viaggioCols = db.prepare('PRAGMA table_info(viaggio)').all().map(c => c.name);
+for (const col of ['ora_inizio', 'ora_fine', 'compagnia', 'numero_volo', 'luogo_partenza', 'luogo_arrivo', 'link', 'contatto']) {
+  if (!viaggioCols.includes(col)) db.prepare(`ALTER TABLE viaggio ADD COLUMN ${col} TEXT`).run();
+}
+
 // Migrazione: traccia l'esito dell'invio email per le note veloci
 const noteCols = db.prepare('PRAGMA table_info(note_veloci)').all().map(c => c.name);
 if (!noteCols.includes('email_stato')) {
