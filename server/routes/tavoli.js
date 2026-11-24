@@ -138,13 +138,13 @@ router.post('/preset/:id/applica', auth, (req, res) => {
     }
     db.prepare('UPDATE ospiti SET tavolo_id = NULL WHERE tavolo_id IS NOT NULL').run();
     db.prepare('DELETE FROM tavoli').run();
-    const ins = db.prepare(`INSERT INTO tavoli (nome, capienza, note, forma, tipo, rotazione, elle_posti, pos_x, pos_y, ordine)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`);
+    const ins = db.prepare(`INSERT INTO tavoli (nome, descrizione, capienza, note, forma, tipo, rotazione, elle_posti, pos_x, pos_y, ordine)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
     const siede = db.prepare('UPDATE ospiti SET tavolo_id = ? WHERE id = ?');
     let tavoloSposi = null;
     dati.tavoli.forEach((t, i) => {
       const v = componi({}, t);
-      const id = ins.run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti,
+      const id = ins.run(v.nome, v.descrizione, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti,
         coord(t.pos_x, PIANTA_W), coord(t.pos_y, PIANTA_H), i).lastInsertRowid;
       if (v.tipo === 'sposi' && tavoloSposi === null) tavoloSposi = id;
       for (const oid of Array.isArray(t.ospiti) ? t.ospiti : []) {
