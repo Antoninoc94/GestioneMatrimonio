@@ -162,7 +162,14 @@ export default function Tavoli() {
   const exportSegnaposti = () => {
     // Tutti i confermati con un tavolo, partner e figli compresi
     const tutti = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato');
-    if (tutti.length === 0) return alert('Nessun ospite confermato con tavolo assegnato.');
+    if (tutti.length === 0) {
+      const seduti = ospiti.filter(o => o.tavolo_id);
+      if (seduti.length === 0) return alert('Nessun ospite ha ancora un tavolo.');
+      const attesa = seduti.filter(o => o.rsvp === 'attesa').length;
+      const declinati = seduti.filter(o => o.rsvp === 'declinato').length;
+      const dettaglio = [attesa && `${attesa} in attesa`, declinati && `${declinati} declinat${declinati === 1 ? 'o' : 'i'}`].filter(Boolean).join(', ');
+      return alert(`Hai ${seduti.length} ${seduti.length === 1 ? 'ospite' : 'ospiti'} a un tavolo, ma nessuno è confermato${dettaglio ? ` (${dettaglio})` : ''}.\n\nI segnaposto si stampano solo per i confermati.`);
+    }
     setExportingCards(true);
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
