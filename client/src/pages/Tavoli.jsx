@@ -8,9 +8,10 @@ import AssegnaOspiti from './tavoli/AssegnaOspiti';
 import PiantaSala from './tavoli/PiantaSala';
 import GestioneTavoli from './tavoli/GestioneTavoli';
 import Preset from './tavoli/Preset';
+import { useScelta } from '../components/Scelta';
 import { calcolaAvvisi, tipoTavolo, formaTavolo, ellePosti } from './tavoli/util';
 
-const empty = { nome: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale', elle_posti: 'entrambi' };
+const empty = { nome: '', descrizione: '', capienza: 8, note: '', forma: 'tondo', tipo: 'normale', elle_posti: 'entrambi' };
 
 const VISTE = [
   { id: 'assegna', label: 'Assegna ospiti', corto: 'Assegna', icon: Users },
@@ -19,6 +20,7 @@ const VISTE = [
 ];
 
 export default function Tavoli() {
+  const [dialogo, chiedi] = useScelta();
   const [tavoli, setTavoli] = useState([]);
   const [ospiti, setOspiti] = useState([]);
   const [modal, setModal] = useState(false);
@@ -44,7 +46,7 @@ export default function Tavoli() {
 
   const openNew = () => { setForm(empty); setEditId(null); setModal(true); };
   const openEdit = t => {
-    setForm({ nome: t.nome, capienza: t.capienza, note: t.note || '', forma: t.forma || 'tondo', tipo: t.tipo || 'normale', elle_posti: t.elle_posti || 'entrambi' });
+    setForm({ nome: t.nome, descrizione: t.descrizione || '', capienza: t.capienza, note: t.note || '', forma: t.forma || 'tondo', tipo: t.tipo || 'normale', elle_posti: t.elle_posti || 'entrambi' });
     setEditId(t.id);
     setModal(true);
   };
@@ -121,7 +123,7 @@ export default function Tavoli() {
   // i bambini restano da sistemare a parte (tavolo dei bambini). Discrimina
   // `tipo`, cioè l'età: un figlio ormai adulto siede con i suoi come chiunque
   // altro, mentre `relazione` resterebbe 'figlio' per sempre.
-  const assignWithFamily = (o, tavoloId) => {
+  const assignWithFamily = async (o, tavoloId) => {
     const insieme = insiemeA(o);
     const seguono = insieme.filter(f => f.tipo !== 'bambino');
     const bambini = insieme.filter(f => f.tipo === 'bambino');
@@ -133,11 +135,18 @@ export default function Tavoli() {
         : o.tavolo_id ? 'Spostare' : 'Assegnare al tavolo';
       // Dirlo esplicitamente, altrimenti i bambini rimasti indietro sembrano un bug.
       const nota = bambini.length
-        ? `\n\n${bambini.length === 1 ? 'Il bambino resta' : `I ${bambini.length} bambini restano`} da assegnare a parte.`
+        ? `\n${bambini.length === 1 ? 'Il bambino resta' : `I ${bambini.length} bambini restano`} dov'è.`
         : '';
-      if (confirm(`${azione} anche ${chi} di ${o.nome}?${nota}
-
-OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.id));
+      const scelta = await chiedi({
+        titolo: `${azione} anche ${chi}?`,
+        testo: `Con ${o.nome}: ${seguono.map(f => f.nome).join(', ')}.${nota}`,
+        azioni: [
+          { valore: 'tutti', label: `Sì, ${seguono.length > 1 ? 'tutti insieme' : 'insieme'}`, primaria: true },
+          { valore: 'solo', label: `Solo ${o.nome}` },
+        ],
+      });
+      if (scelta === null) return;
+      if (scelta === 'tutti') ids.push(...seguono.map(f => f.id));
     }
     return assignGuests(ids, tavoloId);
   };
@@ -236,6 +245,7 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
       const FOOTER_H = 15;
       const CARD_PAD = 4;
       const CARD_HEAD = 16; // name + bar + spacing
+      const head = t => CARD_HEAD + (t.descrizione ? 4 : 0); // + riga di descrizione
       const GUEST_ROW = 5;
       const ROW_GAP = 4;
 
@@ -265,7 +275,7 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
       const cardHeight = t => {
         const lines = buildGuestLines(t.ospiti);
         const rows = Math.max(1, lines.length);
-        return CARD_HEAD + rows * GUEST_ROW + CARD_PAD;
+        return head(t) + rows * GUEST_ROW + CARD_PAD;
       };
 
       const drawCard = (t, cx, cy, height) => {
@@ -297,18 +307,26 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
           doc.roundedRect(cx + CARD_PAD, cy + CARD_PAD + 7, fillW, 2, 1, 1, 'F');
         }
 
+        // Descrizione, sotto la barra
+        if (t.descrizione) {
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(...gray);
+          doc.text(doc.splitTextToSize(t.descrizione, COL_W - 2 * CARD_PAD)[0], cx + CARD_PAD, cy + CARD_PAD + 13);
+        }
+
         // Guests
         if (t.ospiti.length === 0) {
           doc.setFontSize(8);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(156, 163, 175);
-          doc.text('Nessun ospite assegnato', cx + CARD_PAD, cy + CARD_HEAD + CARD_PAD);
+          doc.text('Nessun ospite assegnato', cx + CARD_PAD, cy + head(t) + CARD_PAD);
         } else {
           const lines = buildGuestLines(t.ospiti);
           lines.forEach(({ o, indent, parentNote }, idx) => {
             const name = o.cognome ? `${o.cognome} ${o.nome}` : o.nome;
             const prefix = indent ? '  > ' : '- ';
-            const gy = cy + CARD_HEAD + idx * GUEST_ROW;
+            const gy = cy + head(t) + idx * GUEST_ROW;
             if (indent) {
               doc.setFontSize(7);
               doc.setFont('helvetica', 'italic');
@@ -538,6 +556,7 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
 
   return (
     <div>
+      {dialogo}
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Disposizione Tavoli</h1>
@@ -601,7 +620,7 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
       </div>
 
       {vista === 'assegna' && (
-        <AssegnaOspiti tavoli={tavoli} ospiti={ospiti} assignWithFamily={assignWithFamily} openEdit={openEdit} del={del} />
+        <AssegnaOspiti tavoli={tavoli} ospiti={ospiti} assignWithFamily={assignWithFamily} assignGuests={assignGuests} openEdit={openEdit} del={del} />
       )}
       {vista === 'pianta' && (
         <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} />
@@ -621,6 +640,11 @@ OK = sì, insieme. Annulla = solo ${o.nome}.`)) ids.push(...seguono.map(f => f.i
                 <div>
                   <label className="form-label">Nome tavolo *</label>
                   <input className="form-input" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Es. Tavolo degli Sposi" required />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="form-label">Descrizione</label>
+                  <input className="form-input" value={form.descrizione} maxLength={120} onChange={e => setForm({ ...form, descrizione: e.target.value })}
+                    placeholder="Facoltativa, es. Amici dell'università" />
                 </div>
                 <div>
                   <label className="form-label">Capienza</label>

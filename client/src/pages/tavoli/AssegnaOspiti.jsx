@@ -1,24 +1,29 @@
 import { useState } from 'react';
-import { Pencil, Trash2, Users, UserX, Search, ChevronDown, X, GripVertical, ChevronsDownUp, ChevronsUpDown, ArrowRightLeft, Plus } from 'lucide-react';
+import { Pencil, Trash2, Users, UserX, Search, ChevronDown, X, GripVertical, ChevronsDownUp, ChevronsUpDown, ArrowRightLeft, Plus, CheckSquare, Square, CheckCircle2 } from 'lucide-react';
 import { nomeOspite, tipoTavolo } from './util';
 
 // Elenco dei tavoli tra cui scegliere, dal basso sul telefono e al centro su
 // schermi grandi. Sostituisce i menu a tendina, illeggibili su un telefono.
-function SceltaTavolo({ ospite, tavoli, onScegli, onClose }) {
+function SceltaTavolo({ ospite, gruppo, tavoli, onScegli, onClose }) {
+  // `ospite` per uno solo, `gruppo` (elenco di id) per più persone insieme.
+  const n = gruppo ? gruppo.length : 1;
+  const attualeId = gruppo ? null : ospite.tavolo_id;
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-gray-100">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-400">{ospite.tavolo_id ? 'Sposta' : 'Assegna'}</p>
-            <p className="font-bold text-gray-900 truncate">{nomeOspite(ospite)}{ospite.tipo === 'bambino' ? ' 👶' : ''}</p>
+            <p className="text-xs text-gray-400">{attualeId ? 'Sposta' : 'Assegna'}</p>
+            <p className="font-bold text-gray-900 truncate">
+              {gruppo ? `${n} ospiti selezionati` : `${nomeOspite(ospite)}${ospite.tipo === 'bambino' ? ' 👶' : ''}`}
+            </p>
           </div>
           <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-100" aria-label="Chiudi" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="overflow-y-auto p-2">
           {tavoli.map(t => {
-            const attuale = t.id === ospite.tavolo_id;
-            const pieno = t.ospiti.length >= t.capienza;
+            const attuale = t.id === attualeId;
+            const liberi = t.capienza - t.ospiti.length;
             const emoji = tipoTavolo[t.tipo]?.emoji;
             return (
               <button key={t.id} disabled={attuale} onClick={() => onScegli(t.id)}
@@ -26,17 +31,18 @@ function SceltaTavolo({ ospite, tavoli, onScegli, onClose }) {
                 <span className="w-6 text-center">{emoji || '🍽️'}</span>
                 <span className="flex-1 min-w-0">
                   <span className="block font-semibold text-gray-800 truncate">{t.nome}</span>
+                  {t.descrizione && <span className="block text-xs text-gray-500 truncate">{t.descrizione}</span>}
                   {attuale && <span className="block text-xs text-rose-500">Tavolo attuale</span>}
                 </span>
-                <span className={`text-sm font-bold ${pieno ? 'text-orange-500' : 'text-gray-500'}`}>
-                  {pieno ? 'pieno' : `${t.capienza - t.ospiti.length} liberi`}
+                <span className={`text-sm font-bold text-right ${liberi < n ? 'text-orange-500' : 'text-gray-500'}`}>
+                  {liberi <= 0 ? 'pieno' : liberi < n ? `solo ${liberi} liberi` : `${liberi} liberi`}
                 </span>
               </button>
             );
           })}
           {tavoli.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Nessun tavolo: creane uno.</p>}
         </div>
-        {ospite.tavolo_id && (
+        {attualeId && (
           <div className="p-3 border-t border-gray-100">
             <button className="btn-secondary w-full justify-center text-red-600" onClick={() => onScegli(null)}>
               <X size={15} /> Togli dal tavolo
@@ -52,13 +58,17 @@ function SceltaTavolo({ ospite, tavoli, onScegli, onClose }) {
 // tavoli a destra. Si trascina un ospite su un tavolo (o di nuovo nella
 // colonna per toglierlo); sul telefono, dove il drag & drop HTML5 non è
 // affidabile, si tocca il pulsante e si sceglie il tavolo da un elenco.
-export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEdit, del }) {
+export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, assignGuests, openEdit, del }) {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState(new Set());
   const [trascinato, setTrascinato] = useState(null);
   const [sopra, setSopra] = useState(null); // id tavolo o 'senza'
   const [scelta, setScelta] = useState(null); // ospite per cui si sceglie il tavolo
+  // Selezione multipla (utile sul telefono): più ospiti allo stesso tavolo in un colpo.
+  const [selezionando, setSelezionando] = useState(false);
+  const [selezione, setSelezione] = useState(new Set());
+  const [sceltaGruppo, setSceltaGruppo] = useState(false);
 
   const senzaTavolo = ospiti.filter(o => !o.tavolo_id);
   const parentName = id => {
@@ -186,6 +196,18 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
       </div>
       {senzaTavolo.length > 0 && (
         <>
+          <div className="flex items-center gap-2 mb-2">
+            <button className={`text-xs font-semibold flex items-center gap-1 rounded-lg border px-2.5 py-2 lg:py-1 ${selezionando ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-gray-200 text-gray-600'}`}
+              onClick={() => { setSelezionando(v => !v); setSelezione(new Set()); }}>
+              <CheckSquare size={13} /> {selezionando ? 'Fine selezione' : 'Seleziona più ospiti'}
+            </button>
+            {selezionando && flat.length > 0 && (
+              <button className="text-xs font-semibold text-rose-600 py-2 lg:py-1"
+                onClick={() => setSelezione(sel => (flat.every(({ o }) => sel.has(o.id)) ? new Set() : new Set(flat.map(({ o }) => o.id))))}>
+                {flat.every(({ o }) => selezione.has(o.id)) ? 'Deseleziona' : `Tutti (${flat.length})`}
+              </button>
+            )}
+          </div>
           <div className="relative mb-2">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input className="form-input pl-9 py-1.5 text-sm" placeholder="Cerca ospite…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -202,13 +224,19 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
           <div className="bg-white rounded-lg border border-gray-100 divide-y divide-gray-50 overflow-y-auto max-h-[45vh] lg:max-h-none lg:flex-1 lg:min-h-0">
             {flat.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nessun ospite trovato</p>}
             {flat.map(({ o, indent }) => (
-              <div key={o.id} {...dragProps(o)}
-                className={`flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 ${indent ? 'pl-6' : ''} ${trascinato === o.id ? 'opacity-40' : ''}`}>
+              <div key={o.id} {...(selezionando ? {} : dragProps(o))}
+                onClick={selezionando ? () => setSelezione(sel => { const n = new Set(sel); if (n.has(o.id)) n.delete(o.id); else n.add(o.id); return n; }) : undefined}
+                className={`flex items-center gap-2 px-2.5 py-2 lg:py-1.5 hover:bg-gray-50 ${indent ? 'pl-6' : ''} ${trascinato === o.id ? 'opacity-40' : ''} ${selezionando ? 'cursor-pointer' : ''} ${selezione.has(o.id) ? 'bg-rose-50' : ''}`}>
+                {selezionando && (selezione.has(o.id)
+                  ? <CheckCircle2 size={20} className="text-rose-500 flex-shrink-0" />
+                  : <Square size={20} className="text-gray-300 flex-shrink-0" />)}
                 {nomeRiga(o, { showParent: !indent })}
-                <button draggable={false} onClick={() => setScelta(o)}
-                  className="flex items-center gap-1 text-xs font-semibold text-rose-600 border border-rose-200 bg-white rounded-md px-2 py-1 flex-shrink-0 hover:bg-rose-50">
-                  <Plus size={12} /> Tavolo
-                </button>
+                {!selezionando && (
+                  <button draggable={false} onClick={() => setScelta(o)}
+                    className="flex items-center gap-1 text-xs font-semibold text-rose-600 border border-rose-200 bg-white rounded-md px-3 py-2 lg:px-2 lg:py-1 flex-shrink-0 hover:bg-rose-50">
+                    <Plus size={12} /> Tavolo
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -233,11 +261,11 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
       <div {...dragProps(o)} className={`flex items-center justify-between rounded px-1 -mx-1 py-0.5 hover:bg-gray-50 ${trascinato === o.id ? 'opacity-40' : ''}`}>
         {nomeRiga(o, { showParent })}
         <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
-          <button draggable={false} className="p-1.5 rounded text-gray-400 hover:bg-gray-100 hover:text-rose-600" title="Sposta ad un altro tavolo"
+          <button draggable={false} className="p-2.5 lg:p-1.5 rounded text-gray-400 hover:bg-gray-100 hover:text-rose-600" title="Sposta ad un altro tavolo"
             aria-label={`Sposta ${o.nome}`} onClick={() => setScelta(o)}>
             <ArrowRightLeft size={14} />
           </button>
-          <button draggable={false} className="p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-500" title="Togli dal tavolo"
+          <button draggable={false} className="p-2.5 lg:p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-500" title="Togli dal tavolo"
             aria-label={`Togli ${o.nome} dal tavolo`} onClick={() => assignWithFamily(o, null)}>
             <X size={14} />
           </button>
@@ -255,6 +283,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
               <span className="truncate">{t.nome}</span>
               <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 flex-shrink-0 ${chiuso ? '-rotate-90' : ''}`} />
             </h3>
+            {t.descrizione && <p className="text-xs text-gray-500 truncate">{t.descrizione}</p>}
           </div>
           <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
             <button className="p-1.5 rounded hover:bg-gray-100 text-gray-400" title="Modifica" onClick={() => openEdit(t)}><Pencil size={13} /></button>
@@ -307,7 +336,7 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr] items-start">
+    <div className={`grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr] items-start ${selezionando && selezione.size > 0 ? "pb-20" : ""}`}>
       {colonna}
       <div className="min-w-0">
         {tavoli.length > 0 && (
@@ -328,6 +357,26 @@ export default function AssegnaOspiti({ tavoli, ospiti, assignWithFamily, openEd
           )}
         </div>
       </div>
+
+      {selezionando && selezione.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 p-3 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-700 flex-1">{selezione.size} selezionat{selezione.size === 1 ? 'o' : 'i'}</span>
+          <button className="btn-primary" onClick={() => setSceltaGruppo(true)}>Assegna a un tavolo…</button>
+        </div>
+      )}
+
+      {sceltaGruppo && (
+        <SceltaTavolo gruppo={[...selezione]} tavoli={tavoli} onClose={() => setSceltaGruppo(false)}
+          onScegli={async id => {
+            const t = tavoli.find(x => x.id === id);
+            if (t && t.ospiti.length + selezione.size > t.capienza
+              && !confirm(`${t.nome} ha ${Math.max(0, t.capienza - t.ospiti.length)} posti liberi e stai assegnando ${selezione.size} ospiti. Assegnare comunque?`)) return;
+            setSceltaGruppo(false);
+            await assignGuests([...selezione], id);
+            setSelezione(new Set());
+            setSelezionando(false);
+          }} />
+      )}
 
       {scelta && (
         <SceltaTavolo ospite={scelta} tavoli={tavoli} onClose={() => setScelta(null)}

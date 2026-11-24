@@ -4,6 +4,7 @@ import api from '../api';
 import { giorniA } from '../giorni';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useScelta } from '../components/Scelta';
 import { baseUrlPubblico, linkWhatsApp, MESSAGGIO_SOLLECITO_DEFAULT } from '../publicUrl';
 
 const LATO = ['sposo1', 'sposo2', 'comune'];
@@ -35,6 +36,7 @@ function SortTh({ label, col, sortKey, sortDir, onSort, className = '' }) {
 }
 
 export default function Ospiti() {
+  const [dialogo, chiedi] = useScelta();
   const [items, setItems] = useState([]);
   const [tavoli, setTavoli] = useState([]);
   const [modal, setModal] = useState(false);
@@ -346,10 +348,17 @@ export default function Ospiti() {
       return childrenOf(id).filter(c => c.tipo !== 'bambino' && !selected.has(c.id) && (c.tavolo_id || null) === (o.tavolo_id || null));
     });
     const ids = [...selected];
-    if (seguono.length && confirm(`Spostare anche ${seguono.length === 1 ? 'il familiare' : `i ${seguono.length} familiari`} adulti che oggi siedono con ${ids.length === 1 ? 'lui' : 'loro'} (${seguono.map(c => c.nome).join(', ')})?
-
-OK = sì, spostali insieme. Annulla = sposta solo ${ids.length === 1 ? 'la persona selezionata' : 'le persone selezionate'}.`)) {
-      ids.push(...seguono.map(c => c.id));
+    if (seguono.length) {
+      const scelta = await chiedi({
+        titolo: seguono.length === 1 ? 'Spostare anche un familiare?' : `Spostare anche ${seguono.length} familiari?`,
+        testo: `Gli adulti che oggi siedono con ${ids.length === 1 ? 'la persona selezionata' : 'le persone selezionate'}: ${seguono.map(c => c.nome).join(', ')}.`,
+        azioni: [
+          { valore: 'tutti', label: `Sposta tutti (${ids.length + seguono.length})`, primaria: true },
+          { valore: 'soli', label: ids.length === 1 ? 'Sposta solo la persona selezionata' : `Sposta solo i selezionati (${ids.length})` },
+        ],
+      });
+      if (scelta === null) return;
+      if (scelta === 'tutti') ids.push(...seguono.map(c => c.id));
     }
     await esegui(() => api.post('/ospiti/bulk/aggiorna', { ids, tavolo_id: isNaN(tavolo_id) ? null : tavolo_id }), 'Assegnazione del tavolo non riuscita. Riprova.');
     setSelected(new Set());
@@ -477,6 +486,7 @@ OK = sì, spostali insieme. Annulla = sposta solo ${ids.length === 1 ? 'la perso
 
   return (
     <div>
+      {dialogo}
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Lista Ospiti</h1>

@@ -406,6 +406,9 @@ if (!tavoliCols.includes('pos_y')) {
 if (!tavoliCols.includes('rotazione')) {
   db.prepare('ALTER TABLE tavoli ADD COLUMN rotazione INTEGER DEFAULT 0').run();
 }
+if (!tavoliCols.includes('descrizione')) {
+  db.prepare('ALTER TABLE tavoli ADD COLUMN descrizione TEXT').run();
+}
 if (!tavoliCols.includes('elle_posti')) {
   db.prepare("ALTER TABLE tavoli ADD COLUMN elle_posti TEXT DEFAULT 'entrambi'").run();
 }
@@ -420,6 +423,10 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 `);
+// Il preset creato da solo prima di applicarne un altro (se ne tiene uno).
+if (!db.prepare('PRAGMA table_info(tavoli_preset)').all().some(c => c.name === 'auto')) {
+  db.prepare('ALTER TABLE tavoli_preset ADD COLUMN auto INTEGER DEFAULT 0').run();
+}
 if (!tavoliCols.includes('ordine')) {
   db.prepare('ALTER TABLE tavoli ADD COLUMN ordine INTEGER').run();
   // Finora l'ordine era alfabetico: si parte da lì, così nulla si sposta.

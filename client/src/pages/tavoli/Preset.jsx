@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Save, Play, RefreshCw, Pencil, Trash2, X } from 'lucide-react';
 import api from '../../api';
+import Miniatura from './Miniatura';
 
 const quando = iso => {
   // SQLite datetime('now') è in UTC senza fuso: lo si dichiara per evitare lo sfasamento.
@@ -39,12 +40,18 @@ export default function Preset({ tavoli, onClose, onApplicato }) {
   };
 
   const applica = async p => {
-    if (!confirm(`Applicare "${p.nome}"?\n\nI ${tavoli.length} tavoli attuali e chi siede dove verranno sostituiti. Se vuoi tenere la disposizione di adesso, salvala prima come preset.`)) return;
+    const sostituisce = tavoli.length > 0
+      ? `I ${tavoli.length} tavoli attuali e chi siede dove verranno sostituiti. La disposizione di adesso viene salvata in automatico, così puoi tornare indietro.`
+      : 'Non ci sono tavoli da sostituire.';
+    if (!confirm(`Applicare "${p.nome}"?\n\n${sostituisce}`)) return;
     const r = await esegui(() => api.post(`/tavoli/preset/${p.id}/applica`), 'Il preset non è stato applicato');
     if (!r) return;
+    const righe = [];
     if (r.data.saltati > 0) {
-      alert(`Preset applicato. ${r.data.saltati === 1 ? '1 ospite non esiste più' : `${r.data.saltati} ospiti non esistono più`} nella lista e non è stato rimesso a sedere.`);
+      righe.push(`${r.data.saltati === 1 ? '1 ospite non esiste più' : `${r.data.saltati} ospiti non esistono più`} nella lista e non è stato rimesso a sedere.`);
     }
+    if (r.data.salvato) righe.push(`La disposizione di prima è salvata come "${r.data.salvato}": la ritrovi qui, per tornare indietro.`);
+    if (righe.length) alert(`Preset applicato.\n\n${righe.join('\n')}`);
     onApplicato();
     onClose();
   };
@@ -95,8 +102,13 @@ export default function Preset({ tavoli, onClose, onApplicato }) {
         ) : (
           <ul className="divide-y divide-gray-100 max-h-[50vh] overflow-y-auto">
             {elenco.map(p => (
-              <li key={p.id} className="py-2.5">
-                <p className="font-semibold text-gray-900 truncate">{p.nome}</p>
+              <li key={p.id} className="py-2.5 flex gap-3">
+                <Miniatura tavoli={p.anteprima || []} className="w-24 sm:w-28 aspect-[3/2] flex-shrink-0 self-start" />
+                <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-900 truncate">
+                  {p.auto && <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 mr-1.5 align-middle">Automatico</span>}
+                  {p.nome}
+                </p>
                 <p className="text-xs text-gray-500 mb-1.5">
                   {p.n_tavoli} tavoli · {p.posti} posti · {p.n_ospiti} ospiti seduti · {quando(p.updated_at)}
                 </p>
@@ -110,6 +122,7 @@ export default function Preset({ tavoli, onClose, onApplicato }) {
                   <span className="flex-1" />
                   <button className={btn} aria-label={`Rinomina ${p.nome}`} disabled={occupato} onClick={() => rinomina(p)}><Pencil size={14} /></button>
                   <button className={`${btn} hover:text-red-500 hover:bg-red-50`} aria-label={`Elimina ${p.nome}`} disabled={occupato} onClick={() => elimina(p)}><Trash2 size={14} /></button>
+                </div>
                 </div>
               </li>
             ))}

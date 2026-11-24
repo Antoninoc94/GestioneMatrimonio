@@ -48,6 +48,44 @@ export function misure(t) {
   return { w: r * 2, h: r * 2, r };
 }
 
+// Ingombro dopo la rotazione (solo 0/90/180/270 hanno senso in una sala).
+// La L resta quadrata a ogni rotazione.
+export function ingombro(t) {
+  const m = misure(t);
+  const verticale = t.forma === 'rettangolare' && (t.rotazione || 0) % 180 === 90;
+  return verticale ? { w: m.h, h: m.w } : { w: m.w, h: m.h };
+}
+
+// Passo della griglia a cui i tavoli si agganciano mentre si trascinano.
+export const PASSO_GRIGLIA = 20;
+
+const piazzato = t => t.pos_x != null && t.pos_y != null;
+
+// Coppie di tavoli posizionati che si toccano, sedie comprese (mezza fila
+// di sedie per lato). Due tondi si confrontano come cerchi, il resto per
+// ingombro: la L ha un incavo, quindi un tavolo infilato nell'angolo viene
+// segnalato anche se non la tocca davvero.
+export function sovrapposizioni(tavoli) {
+  const MARGINE = 12;
+  const lista = tavoli.filter(piazzato);
+  const coppie = [];
+  for (let i = 0; i < lista.length; i++) {
+    for (let j = i + 1; j < lista.length; j++) {
+      const a = lista[i], b = lista[j];
+      let tocca;
+      if (a.forma === 'tondo' && b.forma === 'tondo') {
+        tocca = Math.hypot(a.pos_x - b.pos_x, a.pos_y - b.pos_y) < misure(a).r + misure(b).r + 2 * MARGINE;
+      } else {
+        const A = ingombro(a), B = ingombro(b);
+        tocca = Math.abs(a.pos_x - b.pos_x) < (A.w + B.w) / 2 + 2 * MARGINE
+          && Math.abs(a.pos_y - b.pos_y) < (A.h + B.h) / 2 + 2 * MARGINE;
+      }
+      if (tocca) coppie.push([a, b]);
+    }
+  }
+  return coppie;
+}
+
 // Posizione dei tavoli non ancora piazzati: griglia nell'ordine dei tavoli,
 // adattata al loro numero così resta tutto dentro la sala. Dipende dalla
 // posizione nell'elenco completo, non tra i soli non piazzati: altrimenti
@@ -77,6 +115,14 @@ export function calcolaAvvisi(tavoli, ospiti) {
         testo: `${t.nome}: ${t.ospiti.length} ospiti su ${t.capienza} posti (${t.ospiti.length - t.capienza} di troppo)`,
       });
     }
+  }
+
+  const coppie = sovrapposizioni(tavoli);
+  for (const [a, b] of coppie.slice(0, 5)) {
+    avvisi.push({ key: `sovrapposti-${a.id}-${b.id}`, livello: 'attenzione', testo: `${a.nome} e ${b.nome} si sovrappongono sulla pianta` });
+  }
+  if (coppie.length > 5) {
+    avvisi.push({ key: 'sovrapposti-altri', livello: 'attenzione', testo: `…e altre ${coppie.length - 5} sovrapposizioni sulla pianta` });
   }
 
   const declinati = ospiti.filter(o => o.tavolo_id && o.rsvp === 'declinato');

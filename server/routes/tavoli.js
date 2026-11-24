@@ -26,7 +26,7 @@ const coord = (v, max) => {
 // manda la sola rotazione, la gestione il solo nome, e il resto non va toccato.
 function componi(base, body) {
   const t = { ...base };
-  for (const k of ['nome', 'capienza', 'note', 'forma', 'tipo', 'rotazione', 'elle_posti']) {
+  for (const k of ['nome', 'descrizione', 'capienza', 'note', 'forma', 'tipo', 'rotazione', 'elle_posti']) {
     if (k in body) t[k] = body[k];
   }
   const nome = String(t.nome ?? '').trim();
@@ -35,6 +35,7 @@ function componi(base, body) {
   return {
     nome,
     capienza: Number.isInteger(capienza) && capienza >= 1 ? Math.min(capienza, 200) : 8,
+    descrizione: t.descrizione ? String(t.descrizione).trim().slice(0, 120) || null : null,
     note: t.note ? String(t.note) : null,
     forma: FORME.includes(t.forma) ? t.forma : 'tondo',
     tipo: TIPI.includes(t.tipo) ? t.tipo : 'normale',
@@ -46,7 +47,7 @@ function componi(base, body) {
 // ── Preset: disposizioni salvate ────────────────────────────────────────────
 // Un preset fotografa i tavoli e chi siede dove. Gli ospiti sono salvati per
 // id: se nel frattempo uno è stato eliminato, applicando si salta e lo si dice.
-const COLONNE_TAVOLO = 'nome, capienza, note, forma, tipo, rotazione, elle_posti, pos_x, pos_y';
+const COLONNE_TAVOLO = 'nome, descrizione, capienza, note, forma, tipo, rotazione, elle_posti, pos_x, pos_y';
 
 function fotografia() {
   const tavoli = db.prepare(`SELECT id, ${COLONNE_TAVOLO} FROM tavoli ${ORDINE}`).all();
@@ -63,6 +64,12 @@ const riepilogo = r => {
   return {
     id: r.id,
     nome: r.nome,
+    auto: !!r.auto,
+    // Il minimo per disegnare una miniatura della sala.
+    anteprima: tavoli.map(t => ({
+      forma: t.forma, tipo: t.tipo, rotazione: t.rotazione, elle_posti: t.elle_posti,
+      capienza: t.capienza, pos_x: t.pos_x, pos_y: t.pos_y,
+    })),
     created_at: r.created_at,
     updated_at: r.updated_at,
     n_tavoli: tavoli.length,
@@ -76,7 +83,7 @@ const nomeUsato = (nome, tranne) =>
   db.prepare('SELECT 1 FROM tavoli_preset WHERE nome = ? COLLATE NOCASE AND id IS NOT ?').get(nome, tranne ?? null);
 
 router.get('/preset', auth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM tavoli_preset ORDER BY updated_at DESC, id DESC').all().map(riepilogo));
+  res.json(db.prepare('SELECT * FROM tavoli_preset ORDER BY auto DESC, updated_at DESC, id DESC').all().map(riepilogo));
 });
 
 router.post('/preset', auth, (req, res) => {
@@ -120,7 +127,15 @@ router.post('/preset/:id/applica', auth, (req, res) => {
 
   const esistenti = new Set(db.prepare('SELECT id FROM ospiti').all().map(o => o.id));
   let saltati = 0;
+  let salvato = null;
   db.transaction(() => {
+    // Rete di sicurezza: la disposizione di adesso resta recuperabile. Se ne
+    // tiene una sola, quella dell'ultima applicazione.
+    if (db.prepare('SELECT 1 FROM tavoli LIMIT 1').get()) {
+      db.prepare('DELETE FROM tavoli_preset WHERE auto = 1').run();
+      salvato = riga.auto ? 'Disposizione precedente' : `Prima di «${riga.nome}»`.slice(0, 80);
+      db.prepare('INSERT INTO tavoli_preset (nome, dati, auto) VALUES (?, ?, 1)').run(salvato, JSON.stringify(fotografia()));
+    }
     db.prepare('UPDATE ospiti SET tavolo_id = NULL WHERE tavolo_id IS NOT NULL').run();
     db.prepare('DELETE FROM tavoli').run();
     const ins = db.prepare(`INSERT INTO tavoli (nome, capienza, note, forma, tipo, rotazione, elle_posti, pos_x, pos_y, ordine)
@@ -140,7 +155,7 @@ router.post('/preset/:id/applica', auth, (req, res) => {
     // nessuna parte nel preset, tornano al loro tavolo.
     if (tavoloSposi !== null) assicuraSposi(tavoloSposi);
   })();
-  res.json({ ok: true, saltati });
+  res.json({ ok: true, saltati, salvato });
 });
 
 router.get('/', auth, (req, res) => {
@@ -158,8 +173,8 @@ router.post('/', auth, (req, res) => {
   // In coda: un tavolo nuovo non deve scavalcare l'ordine già scelto.
   const { prossimo } = db.prepare('SELECT COALESCE(MAX(ordine), -1) + 1 AS prossimo FROM tavoli').get();
   const id = db.transaction(() => {
-    const r = db.prepare('INSERT INTO tavoli (nome, capienza, note, forma, tipo, rotazione, elle_posti, ordine) VALUES (?,?,?,?,?,?,?,?)')
-      .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti, prossimo);
+    const r = db.prepare('INSERT INTO tavoli (nome, descrizione, capienza, note, forma, tipo, rotazione, elle_posti, ordine) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(v.nome, v.descrizione, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti, prossimo);
     if (v.tipo === 'sposi') assicuraSposi(r.lastInsertRowid);
     return r.lastInsertRowid;
   })();
@@ -195,8 +210,8 @@ router.put('/:id', auth, (req, res) => {
   const v = componi(esistente, req.body);
   if (v.error) return res.status(400).json({ error: v.error });
   db.transaction(() => {
-    db.prepare('UPDATE tavoli SET nome=?, capienza=?, note=?, forma=?, tipo=?, rotazione=?, elle_posti=? WHERE id=?')
-      .run(v.nome, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti, req.params.id);
+    db.prepare('UPDATE tavoli SET nome=?, descrizione=?, capienza=?, note=?, forma=?, tipo=?, rotazione=?, elle_posti=? WHERE id=?')
+      .run(v.nome, v.descrizione, v.capienza, v.note, v.forma, v.tipo, v.rotazione, v.elle_posti, req.params.id);
     // Solo quando diventa il tavolo sposi: risalvarlo non deve rimettere a
     // sedere chi gli sposi hanno tolto apposta.
     if (v.tipo === 'sposi' && esistente.tipo !== 'sposi') assicuraSposi(esistente.id);

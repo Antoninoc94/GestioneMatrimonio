@@ -92,7 +92,10 @@ export default function GestioneTavoli({ tavoli, ospiti, salvaTavolo, del, riord
                   <button className="p-1 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-30" aria-label="Sposta su" disabled={i === 0} onClick={() => sposta(i, -1)}><ArrowUp size={14} /></button>
                   <button className="p-1 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-30" aria-label="Sposta giù" disabled={i === tavoli.length - 1} onClick={() => sposta(i, 1)}><ArrowDown size={14} /></button>
                 </div>
-                <TestoInline valore={t.nome} obbligatorio className="font-semibold" onSalva={nome => salvaTavolo(t.id, { nome })} />
+                <div className="min-w-0 space-y-1">
+                  <TestoInline valore={t.nome} obbligatorio className="font-semibold" onSalva={nome => salvaTavolo(t.id, { nome })} />
+                  <TestoInline valore={t.descrizione} placeholder="Descrizione" className="text-xs text-gray-500" onSalva={descrizione => salvaTavolo(t.id, { descrizione })} />
+                </div>
                 <button className="p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-500 md:hidden" aria-label={`Elimina ${t.nome}`} onClick={() => del(t.id)}><Trash2 size={14} /></button>
 
                 <div className="col-span-2 md:col-span-1 flex md:contents gap-2">
