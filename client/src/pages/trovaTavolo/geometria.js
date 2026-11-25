@@ -43,14 +43,6 @@ export function confini(tavoli, margine = 50) {
   return { x: x0 - margine, y: y0 - margine, w: x1 - x0 + margine * 2, h: y1 - y0 + margine * 2 };
 }
 
-// Inquadratura sul proprio tavolo: lui al centro con un po' di sala attorno,
-// così si capisce dove sta rispetto agli altri.
-export function inquadraTavolo(t) {
-  const r = raggioTavolo(t);
-  const lato = Math.max(r.x, r.y) * 4.2;
-  return { x: t.pos_x - lato / 2, y: t.pos_y - lato / 2, w: lato, h: lato };
-}
-
 // Allarga il riquadro fino alle proporzioni dello schermo, centrato: così
 // passare da un'inquadratura all'altra è uno zoom pulito e non una deformazione.
 export function adattaProporzioni(box, aspetto) {
@@ -59,6 +51,33 @@ export function adattaProporzioni(box, aspetto) {
   if (w / h < aspetto) { const nw = h * aspetto; x -= (nw - w) / 2; w = nw; }
   else { const nh = w / aspetto; y -= (nh - h) / 2; h = nh; }
   return { x, y, w, h };
+}
+
+// Lato più lungo dell'inquadratura sul proprio posto, in unità della pianta:
+// oltre, le sedie (40 unità l'una) diventano troppo piccole sul telefono.
+const LATO_MASSIMO = 1100;
+
+// Dove sta la sedia sulla pianta.
+export function puntoSedia(t, posto) {
+  const p = posto != null ? sedieRuotate(t)[posto] : null;
+  return p ? { x: t.pos_x + p.x, y: t.pos_y + p.y } : { x: t.pos_x, y: t.pos_y };
+}
+
+// Inquadratura sul proprio tavolo, già nelle proporzioni dello schermo.
+// Segue la forma del tavolo: un margine uguale su ogni lato, misurato sul lato
+// corto, così un tavolo lungo non si porta dietro mezza sala. Se il riquadro
+// resta troppo grande (tavolo lunghissimo, o in verticale su uno schermo in
+// orizzontale) si stringe attorno alla sedia, senza uscire dal riquadro intero.
+export function inquadraPosto(t, posto, aspetto) {
+  const r = raggioTavolo(t);
+  const m = Math.min(r.x, r.y) * 1.1 + 40;
+  const box = adattaProporzioni({ x: t.pos_x - r.x - m, y: t.pos_y - r.y - m, w: 2 * (r.x + m), h: 2 * (r.y + m) }, aspetto);
+  const k = Math.min(1, LATO_MASSIMO / Math.max(box.w, box.h));
+  if (k === 1) return box;
+  const w = box.w * k, h = box.h * k;
+  const s = puntoSedia(t, posto);
+  const entro = (c, da, lato, tot) => Math.min(Math.max(c - lato / 2, da), da + tot - lato);
+  return { x: entro(s.x, box.x, w, box.w), y: entro(s.y, box.y, h, box.h), w, h };
 }
 
 // Verso cui guarda la sedia: lo schienale sta dalla parte opposta al tavolo.

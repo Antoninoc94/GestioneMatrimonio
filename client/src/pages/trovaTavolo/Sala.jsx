@@ -14,28 +14,35 @@ const colori = tema => ({
 });
 
 const SERIF = '"Playfair Display", Georgia, serif';
-const SCRIPT = '"Great Vibes", cursive';
+const SANS = 'Montserrat, system-ui, sans-serif';
 
+// Il tavolo sposi in maiuscolo, grassetto e spaziato: il corsivo, alle misure
+// della pianta su un telefono, non si leggeva.
 function Nome({ t, colore, grande }) {
   const sposi = t.tipo === 'sposi';
   const area = areaNome(t);
-  const { fs, righe } = righeNome(t.nome, area.w, area.h, { max: grande ? 34 : 28, min: 11 });
-  // Il corsivo è più piccolo a parità di corpo: un po' più grande.
-  const corpo = sposi ? fs * 1.35 : fs;
-  const lh = corpo * (sposi ? 1 : 1.12);
+  const testo = sposi ? String(t.nome ?? '').toUpperCase() : t.nome;
+  // Lettere maiuscole spaziate occupano circa un terzo in più.
+  const { fs, righe } = righeNome(testo, sposi ? area.w / 1.35 : area.w, area.h, { max: grande ? 34 : 28, min: 11 });
+  const corpo = sposi ? fs * 0.9 : fs;
+  const lh = corpo * 1.12;
   return (
-    <text textAnchor="middle" fontFamily={sposi ? SCRIPT : SERIF} fontWeight={sposi ? 400 : 600}
-      fontSize={corpo} fill={colore} pointerEvents="none" style={{ letterSpacing: sposi ? 0 : '0.01em' }}>
+    <text textAnchor="middle" fontFamily={sposi ? SANS : SERIF} fontWeight={sposi ? 700 : 600}
+      fontSize={corpo} fill={colore} pointerEvents="none" style={{ letterSpacing: sposi ? '0.2em' : '0.01em' }}>
       {righe.map((r, i) => (
-        <tspan key={i} x="0" y={(i - (righe.length - 1) / 2) * lh + corpo * 0.34}>{r}</tspan>
+        <tspan key={i} x={sposi ? corpo * 0.1 : 0} y={(i - (righe.length - 1) / 2) * lh + corpo * 0.34}>{r}</tspan>
       ))}
     </text>
   );
 }
 
-function Sedia({ C, p, mia, delMio, attenuata }) {
+// Attorno a un tondo ogni sedia guarda il centro; lungo un rettangolare
+// guarda dritta verso il suo lato, non verso il centro: a ventaglio, su un
+// tavolo lungo, le sedie in fondo finivano quasi di traverso.
+function Sedia({ C, p, dritta, mia, delMio, attenuata }) {
+  const angolo = dritta ? (p.y < 0 ? 0 : 180) : angoloSedia(p);
   return (
-    <g transform={`translate(${p.x} ${p.y}) rotate(${angoloSedia(p)})${mia ? ' scale(1.3)' : ''}`} className={mia ? 'tt-sedia-mia' : undefined}>
+    <g transform={`translate(${p.x} ${p.y}) rotate(${angolo})${mia ? ' scale(1.3)' : ''}`} className={mia ? 'tt-sedia-mia' : undefined}>
       {mia && <circle r="26" className="tt-alone" />}
       {/* seduta e, verso l'esterno, lo schienale */}
       <rect x="-10" y="-6" width="20" height="14" rx="4.5"
@@ -61,7 +68,7 @@ function Tavolo({ C, t, mio, posto, attenuato, grande, nomi }) {
     <g transform={`translate(${t.pos_x} ${t.pos_y})`} className={`tt-tavolo${attenuato ? ' tt-attenuato' : ''}`}>
       <g transform={`rotate(${rot})`}>
         {posti(t).map((p, i) => (
-          <Sedia key={i} C={C} p={p} mia={mio && i === posto} delMio={mio} attenuata={attenuato} />
+          <Sedia key={i} C={C} p={p} dritta={t.forma === 'rettangolare'} mia={mio && i === posto} delMio={mio} attenuata={attenuato} />
         ))}
         {forma(0, { fill, stroke, strokeWidth: mio ? 3 : 1.5, filter: 'url(#tt-ombra)' })}
         {/* l'orlo della tovaglia */}

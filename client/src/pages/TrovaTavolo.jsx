@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { TEMI } from '../temiWedding';
 import Sala from './trovaTavolo/Sala';
-import { piazza, ruotaSala, confini, inquadraTavolo, adattaProporzioni } from './trovaTavolo/geometria';
+import { piazza, ruotaSala, confini, inquadraPosto, adattaProporzioni } from './trovaTavolo/geometria';
 import './trovaTavolo/TrovaTavolo.css';
 
 // Pagina per gli invitati, raggiunta dal QR all'ingresso della sala. Tre passi:
@@ -30,7 +30,7 @@ function useFont() {
     const link = document.createElement('link');
     link.id = 'trova-fonts';
     link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Montserrat:wght@400;500;600&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Montserrat:wght@400;500;600;700&display=swap';
     document.head.appendChild(link);
   }, []);
 }
@@ -224,7 +224,12 @@ function Esito({ scelta, tavolo, tema, onSala, onAltro }) {
   const box = useMemo(() => {
     if (!tavolo) return null;
     const [t] = piazza([tavolo]);
-    return { t, vb: confini([t], 22) };
+    // Il riquadro prende la forma del tavolo: quadrato per un tondo, largo e
+    // basso per un tavolo lungo, alto per uno girato in verticale. Entro dei
+    // limiti, perché non spinga il bottone fuori dallo schermo.
+    const vb = confini([t], 22);
+    const aspetto = Math.min(2.6, Math.max(0.75, vb.w / vb.h));
+    return { t, vb: adattaProporzioni(vb, aspetto), aspetto };
   }, [tavolo]);
   return (
     <div className="tt-esito">
@@ -233,7 +238,8 @@ function Esito({ scelta, tavolo, tema, onSala, onAltro }) {
       <h2 className="tt-tavolo-nome">{tavolo?.nome || scelta.tavolo.nome}</h2>
       {box && scelta.posto != null ? (
         <>
-          <Sala tema={tema} tavoli={[box.t]} mioId={box.t.id} posto={scelta.posto} viewBox={box.vb} pavimento={false} nomi={false} className="tt-vicino" />
+          <Sala tema={tema} tavoli={[box.t]} mioId={box.t.id} posto={scelta.posto} viewBox={box.vb} pavimento={false} nomi={false} className="tt-vicino"
+            style={{ aspectRatio: box.aspetto, maxWidth: Math.min(420, Math.round(250 * Math.sqrt(box.aspetto))) }} />
           <p className="tt-didascalia"><i /> Il tuo posto è quello illuminato</p>
         </>
       ) : <div style={{ height: '1.5rem' }} />}
@@ -310,9 +316,9 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
 
   const target = useMemo(() => {
     if (!aspetto) return null;
-    const base = vista === 'mio' && mio ? inquadraTavolo(mio) : confini(disposti);
-    return adattaProporzioni(base, aspetto);
-  }, [aspetto, vista, mio, disposti]);
+    if (vista === 'mio' && mio) return inquadraPosto(mio, scelta.posto, aspetto);
+    return adattaProporzioni(confini(disposti), aspetto);
+  }, [aspetto, vista, mio, disposti, scelta]);
   const vb = useViewBox(target);
 
   if (chiediRotazione) {
