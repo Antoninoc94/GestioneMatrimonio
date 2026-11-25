@@ -14,16 +14,10 @@ import './trovaTavolo/TrovaTavolo.css';
 // sala a schermo intero con la propria sedia accesa.
 // Usa axios e non `api`: `api` porta al login su un 401, qui non c'è login.
 
-const CHIAVE_SCELTA = 'trova-tavolo-scelta';
-const leggiScelta = () => {
-  try { return JSON.parse(localStorage.getItem(CHIAVE_SCELTA)) || null; } catch { return null; }
-};
-const salvaScelta = v => {
-  try {
-    if (v) localStorage.setItem(CHIAVE_SCELTA, JSON.stringify(v));
-    else localStorage.removeItem(CHIAVE_SCELTA);
-  } catch { /* navigazione privata: si ricomincia dalla ricerca */ }
-};
+// La pagina non ricorda chi è stato cercato: ogni apertura riparte dalla
+// ricerca, così chi cerca dal telefono di un altro non gli lascia il suo nome.
+// Una versione di prova lo salvava: si cancella quel che è rimasto.
+try { localStorage.removeItem('trova-tavolo-scelta'); } catch { /* storage bloccato */ }
 
 const nomeCompleto = o => [o.nome, o.cognome].filter(Boolean).join(' ');
 const iniziali = o => [o.nome, o.cognome].filter(Boolean).map(s => [...s.trim()][0] || '').join('').toUpperCase();
@@ -74,9 +68,8 @@ export default function TrovaTavolo() {
   const [params, setParams] = useSearchParams();
   const [info, setInfo] = useState(null);
   const [tavoli, setTavoli] = useState(null);
-  // { id, nome, primo, tavolo: { id, nome }, posto }: resta dopo una ricarica,
-  // così chi riapre il link trova subito il suo posto.
-  const [scelta, setScelta] = useState(leggiScelta);
+  // { id, nome, primo, tavolo: { id, nome }, posto }: solo in memoria.
+  const [scelta, setScelta] = useState(null);
   const [cercaAltro, setCercaAltro] = useState(false);
   // La sala sta nell'URL: il tasto indietro del telefono la chiude invece di
   // uscire dalla pagina.
@@ -90,24 +83,10 @@ export default function TrovaTavolo() {
   useEffect(() => {
     if (info?.abilitata !== 1) return;
     axios.get('/api/tavolo/pianta').then(r => setTavoli(r.data)).catch(() => setTavoli([]));
-    // La scelta salvata si aggiorna: nel frattempo gli sposi possono aver
-    // cambiato tavolo o sedia. Si rifà la ricerca col nome e si riprende la
-    // stessa persona per id; sparita dai risultati, si dimentica.
-    const salvata = leggiScelta();
-    if (salvata?.id) {
-      axios.get('/api/tavolo/cerca', { params: { q: salvata.nome } }).then(r => {
-        const o = r.data.risultati.find(x => x.id === salvata.id);
-        const v = o ? daRisultato(o) : null;
-        setScelta(v);
-        salvaScelta(v);
-      }).catch(() => { /* offline: resta quella salvata */ });
-    }
   }, [info]);
 
   const scegli = o => {
-    const v = daRisultato(o);
-    setScelta(v);
-    salvaScelta(v);
+    setScelta(daRisultato(o));
     setCercaAltro(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
