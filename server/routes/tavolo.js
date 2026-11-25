@@ -22,7 +22,8 @@ const parole = s => semplifica(s).split(/[\s'’-]+/).filter(Boolean);
 const MAX_RISULTATI = 8;
 
 router.get('/info', (req, res) => {
-  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, landing_tema FROM config LIMIT 1').get() || {};
+  // La foto è quella della pagina Wedding, già pubblica in /uploads/landing.
+  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, landing_tema, landing_foto FROM config LIMIT 1').get() || {};
   res.json({ ...cfg, abilitata: abilitata() ? 1 : 0 });
 });
 
