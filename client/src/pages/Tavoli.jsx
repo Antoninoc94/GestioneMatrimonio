@@ -93,6 +93,22 @@ export default function Tavoli() {
     }
   };
 
+  // Le sedie di un tavolo, tutte insieme (null = di nuovo automatiche).
+  const salvaPosti = async (id, posti) => {
+    if (posti) {
+      const byId = new Map(posti.map(p => [p.id, p.posto]));
+      setTavoli(ts => ts.map(t => (t.id === id
+        ? { ...t, posti_scelti: true, ospiti: t.ospiti.map(o => ({ ...o, posto: byId.get(o.id) ?? null })) }
+        : t)));
+    }
+    try {
+      await api.post(`/tavoli/${id}/posti`, posti ? { posti } : { automatico: true });
+    } catch (err) {
+      errore(err, 'Posti non salvati');
+    }
+    load();
+  };
+
   const del = async id => {
     if (!confirm('Eliminare questo tavolo? Gli ospiti assegnati verranno scollegati.')) return;
     await api.delete(`/tavoli/${id}`);
@@ -598,7 +614,7 @@ export default function Tavoli() {
         <AssegnaOspiti tavoli={tavoli} ospiti={ospiti} assignWithFamily={assignWithFamily} openEdit={openEdit} del={del} />
       )}
       {vista === 'pianta' && (
-        <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} />
+        <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} salvaPosti={salvaPosti} />
       )}
       {vista === 'gestisci' && (
         <GestioneTavoli tavoli={tavoli} ospiti={ospiti} salvaTavolo={salvaTavolo} del={del} riordina={riordina} openNew={openNew} />

@@ -6,6 +6,7 @@
 // intolleranze, note o recapiti.
 const router = require('express').Router();
 const db = require('../db');
+const { postiEffettivi } = require('../posti');
 
 const abilitata = () => db.prepare('SELECT tavolo_pubblico_abilitato FROM config LIMIT 1').get()?.tavolo_pubblico_abilitato === 1;
 
@@ -33,23 +34,34 @@ router.get('/cerca', checkAbilitata, (req, res) => {
   const cercate = parole(req.query.q);
   if (cercate.join('').length < 2) return res.json({ risultati: [], altri: false });
 
-  // Gli sposi no: sanno dove siedono. Chi ha declinato non ha un posto anche
-  // se fosse rimasto assegnato per sbaglio.
-  const seduti = db.prepare(`
-    SELECT o.id, o.nome, o.cognome, t.id AS tavolo_id, t.nome AS tavolo_nome
+  // Si leggono tutti quelli seduti, sposi compresi: le sedie si calcolano sul
+  // tavolo intero, come nella pianta degli sposi, altrimenti uscirebbe un'altra
+  // sedia. Si cercano però solo gli invitati: gli sposi sanno dove siedono, e
+  // chi ha declinato non ha un posto anche se fosse rimasto assegnato per sbaglio.
+  const tutti = db.prepare(`
+    SELECT o.id, o.nome, o.cognome, o.rsvp, o.sposo, o.parent_id, o.relazione, o.posto, o.tavolo_id,
+           t.nome AS tavolo_nome, t.capienza, t.tipo
     FROM ospiti o JOIN tavoli t ON t.id = o.tavolo_id
-    WHERE o.sposo IS NULL AND COALESCE(o.rsvp, '') != 'declinato'
     ORDER BY o.cognome ASC, o.nome ASC
   `).all();
+  const seduti = tutti.filter(o => !o.sposo && o.rsvp !== 'declinato');
 
   const trovati = seduti.filter(o => {
     const sue = [...parole(o.nome), ...parole(o.cognome)];
     return cercate.every(c => sue.some(p => p.startsWith(c)));
   });
 
+  const mostrati = trovati.slice(0, MAX_RISULTATI);
+  const sedie = new Map();
+  for (const tid of new Set(mostrati.map(o => o.tavolo_id))) {
+    const alTavolo = tutti.filter(o => o.tavolo_id === tid);
+    for (const [id, p] of postiEffettivi(alTavolo[0], alTavolo)) sedie.set(id, p);
+  }
+
   res.json({
-    risultati: trovati.slice(0, MAX_RISULTATI).map(o => ({
+    risultati: mostrati.map(o => ({
       id: o.id, nome: o.nome, cognome: o.cognome || '', tavolo: { id: o.tavolo_id, nome: o.tavolo_nome },
+      posto: sedie.get(o.id) ?? null,
     })),
     altri: trovati.length > MAX_RISULTATI,
   });

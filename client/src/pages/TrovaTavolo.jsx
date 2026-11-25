@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { Search, MapPin, Armchair, X } from 'lucide-react';
+import { Search, MapPin, Armchair, X, Smartphone } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { TEMI } from '../temiWedding';
-import { PIANTA_W, PIANTA_H, misure, ruotabile, ingombro, posti, posizioneTavolo } from './tavoli/util';
+import { PIANTA_W, PIANTA_H, misure, ruotabile, posti, posizioneTavolo } from './tavoli/util';
+import TavoloDaVicino, { TestoTavolo } from './tavoli/TavoloDaVicino';
 
 // Pagina per gli invitati, raggiunta dal QR all'ingresso della sala: si scrive
 // il proprio nome, si vede il tavolo e lo si ritrova evidenziato sulla pianta.
@@ -32,8 +33,8 @@ export default function TrovaTavolo() {
   const [esito, setEsito] = useState(null); // { risultati, altri } | null
   const [cercando, setCercando] = useState(false);
   const [errore, setErrore] = useState('');
-  // { nome, tavolo: { id, nome } }: resta dopo una ricarica della pagina, così
-  // chi riapre il link dal telefono trova subito il suo tavolo.
+  // { id, nome, tavolo: { id, nome }, posto }: resta dopo una ricarica della
+  // pagina, così chi riapre il link dal telefono trova subito il suo tavolo.
   const [scelta, setScelta] = useState(leggiScelta);
   const [tavoli, setTavoli] = useState(null);
   const richiesta = useRef(0);
@@ -70,8 +71,23 @@ export default function TrovaTavolo() {
     return () => clearTimeout(timer);
   }, [q]);
 
+  // Riaprendo la pagina, la scelta salvata si aggiorna: nel frattempo gli
+  // sposi possono aver cambiato tavolo o sedia. Si rifà la ricerca col nome e
+  // si riprende la stessa persona per id; sparita dai risultati, si dimentica.
+  useEffect(() => {
+    if (info?.abilitata !== 1) return;
+    const salvata = leggiScelta();
+    if (!salvata?.id) return;
+    axios.get('/api/tavolo/cerca', { params: { q: salvata.nome } }).then(r => {
+      const o = r.data.risultati.find(x => x.id === salvata.id);
+      const v = o ? { id: o.id, nome: nomeCompleto(o), tavolo: o.tavolo, posto: o.posto } : null;
+      setScelta(v);
+      salvaScelta(v);
+    }).catch(() => { /* offline: resta quella salvata */ });
+  }, [info]);
+
   const scegli = o => {
-    const v = { nome: nomeCompleto(o), tavolo: o.tavolo };
+    const v = { id: o.id, nome: nomeCompleto(o), tavolo: o.tavolo, posto: o.posto };
     setScelta(v);
     salvaScelta(v);
     setQ('');
@@ -139,7 +155,8 @@ export default function TrovaTavolo() {
                   <X size={18} />
                 </button>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>{scelta.nome}, siedi al</p>
-                <p style={{ fontFamily: SERIF, fontSize: '2rem', color: tema.dark, margin: '0.25rem 0 1rem', lineHeight: 1.2 }}>{tavoli?.find(t => t.id === scelta.tavolo.id)?.nome || scelta.tavolo.nome}</p>
+                <p style={{ fontFamily: SERIF, fontSize: '2rem', color: tema.dark, margin: '0.25rem 0 0.5rem', lineHeight: 1.2 }}>{tavoli?.find(t => t.id === scelta.tavolo.id)?.nome || scelta.tavolo.nome}</p>
+                <SediaDaVicino tavolo={tavoli?.find(t => t.id === scelta.tavolo.id)} posto={scelta.posto} tema={tema} />
                 <button onClick={() => setScheda('pianta')}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: tema.primary, color: '#fff', border: 0, borderRadius: '2rem', padding: '0.7rem 1.5rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
                   <MapPin size={16} /> Vedi sulla pianta
@@ -181,16 +198,49 @@ export default function TrovaTavolo() {
             </div>
           </>
         ) : (
-          <Pianta tavoli={tavoli} evidenziato={scelta?.tavolo.id} tema={tema} onCerca={() => setScheda('cerca')} haScelta={!!scelta} />
+          <Pianta tavoli={tavoli} evidenziato={scelta?.tavolo.id} posto={scelta?.posto} tema={tema} onCerca={() => setScheda('cerca')} haScelta={!!scelta} />
         )}
       </main>
     </div>
   );
 }
 
+// Telefono tenuto in verticale: la sala (3:2, più larga che alta) ci sta
+// stretta. Un tablet o un computer in verticale ha spazio a sufficienza.
+const QUERY_VERTICALE = '(orientation: portrait) and (max-width: 640px)';
+function useVerticale() {
+  const [verticale, setVerticale] = useState(() => window.matchMedia?.(QUERY_VERTICALE).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(QUERY_VERTICALE);
+    if (!mq) return;
+    const cambia = e => setVerticale(e.matches);
+    mq.addEventListener('change', cambia);
+    return () => mq.removeEventListener('change', cambia);
+  }, []);
+  return verticale;
+}
+
+// Il proprio tavolo ingrandito, con la propria sedia illuminata. Le sedie vere
+// non hanno numeri, quindi qui non ce ne sono: conta la posizione.
+function SediaDaVicino({ tavolo, posto, tema }) {
+  if (!tavolo || posto == null) return <div style={{ height: '0.5rem' }} />;
+  return (
+    <>
+      <TavoloDaVicino t={tavolo} style={{ display: 'block', width: '100%', maxWidth: 230, margin: '0 auto' }}
+        coloreTavolo={{ fill: tema.light, stroke: tema.border }} fontFamily={SERIF} coloreTesto={tema.dark}
+        sedia={i => (i === posto
+          ? { fill: tema.primary, stroke: tema.dark, evidenzia: true }
+          : { fill: '#ffffff', stroke: '#d1d5db' })} />
+      <p style={{ margin: '0.25rem 0 1rem', color: '#6b7280', fontSize: '0.85rem' }}>Il tuo posto è quello illuminato.</p>
+    </>
+  );
+}
+
 // Sola lettura e niente ospiti: solo dove sta ogni tavolo, col proprio in evidenza.
-function Pianta({ tavoli, evidenziato, tema, onCerca, haScelta }) {
+function Pianta({ tavoli, evidenziato, posto, tema, onCerca, haScelta }) {
   const scrollRef = useRef(null);
+  const verticale = useVerticale();
+  const [avvisoChiuso, setAvvisoChiuso] = useState(false);
   const mio = tavoli?.find(t => t.id === evidenziato);
 
   // Sul telefono la pianta è più larga dello schermo: si porta il proprio
@@ -208,9 +258,22 @@ function Pianta({ tavoli, evidenziato, tema, onCerca, haScelta }) {
 
   return (
     <>
+      {verticale && !avvisoChiuso && (
+        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: tema.light, border: `1px solid ${tema.border}`, borderRadius: '0.9rem', padding: '0.75rem 0.85rem', marginBottom: '1rem' }}>
+          <Smartphone size={26} color={tema.primary} style={{ flexShrink: 0, animation: 'ruota-telefono 2.4s ease-in-out infinite' }} />
+          <p style={{ margin: 0, fontSize: '0.875rem', color: tema.text, lineHeight: 1.4, flex: 1 }}>
+            <strong>Ruota il telefono in orizzontale</strong> per vedere meglio la sala.
+          </p>
+          <button onClick={() => setAvvisoChiuso(true)} aria-label="Chiudi l'avviso"
+            style={{ border: 0, background: 'transparent', color: '#9ca3af', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
+            <X size={16} />
+          </button>
+          <style>{'@keyframes ruota-telefono { 0%, 25% { transform: rotate(0deg); } 50%, 75% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }'}</style>
+        </div>
+      )}
       <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '0.95rem', margin: '0 0 1rem', lineHeight: 1.5 }}>
         {mio
-          ? <>Il tuo tavolo è <strong style={{ color: tema.dark }}>{mio.nome}</strong>, evidenziato qui sotto.</>
+          ? <>Il tuo tavolo è <strong style={{ color: tema.dark }}>{mio.nome}</strong>{posto != null ? ': il tuo posto è illuminato.' : ', evidenziato qui sotto.'}</>
           : haScelta ? 'Il tuo tavolo non è sulla pianta: chiedi al personale di sala.'
           : <>Cerca il tuo nome per vedere dove siedi. <button onClick={onCerca} style={{ border: 0, background: 'none', color: tema.primary, fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>Cerca</button></>}
       </p>
@@ -221,35 +284,45 @@ function Pianta({ tavoli, evidenziato, tema, onCerca, haScelta }) {
             const { x, y } = posizioneTavolo(t, tavoli);
             const m = misure(t);
             const suo = t.id === evidenziato;
-            const { w } = ingombro(t);
-            const maxCar = Math.max(8, Math.floor(w / 15));
-            const nome = t.nome.length > maxCar ? `${t.nome.slice(0, maxCar - 1)}…` : t.nome;
-            const fill = suo ? tema.primary : t.tipo === 'sposi' ? tema.light : '#ffffff';
-            const stroke = suo ? tema.dark : tema.border;
+            const conSedia = suo && posto != null;
+            // Con la sedia nota, il tavolo resta chiaro e si illumina la sedia;
+            // senza, si colora il tavolo intero.
+            const fill = suo && !conSedia ? tema.primary : suo || t.tipo === 'sposi' ? tema.light : '#ffffff';
+            const stroke = suo ? tema.primary : tema.border;
             return (
               <g key={t.id} transform={`translate(${x} ${y})`}>
                 <g transform={`rotate(${ruotabile(t) ? t.rotazione || 0 : 0})`}>
-                  {posti(t).map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="8" fill={suo ? tema.mid : '#ffffff'} stroke={suo ? tema.dark : '#d1d5db'} strokeWidth="1.5" />
-                  ))}
                   {t.forma === 'rettangolare'
                     ? <rect x={-m.w / 2} y={-m.h / 2} width={m.w} height={m.h} rx="8" fill={fill} stroke={stroke} strokeWidth={suo ? 4 : 2} />
                     : <circle r={m.r} fill={fill} stroke={stroke} strokeWidth={suo ? 4 : 2} />}
+                  {posti(t).map((p, i) => {
+                    const mia = conSedia && i === posto;
+                    return (
+                      <g key={i} transform={`translate(${p.x} ${p.y})`}>
+                        {mia && (
+                          <circle r="22" fill="none" stroke={tema.primary} strokeWidth="4">
+                            <animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.6s" repeatCount="indefinite" />
+                          </circle>
+                        )}
+                        <circle r={mia ? 13 : 8} fill={mia ? tema.primary : suo && !conSedia ? tema.mid : '#ffffff'}
+                          stroke={mia ? tema.dark : suo && !conSedia ? tema.dark : '#d1d5db'} strokeWidth={mia ? 3 : 1.5} />
+                      </g>
+                    );
+                  })}
                 </g>
-                {suo && (
+                {suo && !conSedia && (
                   <circle r={Math.max(m.w, m.h) / 2 + 34} fill="none" stroke={tema.primary} strokeWidth="4" opacity="0.6">
                     <animate attributeName="opacity" values="0.7;0.1;0.7" dur="1.8s" repeatCount="indefinite" />
                   </circle>
                 )}
-                <text y="9" textAnchor="middle" fontSize="26" fontWeight="700" fontFamily={SERIF} fill={suo ? '#ffffff' : '#374151'}>
-                  {t.tipo === 'sposi' ? '💍 ' : ''}{nome}
-                </text>
+                <TestoTavolo t={t} testo={t.tipo === 'sposi' ? `💍 ${t.nome}` : t.nome} max={28} fontFamily={SERIF}
+                  fill={suo && !conSedia ? '#ffffff' : suo ? tema.dark : '#374151'} />
               </g>
             );
           })}
         </svg>
       </div>
-      <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem', marginTop: '0.6rem' }}>Scorri di lato per vedere tutta la sala.</p>
+      {verticale && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem', marginTop: '0.6rem' }}>Scorri di lato per vedere tutta la sala.</p>}
     </>
   );
 }
