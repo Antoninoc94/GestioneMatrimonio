@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Plus, Download, Tag, UtensilsCrossed, AlertTriangle, ChevronDown, Users, Map as MapIcon, Settings2, BookmarkCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -95,6 +95,22 @@ export default function Tavoli() {
       errore(err, 'Posizione del tavolo non salvata');
       load();
     }
+  };
+
+  // Le sedie di un tavolo, tutte insieme (null = di nuovo automatiche).
+  const salvaPosti = async (id, posti) => {
+    if (posti) {
+      const byId = new Map(posti.map(p => [p.id, p.posto]));
+      setTavoli(ts => ts.map(t => (t.id === id
+        ? { ...t, posti_scelti: true, ospiti: t.ospiti.map(o => ({ ...o, posto: byId.get(o.id) ?? null })) }
+        : t)));
+    }
+    try {
+      await api.post(`/tavoli/${id}/posti`, posti ? { posti } : { automatico: true });
+    } catch (err) {
+      errore(err, 'Posti non salvati');
+    }
+    load();
   };
 
   const del = async id => {
@@ -568,6 +584,7 @@ export default function Tavoli() {
         <div>
           <h1 className="page-title">Disposizione Tavoli</h1>
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
+          <Link to="/landing#qr" className="text-xs text-rose-500 hover:text-rose-600 font-medium">QR "Trova il tuo tavolo" per gli invitati</Link>
         </div>
         {/* Sul telefono una riga sola, icona sopra al testo */}
         <div className="grid grid-cols-5 gap-2 sm:flex sm:flex-wrap">
@@ -630,7 +647,7 @@ export default function Tavoli() {
         <AssegnaOspiti tavoli={tavoli} ospiti={ospiti} assignWithFamily={assignWithFamily} assignGuests={assignGuests} openEdit={openEdit} del={del} />
       )}
       {vista === 'pianta' && (
-        <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} />
+        <PiantaSala tavoli={tavoli} salvaPosizioni={salvaPosizioni} salvaTavolo={salvaTavolo} salvaPosti={salvaPosti} />
       )}
       {vista === 'gestisci' && (
         <GestioneTavoli tavoli={tavoli} ospiti={ospiti} salvaTavolo={salvaTavolo} del={del} riordina={riordina} openNew={openNew} />

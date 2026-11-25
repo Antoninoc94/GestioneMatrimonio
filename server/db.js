@@ -295,6 +295,12 @@ for (const col of ['regalo_titolo', 'regalo_messaggio', 'regalo_iban', 'regalo_i
     db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
   }
 }
+// Pagina pubblica "Trova il tuo tavolo" (/tavolo, raggiunta dal QR all'ingresso
+// della sala). Spenta finché gli sposi non la accendono: prima del giorno la
+// disposizione cambia, e comunque elenca chi è invitato.
+if (!configCols.find(c => c.name === 'tavolo_pubblico_abilitato')) {
+  db.prepare('ALTER TABLE config ADD COLUMN tavolo_pubblico_abilitato INTEGER DEFAULT 0').run();
+}
 if (!configCols.find(c => c.name === 'invito_tema')) {
   db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
 }
@@ -363,6 +369,19 @@ if (!ospCols.includes('relazione')) {
 }
 // Invito consegnato alla famiglia (solo sull'invitato principale): data ISO, o
 // NULL se ancora da consegnare, e come ('whatsapp' / 'manuale').
+// Sedia al tavolo: indice della sedia nel disegno del tavolo (0..capienza-1,
+// stesso ordine di posti() in client/src/pages/tavoli/util.js). NULL = posto
+// scelto in automatico da server/posti.js.
+if (!ospCols.includes('posto')) {
+  db.prepare('ALTER TABLE ospiti ADD COLUMN posto INTEGER').run();
+}
+// Cambiando tavolo la sedia di prima non vale più. Un trigger e non le singole
+// rotte: tavolo_id si scrive da una mezza dozzina di posti (scheda ospite,
+// famiglia, selezione multipla, eliminazione del tavolo, sposi).
+db.exec(`CREATE TRIGGER IF NOT EXISTS ospiti_cambio_tavolo
+  AFTER UPDATE OF tavolo_id ON ospiti
+  WHEN OLD.tavolo_id IS NOT NEW.tavolo_id
+  BEGIN UPDATE ospiti SET posto = NULL WHERE id = NEW.id; END`);
 if (!ospCols.includes('invito_inviato')) {
   db.prepare('ALTER TABLE ospiti ADD COLUMN invito_inviato TEXT').run();
 }

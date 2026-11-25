@@ -86,6 +86,7 @@ router.put('/', auth, (req, res) => {
     invito_rsvp_telefono=COALESCE(?,invito_rsvp_telefono),
     invito_messaggio_apertura=COALESCE(?,invito_messaggio_apertura),
     invito_messaggio_chiusura=COALESCE(?,invito_messaggio_chiusura),
+    tavolo_pubblico_abilitato=COALESCE(?,tavolo_pubblico_abilitato),
     updated_at=datetime('now')`)
     .run(
       p('data_matrimonio', v => v || null),
@@ -135,7 +136,8 @@ router.put('/', auth, (req, res) => {
       p('invito_rsvp_entro', v => v ?? ''),
       p('invito_rsvp_telefono', v => v ?? ''),
       p('invito_messaggio_apertura', v => v ?? ''),
-      p('invito_messaggio_chiusura', v => v ?? '')
+      p('invito_messaggio_chiusura', v => v ?? ''),
+      p('tavolo_pubblico_abilitato', v => (v === true || v === 1 ? 1 : 0))
     );
 
   // Se la soglia è cambiata, riallinea subito il tipo dei figli già esistenti

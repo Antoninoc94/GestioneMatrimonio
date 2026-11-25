@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { RotateCw, LayoutGrid, MousePointerClick, ZoomIn, ZoomOut, Maximize2, Magnet } from 'lucide-react';
-import { PIANTA_W, PIANTA_H, PASSO_GRIGLIA, misure, ingombro, sovrapposizioni, posizioneDefault, nomeOspite, tipoTavolo, formaTavolo, ellePosti, contornoElle, postiElle } from './util';
+import { RotateCw, LayoutGrid, MousePointerClick, Undo2, ZoomIn, ZoomOut, Maximize2, Magnet } from 'lucide-react';
+import TavoloDaVicino from './TavoloDaVicino';
+import { PIANTA_W, PIANTA_H, PASSO_GRIGLIA, misure, ingombro, sovrapposizioni, posizioneDefault, nomeOspite, tipoTavolo, formaTavolo, ellePosti, contornoElle, ruotabile, posti, limitaPosizione, posizioneTavolo } from './util';
 
 const COLORI = {
   normale: { fill: '#ffffff', stroke: '#d1d5db' },
@@ -8,12 +9,6 @@ const COLORI = {
   bambini: { fill: '#f3e8ff', stroke: '#c084fc' },
 };
 
-// Si ruota ciò che non è simmetrico: il rettangolare, e il tavolo sposi
-// anche tondo, perché le sue sedie stanno su un lato solo. Le sedie sono
-// disegnate dentro lo stesso gruppo ruotato, quindi girano col tavolo; i
-// quattro versi servono a scegliere verso dove guardano.
-// Anche la L, che ha l'angolo da portare dal lato giusto.
-const ruotabile = t => t.forma === 'rettangolare' || t.forma === 'elle' || t.tipo === 'sposi';
 // Per il tavolo sposi: dove stanno le sedie e quindi verso dove guardano
 // gli sposi (oltre il tavolo, cioè dal lato opposto). rotate() in SVG gira
 // in senso orario: le sedie partono in alto e passano a destra, in basso, a sinistra.
@@ -24,38 +19,14 @@ const ORIENTAMENTO = {
   270: 'Sedie sul lato sinistro: gli sposi guardano verso destra.',
 };
 
-// Posti attorno al tavolo, in coordinate locali (prima della rotazione).
-function posti(t) {
-  if (t.forma === 'elle') return postiElle(t);
-  const n = Math.max(1, t.capienza || 1);
-  const m = misure(t);
-  // Tavolo sposi: tutti sullo stesso lato, mai uno di fronte all'altro. Le
-  // sedie partono dal lato in alto, così gli sposi guardano verso il basso
-  // della pianta; con "Ruota" si sceglie il lato.
-  if (t.tipo === 'sposi') {
-    if (t.forma === 'rettangolare') {
-      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: -m.h / 2 - 15 }));
-    }
-    const passo = Math.min(0.55, Math.PI / Math.max(1, n - 1));
-    return Array.from({ length: n }, (_, i) => {
-      const a = -Math.PI / 2 + (i - (n - 1) / 2) * passo;
-      return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
-    });
-  }
-  if (t.forma === 'rettangolare') {
-    const sopra = Math.ceil(n / 2), sotto = n - sopra;
-    return [
-      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 15 })),
-      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 15 })),
-    ];
-  }
-  return Array.from({ length: n }, (_, i) => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
-  });
-}
+// Chi siede su ogni sedia: Map(indice sedia → ospite).
+const perSedia = t => new Map(t.ospiti.filter(o => o.posto != null).map(o => [o.posto, o]));
 
-export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
+const coloreSedia = o => (!o ? { fill: '#ffffff', stroke: '#d1d5db' }
+  : o.tipo === 'bambino' ? { fill: '#c084fc', stroke: '#9333ea' }
+  : { fill: '#fb7185', stroke: '#e11d48' });
+
+export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo, salvaPosti }) {
   const svgRef = useRef(null);
   const [drag, setDrag] = useState(null); // { id, dx, dy, x, y, mosso }
   const [selId, setSelId] = useState(null);
@@ -67,14 +38,13 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   const [cam, setCam] = useState({ x: 0, y: 0, z: 1 });
   const ptrs = useRef(new Map()); // dita attualmente sullo schermo (coordinate schermo)
   const gesto = useRef(null);
+  const [selOspite, setSelOspite] = useState(null);
 
   const nonPiazzati = tavoli.filter(t => t.pos_x == null || t.pos_y == null);
   const sovrapposti = new Set(sovrapposizioni(tavoli).flat().map(t => t.id));
   const posizione = t => {
     if (drag?.id === t.id) return { x: drag.x, y: drag.y };
-    if (t.pos_x != null && t.pos_y != null) return { x: t.pos_x, y: t.pos_y };
-    const p = posizioneDefault(tavoli.indexOf(t), tavoli.length);
-    return limita(t, p.x, p.y);
+    return posizioneTavolo(t, tavoli);
   };
 
   const puntoSvg = e => {
@@ -136,14 +106,6 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
     if (ptrs.current.size < 2) gesto.current = null;
   };
 
-  const limita = (t, x, y) => {
-    const { w, h } = ingombro(t);
-    const mw = w / 2 + 26, mh = h / 2 + 26; // posti compresi
-    return {
-      x: Math.round(Math.min(Math.max(x, mw), PIANTA_W - mw)),
-      y: Math.round(Math.min(Math.max(y, mh), PIANTA_H - mh)),
-    };
-  };
 
   const onPointerDown = (e, t) => {
     if (e.button !== undefined && e.button !== 0) return;
@@ -158,7 +120,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
     if (drag?.id !== t.id) return;
     const p = puntoSvg(e);
     const aggancia = v => (calamita ? Math.round(v / PASSO_GRIGLIA) * PASSO_GRIGLIA : v);
-    const n = limita(t, aggancia(p.x - drag.dx), aggancia(p.y - drag.dy));
+    const n = limitaPosizione(t, aggancia(p.x - drag.dx), aggancia(p.y - drag.dy));
     // Qualche unità di tolleranza: un tocco col dito non deve diventare uno spostamento.
     const mosso = drag.mosso || Math.hypot(n.x - drag.x, n.y - drag.y) > 3;
     setDrag(d => ({ ...d, ...(mosso ? n : {}), mosso }));
@@ -166,7 +128,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   const onPointerUp = t => {
     if (drag?.id !== t.id) return;
     if (drag.mosso) salvaPosizioni([{ id: t.id, x: drag.x, y: drag.y }]);
-    else setSelId(s => (s === t.id ? null : t.id));
+    else { setSelId(s => (s === t.id ? null : t.id)); setSelOspite(null); }
     setDrag(null);
   };
 
@@ -174,7 +136,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
     if (tavoli.length > nonPiazzati.length && !confirm('Riposizionare tutti i tavoli in griglia? Le posizioni attuali andranno perse.')) return;
     salvaPosizioni(tavoli.map((t, i) => {
       const p = posizioneDefault(i, tavoli.length);
-      return { id: t.id, ...limita(t, p.x, p.y) };
+      return { id: t.id, ...limitaPosizione(t, p.x, p.y) };
     }));
   };
 
@@ -219,8 +181,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
               const m = misure(t);
               const c = COLORI[t.tipo] || COLORI.normale;
               const occupati = t.ospiti.length;
-              // Posti colorati: prima gli adulti, poi i bambini in viola come nella legenda.
-              const adulti = t.ospiti.filter(o => o.tipo !== 'bambino').length;
+              const sedute = perSedia(t);
               const oltre = occupati > t.capienza;
               const piazzato = t.pos_x != null && t.pos_y != null;
               const selezionato = selId === t.id;
@@ -251,11 +212,10 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
                   onPointerUp={() => onPointerUp(t)}
                   onPointerCancel={() => setDrag(null)}>
                   <g transform={`rotate(${ruotabile(t) ? t.rotazione || 0 : 0})`}>
-                    {posti(t).map((p, i) => (
-                      <circle key={i} cx={p.x} cy={p.y} r="9"
-                        fill={i < adulti ? '#fb7185' : i < occupati ? '#c084fc' : '#ffffff'}
-                        stroke={i < adulti ? '#e11d48' : i < occupati ? '#9333ea' : '#d1d5db'} strokeWidth="1.5" />
-                    ))}
+                    {posti(t).map((p, i) => {
+                      const c = coloreSedia(sedute.get(i));
+                      return <circle key={i} cx={p.x} cy={p.y} r="9" fill={c.fill} stroke={c.stroke} strokeWidth="1.5" />;
+                    })}
                     {t.forma === 'elle'
                       ? <polygon points={contornoElle(m.S, m.T).map(p => p.join(',')).join(' ')} fill={c.fill} stroke={stroke}
                           strokeLinejoin="round" strokeWidth={selezionato ? 3 : 2} strokeDasharray={piazzato ? undefined : '6 4'} />
@@ -326,17 +286,77 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
             {sel.ospiti.length === 0 ? (
               <p className="text-xs text-gray-400">Nessun ospite seduto.</p>
             ) : (
-              <ul className="text-sm space-y-0.5 max-h-80 overflow-y-auto">
-                {sel.ospiti.map(o => (
-                  <li key={o.id} className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs pl-3' : 'text-gray-800'}`}>
-                    {o.sposo ? '💍 ' : ''}{nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
-                  </li>
-                ))}
-              </ul>
+              <Posti t={sel} selOspite={selOspite} setSelOspite={setSelOspite} salvaPosti={salvaPosti} />
             )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+// Chi siede dove. Si tocca un ospite e poi la sedia: se è occupata i due si
+// scambiano. Al primo cambio tutto il tavolo viene salvato com'è, così le
+// altre sedie non si spostano più da sole quando arriva un ospite nuovo.
+function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
+  const sedute = perSedia(t);
+  const scelto = t.ospiti.find(o => o.id === selOspite);
+  const senzaSedia = t.ospiti.filter(o => o.posto == null);
+
+  const siedi = i => {
+    const occupante = sedute.get(i);
+    if (!scelto) {
+      if (occupante) setSelOspite(occupante.id);
+      return;
+    }
+    if (occupante?.id === scelto.id) { setSelOspite(null); return; }
+    const nuovi = t.ospiti.map(o => ({
+      id: o.id,
+      posto: o.id === scelto.id ? i : o.id === occupante?.id ? scelto.posto ?? null : o.posto ?? null,
+    }));
+    salvaPosti(t.id, nuovi);
+    setSelOspite(null);
+  };
+
+  return (
+    <>
+      <TavoloDaVicino t={t} className="w-full max-w-[260px] mx-auto block my-1" onSedia={siedi}
+        coloreTavolo={{ fill: '#f9fafb', stroke: '#d1d5db' }}
+        sedia={i => {
+          const o = sedute.get(i);
+          const suo = scelto && o?.id === scelto.id;
+          return { ...coloreSedia(o), testo: i + 1, coloreTesto: o ? '#ffffff' : '#9ca3af', evidenzia: suo, ...(suo ? { stroke: '#111827' } : {}) };
+        }} />
+      <p className="text-[11px] text-gray-500 text-center mb-2">
+        {scelto ? <>Ora tocca la sedia per <strong>{nomeOspite(scelto)}</strong></> : 'Tocca un ospite (o la sua sedia), poi la sedia dove siede.'}
+      </p>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-[11px] text-gray-400">{t.posti_scelti ? 'Posti scelti da voi' : 'Posti automatici: famiglie vicine'}</span>
+        {t.posti_scelti && (
+          <button className="text-[11px] text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1"
+            onClick={() => { if (confirm('Tornare ai posti automatici per questo tavolo?')) salvaPosti(t.id, null); }}>
+            <Undo2 size={11} /> Automatici
+          </button>
+        )}
+      </div>
+      <ul className="text-sm space-y-0.5 max-h-72 overflow-y-auto">
+        {[...t.ospiti].sort((a, b) => (a.posto ?? 999) - (b.posto ?? 999)).map(o => (
+          <li key={o.id}>
+            <button onClick={() => setSelOspite(s => (s === o.id ? null : o.id))}
+              className={`w-full flex items-center gap-2 text-left rounded px-1.5 py-0.5 ${selOspite === o.id ? 'bg-rose-50 ring-1 ring-rose-300' : 'hover:bg-gray-50'}`}>
+              <span className={`w-5 h-5 flex-shrink-0 rounded-full text-[10px] font-bold flex items-center justify-center ${o.posto == null ? 'bg-red-100 text-red-600' : o.tipo === 'bambino' ? 'bg-purple-400 text-white' : 'bg-rose-400 text-white'}`}>
+                {o.posto == null ? '!' : o.posto + 1}
+              </span>
+              <span className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs' : 'text-gray-800'}`}>
+                {o.sposo ? '💍 ' : ''}{nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {senzaSedia.length > 0 && (
+        <p className="text-[11px] text-red-500 mt-1.5">{senzaSedia.length === 1 ? '1 ospite è' : `${senzaSedia.length} ospiti sono`} senza sedia: il tavolo è pieno.</p>
+      )}
+    </>
   );
 }

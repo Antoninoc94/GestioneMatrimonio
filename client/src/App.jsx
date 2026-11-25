@@ -20,6 +20,7 @@ import Viaggio from './pages/Viaggio';
 import Inviti from './pages/Inviti';
 import Conferma from './pages/Conferma';
 import Landing from './pages/Landing';
+import TrovaTavolo from './pages/TrovaTavolo';
 import LandingEditor from './pages/LandingEditor';
 import Checklist from './pages/Checklist';
 
@@ -34,6 +35,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/conferma" element={<Conferma />} />
       <Route path="/wedding" element={<Landing />} />
+      <Route path="/tavolo" element={<TrovaTavolo />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />

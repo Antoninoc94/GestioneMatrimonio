@@ -28,7 +28,7 @@ router.get('/info', (req, res) => {
     SELECT data_matrimonio, nome_sposo1, nome_sposo2,
            landing_abilitata, landing_messaggio, landing_dress_code,
            landing_info_pratiche, landing_tema, landing_foto, landing_foto_posizione,
-           conferma_abilitata
+           conferma_abilitata, tavolo_pubblico_abilitato
     FROM config LIMIT 1
   `).get();
 

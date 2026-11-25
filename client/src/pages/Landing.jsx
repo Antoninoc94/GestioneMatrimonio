@@ -1,23 +1,13 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown } from 'lucide-react';
+import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown, Armchair } from 'lucide-react';
 import { formattaIban } from '../publicUrl';
+import { TEMI } from '../temiWedding';
 import { format, parseISO } from 'date-fns';
 import { giorniA } from '../giorni';
 import { it } from 'date-fns/locale';
 
 const toUtc = s => s && !s.endsWith('Z') ? s.replace(' ', 'T') + 'Z' : s;
-
-const TEMI = {
-  rose:    { primary: '#be185d', light: '#fdf2f8', border: '#f9a8d4', text: '#9d174d', mid: '#ec4899', dark: '#831843' },
-  lavanda: { primary: '#6d28d9', light: '#f5f3ff', border: '#c4b5fd', text: '#5b21b6', mid: '#8b5cf6', dark: '#4c1d95' },
-  salvia:  { primary: '#047857', light: '#ecfdf5', border: '#6ee7b7', text: '#065f46', mid: '#10b981', dark: '#064e3b' },
-  cielo:   { primary: '#0369a1', light: '#f0f9ff', border: '#7dd3fc', text: '#075985', mid: '#0ea5e9', dark: '#0c4a6e' },
-  oro:     { primary: '#b45309', light: '#fffbeb', border: '#fcd34d', text: '#92400e', mid: '#f59e0b', dark: '#78350f' },
-  // Sfondo bianco pieno e scritte oro. Titoli e testi sono un oro scuro: quello
-  // brillante (mid) sul bianco non si legge, quindi resta a ornamenti e icone.
-  biancoro: { primary: '#9c7a1c', light: '#fdfaf3', border: '#e9d9ae', text: '#94731c', mid: '#c8a24a', dark: '#8b6914', bg: '#ffffff' },
-};
 
 // Chiavi minuscole: i tipi location/cronologia sono confrontati case-insensitive
 // perché Location.jsx salva 'Chiesa'/'Ricevimento' (maiuscolo) mentre qui serve
@@ -276,6 +266,20 @@ export default function Landing() {
                 {config.landing_info_pratiche}
               </InfoBox>
             )}
+          </div>
+        )}
+
+        {/* Il giorno del matrimonio: chi apre la pagina dalla sala trova il suo tavolo */}
+        {config.tavolo_pubblico_abilitato === 1 && (
+          <div style={{ textAlign: 'center', padding: '1rem 0 1.5rem' }}>
+            <a href="/tavolo" style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+              background: '#fff', color: tema.primary, border: `1.5px solid ${tema.primary}`,
+              padding: '0.75rem 2rem', borderRadius: '3rem', textDecoration: 'none',
+              fontWeight: 600, fontSize: '0.9375rem', letterSpacing: '0.03em',
+            }}>
+              <Armchair size={16} /> Trova il tuo tavolo
+            </a>
           </div>
         )}
 
