@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { RotateCw, LayoutGrid, Circle, RectangleHorizontal, MousePointerClick } from 'lucide-react';
-import { PIANTA_W, PIANTA_H, misure, posizioneDefault, nomeOspite, tipoTavolo } from './util';
+import { PIANTA_W, PIANTA_H, misure, posizioneDefault, nomeOspite, tipoTavolo, ruotabile, ingombro, posti, limitaPosizione, posizioneTavolo } from './util';
 
 const COLORI = {
   normale: { fill: '#ffffff', stroke: '#d1d5db' },
@@ -8,11 +8,6 @@ const COLORI = {
   bambini: { fill: '#f3e8ff', stroke: '#c084fc' },
 };
 
-// Si ruota ciò che non è simmetrico: il rettangolare, e il tavolo sposi
-// anche tondo, perché le sue sedie stanno su un lato solo. Le sedie sono
-// disegnate dentro lo stesso gruppo ruotato, quindi girano col tavolo; i
-// quattro versi servono a scegliere verso dove guardano.
-const ruotabile = t => t.forma === 'rettangolare' || t.tipo === 'sposi';
 // Per il tavolo sposi: dove stanno le sedie e quindi verso dove guardano
 // gli sposi (oltre il tavolo, cioè dal lato opposto). rotate() in SVG gira
 // in senso orario: le sedie partono in alto e passano a destra, in basso, a sinistra.
@@ -23,43 +18,6 @@ const ORIENTAMENTO = {
   270: 'Sedie sul lato sinistro: gli sposi guardano verso destra.',
 };
 
-// Ingombro dopo la rotazione (solo 0/90/180/270 hanno senso in una sala).
-const ingombro = t => {
-  const m = misure(t);
-  const verticale = t.forma === 'rettangolare' && (t.rotazione || 0) % 180 === 90;
-  return verticale ? { w: m.h, h: m.w } : { w: m.w, h: m.h };
-};
-
-// Posti attorno al tavolo, in coordinate locali (prima della rotazione).
-function posti(t) {
-  const n = Math.max(1, t.capienza || 1);
-  const m = misure(t);
-  // Tavolo sposi: tutti sullo stesso lato, mai uno di fronte all'altro. Le
-  // sedie partono dal lato in alto, così gli sposi guardano verso il basso
-  // della pianta; con "Ruota" si sceglie il lato.
-  if (t.tipo === 'sposi') {
-    if (t.forma === 'rettangolare') {
-      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: -m.h / 2 - 15 }));
-    }
-    const passo = Math.min(0.55, Math.PI / Math.max(1, n - 1));
-    return Array.from({ length: n }, (_, i) => {
-      const a = -Math.PI / 2 + (i - (n - 1) / 2) * passo;
-      return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
-    });
-  }
-  if (t.forma === 'rettangolare') {
-    const sopra = Math.ceil(n / 2), sotto = n - sopra;
-    return [
-      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 15 })),
-      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 15 })),
-    ];
-  }
-  return Array.from({ length: n }, (_, i) => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
-  });
-}
-
 export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   const svgRef = useRef(null);
   const [drag, setDrag] = useState(null); // { id, dx, dy, x, y, mosso }
@@ -68,9 +26,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   const nonPiazzati = tavoli.filter(t => t.pos_x == null || t.pos_y == null);
   const posizione = t => {
     if (drag?.id === t.id) return { x: drag.x, y: drag.y };
-    if (t.pos_x != null && t.pos_y != null) return { x: t.pos_x, y: t.pos_y };
-    const p = posizioneDefault(tavoli.indexOf(t), tavoli.length);
-    return limita(t, p.x, p.y);
+    return posizioneTavolo(t, tavoli);
   };
 
   const puntoSvg = e => {
@@ -79,14 +35,6 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
     pt.x = e.clientX;
     pt.y = e.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
-  };
-  const limita = (t, x, y) => {
-    const { w, h } = ingombro(t);
-    const mw = w / 2 + 26, mh = h / 2 + 26; // posti compresi
-    return {
-      x: Math.round(Math.min(Math.max(x, mw), PIANTA_W - mw)),
-      y: Math.round(Math.min(Math.max(y, mh), PIANTA_H - mh)),
-    };
   };
 
   const onPointerDown = (e, t) => {
@@ -100,7 +48,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
   const onPointerMove = (e, t) => {
     if (drag?.id !== t.id) return;
     const p = puntoSvg(e);
-    const n = limita(t, p.x - drag.dx, p.y - drag.dy);
+    const n = limitaPosizione(t, p.x - drag.dx, p.y - drag.dy);
     // Qualche unità di tolleranza: un tocco col dito non deve diventare uno spostamento.
     const mosso = drag.mosso || Math.hypot(n.x - drag.x, n.y - drag.y) > 3;
     setDrag(d => ({ ...d, ...(mosso ? n : {}), mosso }));
@@ -116,7 +64,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo }) {
     if (tavoli.length > nonPiazzati.length && !confirm('Riposizionare tutti i tavoli in griglia? Le posizioni attuali andranno perse.')) return;
     salvaPosizioni(tavoli.map((t, i) => {
       const p = posizioneDefault(i, tavoli.length);
-      return { id: t.id, ...limita(t, p.x, p.y) };
+      return { id: t.id, ...limitaPosizione(t, p.x, p.y) };
     }));
   };
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Plus, Download, Tag, UtensilsCrossed, AlertTriangle, ChevronDown, Users, Map as MapIcon, Settings2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -538,6 +538,7 @@ export default function Tavoli() {
         <div>
           <h1 className="page-title">Disposizione Tavoli</h1>
           <p className="page-subtitle">{tavoli.length} tavoli · {totaleAssegnati}/{ospiti.length} ospiti assegnati</p>
+          <Link to="/landing#qr" className="text-xs text-rose-500 hover:text-rose-600 font-medium">QR "Trova il tuo tavolo" per gli invitati</Link>
         </div>
         {/* Sul telefono una riga sola, icona sopra al testo */}
         <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">

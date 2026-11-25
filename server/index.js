@@ -104,11 +104,24 @@ const rispondiLimiter = rateLimit({
   message: { error: 'Troppe conferme inviate da questa connessione. Riprova tra un\'ora.' },
 });
 
+// "Trova il tuo tavolo" si usa in sala, dove gli invitati sono quasi tutti sul
+// Wi-Fi del locale, cioè dietro lo stesso IP, e ognuno digita più volte (la
+// ricerca parte a ogni lettera). Il limite è quindi largo: 150 ospiti per una
+// decina di richieste stanno dentro, uno script che scorre la lista no.
+const tavoloLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1500,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Troppe richieste. Riprova tra qualche minuto.' },
+});
+
 app.post('/api/auth/login', loginLimiter);
 app.post('/api/conferma/rispondi', rispondiLimiter);
 
 app.use('/api/conferma', confermaLimiter, require('./routes/conferma'));
 app.use('/api/landing', require('./routes/landing'));
+app.use('/api/tavolo', tavoloLimiter, require('./routes/tavolo'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/dashboard', require('./routes/dashboard'));

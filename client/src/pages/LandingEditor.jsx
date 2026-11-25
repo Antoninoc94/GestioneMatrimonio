@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop, Gift } from 'lucide-react';
+import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop, Gift, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api';
 import PhotoCropper from '../components/PhotoCropper';
@@ -47,6 +48,9 @@ export default function LandingEditor() {
   const fileRef = useRef();
   const qrWeddingRef = useRef();
   const qrConfermaRef = useRef();
+  const qrTavoloRef = useRef();
+  const [tavoloAttivo, setTavoloAttivo] = useState(false);
+  const [sposi, setSposi] = useState('');
 
   // Il QR è disegnato in SVG: l'SVG si scarica così com'è (vettoriale, nitido
   // a qualsiasi dimensione di stampa), il PNG si ricava dallo stesso SVG a
@@ -70,20 +74,65 @@ export default function LandingEditor() {
     scarica(url, `${nome}.svg`);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const downloadPNG = (ref, nome) => {
+  // PNG ricavato dall'SVG del QR, al lato richiesto in pixel.
+  const pngQR = (ref, lato) => new Promise((resolve, reject) => {
     const testo = svgQR(ref);
-    if (!testo) return;
-    const LATO = 2048;
+    if (!testo) return reject(new Error('QR non pronto'));
     const img = new window.Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = LATO;
+      canvas.width = canvas.height = lato;
       const ctx = canvas.getContext('2d');
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0, LATO, LATO);
-      scarica(canvas.toDataURL('image/png'), `${nome}.png`);
+      ctx.drawImage(img, 0, 0, lato, lato);
+      resolve(canvas.toDataURL('image/png'));
     };
+    img.onerror = reject;
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(testo);
+  });
+  const downloadPNG = (ref, nome) => pngQR(ref, 2048).then(png => scarica(png, `${nome}.png`)).catch(() => {});
+
+  // Il cartello da mettere su un cavalletto all'ingresso della sala: A4
+  // verticale, si può stampare ingrandito in A3. Solo testo e QR, niente
+  // emoji né "→": helvetica e times non le hanno.
+  const cartelloTavolo = async url => {
+    const png = await pngQR(qrTavoloRef, 2048);
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210, cx = W / 2;
+    doc.setDrawColor(225, 29, 72);
+    doc.setLineWidth(0.6);
+    doc.rect(12, 12, W - 24, 273);
+    doc.setLineWidth(0.2);
+    doc.rect(15, 15, W - 30, 267);
+    doc.setTextColor(31, 41, 55);
+    doc.setFont('times', 'italic');
+    doc.setFontSize(20);
+    if (sposi) doc.text(sposi, cx, 42, { align: 'center' });
+    doc.setFont('times', 'normal');
+    doc.setFontSize(40);
+    doc.text('Trova il tuo tavolo', cx, 68, { align: 'center' });
+    doc.setDrawColor(225, 29, 72);
+    doc.line(cx - 25, 78, cx + 25, 78);
+    const lato = 120;
+    doc.addImage(png, 'PNG', cx - lato / 2, 92, lato, lato);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(15);
+    doc.text('Inquadra il codice con la fotocamera del telefono,', cx, 230, { align: 'center' });
+    doc.text('scrivi il tuo nome e scopri dove siedi.', cx, 238, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text(url.replace(/^https?:\/\//, ''), cx, 262, { align: 'center' });
+    doc.save('cartello-trova-il-tuo-tavolo.pdf');
+  };
+
+  const toggleTavolo = async () => {
+    const nuovo = !tavoloAttivo;
+    setTavoloAttivo(nuovo);
+    try {
+      await api.put('/config', { tavolo_pubblico_abilitato: nuovo });
+    } catch {
+      setTavoloAttivo(!nuovo);
+    }
   };
 
   useEffect(() => {
@@ -99,10 +148,14 @@ export default function LandingEditor() {
         ...Object.fromEntries(CAMPI_REGALO.map(k => [k, d[k] || ''])),
       });
       setUrlPubblico(d.url_pubblico || '');
+      setTavoloAttivo(d.tavolo_pubblico_abilitato === 1);
+      setSposi([d.nome_sposo1, d.nome_sposo2].filter(Boolean).join(' & '));
       setMessaggioWa(d.messaggio_whatsapp || '');
       setFoto(d.landing_foto || null);
       setFotoOriginale(d.landing_foto_originale || null);
       setFotoCrop(d.landing_foto_crop ? JSON.parse(d.landing_foto_crop) : null);
+      // Arrivando da Tavoli (/landing#qr): il router non scorre da solo all'ancora.
+      if (window.location.hash === '#qr') requestAnimationFrame(() => document.getElementById('qr')?.scrollIntoView({ behavior: 'smooth' }));
     });
   }, []);
 
@@ -451,12 +504,12 @@ export default function LandingEditor() {
       </form>
 
       {/* QR Code */}
-      <div className="card mt-6">
+      <div id="qr" className="card mt-6 scroll-mt-4">
         <div className="flex items-center gap-2 mb-4">
           <QrCode size={18} className="text-rose-400" />
           <h2 className="font-bold text-gray-800">QR Code</h2>
         </div>
-        <p className="text-xs text-gray-400 mb-4">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine.</p>
+        <p className="text-xs text-gray-400 mb-4">Stampa o condividi questi QR code sugli inviti per portare gli ospiti direttamente alle pagine. Quello di "Trova il tuo tavolo" va invece all'ingresso della sala, al posto del cartellone con tutti i nomi.</p>
         <div className="mb-5">
           <label className="form-label">Indirizzo pubblico del sito</label>
           <input className="form-input" value={urlPubblico} onChange={e => setUrlPubblico(e.target.value)}
@@ -474,11 +527,12 @@ export default function LandingEditor() {
             <Save size={15} /> {urlSaved ? 'Salvato!' : 'Salva indirizzo e messaggio'}
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
             { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding' },
             { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma' },
-          ].map(({ label, path, ref, file }) => {
+            { label: 'Trova il tuo tavolo', path: '/tavolo', ref: qrTavoloRef, file: 'qr-tavolo', tavolo: true },
+          ].map(({ label, path, ref, file, tavolo }) => {
             const url = `${baseQR}${path}`;
             return (
               <div key={path} className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
@@ -500,6 +554,20 @@ export default function LandingEditor() {
                   </button>
                 </div>
                 <p className="text-[11px] text-gray-400 text-center -mt-1">Per il biglietto stampato usa l'SVG: resta nitido a qualsiasi dimensione.</p>
+                {tavolo && (
+                  <div className="w-full border-t border-gray-200 pt-3 space-y-2">
+                    <button type="button" className="btn-primary text-sm w-full justify-center" onClick={() => cartelloTavolo(url)}>
+                      <FileText size={13} /> Cartello da stampare (PDF)
+                    </button>
+                    <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5 accent-rose-500" checked={tavoloAttivo} onChange={toggleTavolo} />
+                      <span>
+                        <strong>Ricerca attiva</strong>: gli invitati vedono il proprio tavolo e la pianta.
+                        {!tavoloAttivo && ' Spenta, la pagina dice che sarà disponibile il giorno del matrimonio: accendila quando la disposizione è definitiva.'}
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             );
           })}

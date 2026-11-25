@@ -295,6 +295,12 @@ for (const col of ['regalo_titolo', 'regalo_messaggio', 'regalo_iban', 'regalo_i
     db.prepare(`ALTER TABLE config ADD COLUMN ${col} TEXT`).run();
   }
 }
+// Pagina pubblica "Trova il tuo tavolo" (/tavolo, raggiunta dal QR all'ingresso
+// della sala). Spenta finché gli sposi non la accendono: prima del giorno la
+// disposizione cambia, e comunque elenca chi è invitato.
+if (!configCols.find(c => c.name === 'tavolo_pubblico_abilitato')) {
+  db.prepare('ALTER TABLE config ADD COLUMN tavolo_pubblico_abilitato INTEGER DEFAULT 0').run();
+}
 if (!configCols.find(c => c.name === 'invito_tema')) {
   db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
 }

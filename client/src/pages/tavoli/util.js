@@ -28,6 +28,58 @@ export function misure(t) {
   return { w: r * 2, h: r * 2, r };
 }
 
+// Si ruota ciò che non è simmetrico: il rettangolare, e il tavolo sposi
+// anche tondo, perché le sue sedie stanno su un lato solo. Le sedie sono
+// disegnate dentro lo stesso gruppo ruotato, quindi girano col tavolo; i
+// quattro versi servono a scegliere verso dove guardano.
+export const ruotabile = t => t.forma === 'rettangolare' || t.tipo === 'sposi';
+// Ingombro dopo la rotazione (solo 0/90/180/270 hanno senso in una sala).
+export const ingombro = t => {
+  const m = misure(t);
+  const verticale = t.forma === 'rettangolare' && (t.rotazione || 0) % 180 === 90;
+  return verticale ? { w: m.h, h: m.w } : { w: m.w, h: m.h };
+};
+
+// Posti attorno al tavolo, in coordinate locali (prima della rotazione).
+export function posti(t) {
+  const n = Math.max(1, t.capienza || 1);
+  const m = misure(t);
+  // Tavolo sposi: tutti sullo stesso lato, mai uno di fronte all'altro. Le
+  // sedie partono dal lato in alto, così gli sposi guardano verso il basso
+  // della pianta; con "Ruota" si sceglie il lato.
+  if (t.tipo === 'sposi') {
+    if (t.forma === 'rettangolare') {
+      return Array.from({ length: n }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / n), y: -m.h / 2 - 15 }));
+    }
+    const passo = Math.min(0.55, Math.PI / Math.max(1, n - 1));
+    return Array.from({ length: n }, (_, i) => {
+      const a = -Math.PI / 2 + (i - (n - 1) / 2) * passo;
+      return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
+    });
+  }
+  if (t.forma === 'rettangolare') {
+    const sopra = Math.ceil(n / 2), sotto = n - sopra;
+    return [
+      ...Array.from({ length: sopra }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / sopra), y: -m.h / 2 - 15 })),
+      ...Array.from({ length: sotto }, (_, j) => ({ x: -m.w / 2 + (j + 0.5) * (m.w / Math.max(1, sotto)), y: m.h / 2 + 15 })),
+    ];
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return { x: Math.cos(a) * (m.r + 15), y: Math.sin(a) * (m.r + 15) };
+  });
+}
+
+// Tiene il tavolo (sedie comprese) dentro la sala.
+export const limitaPosizione = (t, x, y) => {
+  const { w, h } = ingombro(t);
+  const mw = w / 2 + 26, mh = h / 2 + 26;
+  return {
+    x: Math.round(Math.min(Math.max(x, mw), PIANTA_W - mw)),
+    y: Math.round(Math.min(Math.max(y, mh), PIANTA_H - mh)),
+  };
+};
+
 // Posizione dei tavoli non ancora piazzati: griglia nell'ordine dei tavoli,
 // adattata al loro numero così resta tutto dentro la sala. Dipende dalla
 // posizione nell'elenco completo, non tra i soli non piazzati: altrimenti
@@ -40,6 +92,14 @@ export function posizioneDefault(index, totale) {
     x: (PIANTA_W / cols) * ((index % cols) + 0.5),
     y: (PIANTA_H / rows) * (Math.floor(index / cols) + 0.5),
   };
+}
+
+// Dove sta il tavolo sulla pianta: la posizione salvata, oppure il suo posto
+// nella griglia di partenza finché nessuno l'ha spostato.
+export function posizioneTavolo(t, tavoli) {
+  if (t.pos_x != null && t.pos_y != null) return { x: t.pos_x, y: t.pos_y };
+  const p = posizioneDefault(tavoli.indexOf(t), tavoli.length);
+  return limitaPosizione(t, p.x, p.y);
 }
 
 // Problemi da segnalare sopra le schede. Ogni avviso può avere un'azione
