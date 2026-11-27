@@ -13,9 +13,17 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # Reverse proxy davanti all'app: 0 = nessuno, 1 = nginx, 2 = CDN + nginx
       TRUST_PROXY: ${TRUST_PROXY:-0}
+      # Galleria foto: dentro il container le foto stanno sempre in /app/galleria.
+      # Con GALLERIA_DIR nel .env (cartella della NAS montata sul server) l'app
+      # scrive solo se in quella cartella c'è il file .galleria-nas.
+      GALLERIA_PATH: /app/galleria
+      GALLERIA_NAS: ${GALLERIA_DIR:+1}
     volumes:
       - matrimonio_db:/app/data
       - matrimonio_uploads:/app/server/uploads
+      # GALLERIA_DIR = percorso sul server (es. il mount della NAS): bind mount.
+      # Senza, un volume locale di Docker.
+      - ${GALLERIA_DIR:-matrimonio_galleria}:/app/galleria
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/config/public"]
       interval: 30s
@@ -27,4 +35,6 @@ volumes:
   matrimonio_db:
     driver: local
   matrimonio_uploads:
+    driver: local
+  matrimonio_galleria:
     driver: local

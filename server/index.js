@@ -116,12 +116,34 @@ const tavoloLimiter = rateLimit({
   message: { error: 'Troppe richieste. Riprova tra qualche minuto.' },
 });
 
+// La galleria si usa in sala, sul Wi-Fi del locale: tutti gli invitati hanno lo
+// stesso IP, e ogni apertura carica decine di miniature. Il limite sulla lettura
+// è quindi molto largo. Anche quello sui caricamenti conta richieste, una per
+// foto: 150 invitati per una ventina di foto stanno dentro, uno script che
+// riempie la NAS no (e ogni foto è comunque limitata a 25 MB).
+const galleriaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 6000,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Troppe richieste. Riprova tra qualche minuto.' },
+});
+const galleriaCaricaLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 2500,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Troppe foto caricate da questa connessione. Riprova tra un po\'.' },
+});
+
 app.post('/api/auth/login', loginLimiter);
 app.post('/api/conferma/rispondi', rispondiLimiter);
+app.post('/api/galleria/carica', galleriaCaricaLimiter);
 
 app.use('/api/conferma', confermaLimiter, require('./routes/conferma'));
 app.use('/api/landing', require('./routes/landing'));
 app.use('/api/tavolo', tavoloLimiter, require('./routes/tavolo'));
+app.use('/api/galleria', galleriaLimiter, require('./routes/galleria'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/dashboard', require('./routes/dashboard'));

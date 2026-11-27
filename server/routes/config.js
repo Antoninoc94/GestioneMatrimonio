@@ -89,6 +89,8 @@ router.put('/', auth, (req, res) => {
     tavolo_pubblico_abilitato=COALESCE(?,tavolo_pubblico_abilitato),
     tavolo_grazie_abilitato=COALESCE(?,tavolo_grazie_abilitato),
     tavolo_grazie=COALESCE(?,tavolo_grazie),
+    galleria_abilitata=COALESCE(?,galleria_abilitata),
+    galleria_caricamenti=COALESCE(?,galleria_caricamenti),
     updated_at=datetime('now')`)
     .run(
       p('data_matrimonio', v => v || null),
@@ -141,7 +143,9 @@ router.put('/', auth, (req, res) => {
       p('invito_messaggio_chiusura', v => v ?? ''),
       p('tavolo_pubblico_abilitato', v => (v === true || v === 1 ? 1 : 0)),
       p('tavolo_grazie_abilitato', v => (v === true || v === 1 ? 1 : 0)),
-      p('tavolo_grazie', v => String(v ?? '').trim().slice(0, 400))
+      p('tavolo_grazie', v => String(v ?? '').trim().slice(0, 400)),
+      p('galleria_abilitata', v => (v === true || v === 1 ? 1 : 0)),
+      p('galleria_caricamenti', v => (v === true || v === 1 ? 1 : 0))
     );
 
   // Se la soglia è cambiata, riallinea subito il tipo dei figli già esistenti

@@ -21,6 +21,8 @@ import Inviti from './pages/Inviti';
 import Conferma from './pages/Conferma';
 import Landing from './pages/Landing';
 import TrovaTavolo from './pages/TrovaTavolo';
+import Foto from './pages/Foto';
+import Galleria from './pages/Galleria';
 import LandingEditor from './pages/LandingEditor';
 import Checklist from './pages/Checklist';
 
@@ -36,6 +38,7 @@ function AppRoutes() {
       <Route path="/conferma" element={<Conferma />} />
       <Route path="/wedding" element={<Landing />} />
       <Route path="/tavolo" element={<TrovaTavolo />} />
+      <Route path="/foto" element={<Foto />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />
@@ -54,6 +57,7 @@ function AppRoutes() {
         <Route path="viaggio" element={<Viaggio />} />
         <Route path="inviti" element={<Inviti />} />
         <Route path="landing" element={<LandingEditor />} />
+        <Route path="galleria" element={<Galleria />} />
         <Route path="checklist" element={<Checklist />} />
       </Route>
     </Routes>

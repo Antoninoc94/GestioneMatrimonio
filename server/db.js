@@ -309,6 +309,31 @@ if (!configCols.find(c => c.name === 'tavolo_grazie_abilitato')) {
 if (!configCols.find(c => c.name === 'tavolo_grazie')) {
   db.prepare("ALTER TABLE config ADD COLUMN tavolo_grazie TEXT DEFAULT ''").run();
 }
+// Galleria foto degli invitati (/foto). `galleria_abilitata` mostra la pagina,
+// `galleria_caricamenti` permette di aggiungerne: a fine festa si chiudono i
+// caricamenti e la galleria resta da guardare.
+if (!configCols.find(c => c.name === 'galleria_abilitata')) {
+  db.prepare('ALTER TABLE config ADD COLUMN galleria_abilitata INTEGER DEFAULT 0').run();
+}
+if (!configCols.find(c => c.name === 'galleria_caricamenti')) {
+  db.prepare('ALTER TABLE config ADD COLUMN galleria_caricamenti INTEGER DEFAULT 1').run();
+}
+// `codice` è il nome dei file su disco (originali/, grandi/, mini/): casuale,
+// così l'indirizzo di una foto non si indovina contando.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS galleria_foto (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codice TEXT NOT NULL UNIQUE,
+    estensione TEXT NOT NULL,
+    nome_file TEXT,
+    autore TEXT,
+    larghezza INTEGER,
+    altezza INTEGER,
+    peso INTEGER,
+    nascosta INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
 if (!configCols.find(c => c.name === 'invito_tema')) {
   db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
 }

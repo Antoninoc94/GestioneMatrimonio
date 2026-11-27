@@ -1,0 +1,85 @@
+/* Galleria foto per gli invitati (/foto). Si appoggia a .tt (variabili, copertina,
+   carta, campo di testo) e aggiunge griglia, coda di caricamento e lightbox. */
+
+.ft-colonna {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 1040px; margin: -4.5rem auto 0;
+  padding: 0 1rem calc(env(safe-area-inset-bottom) + 2.5rem);
+}
+.ft-carta { max-width: 560px; margin: 0 auto; text-align: center; }
+
+.ft-etichetta { display: block; text-align: left; font-size: .78rem; font-weight: 600; color: var(--tt-muted); margin: 1.2rem 0 .4rem .3rem; }
+.ft-etichetta span { font-weight: 400; }
+.ft-nome { padding-left: 18px !important; }
+
+.ft-principale {
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  width: 100%; margin-top: 1.1rem; padding: 1.05rem 1.2rem;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(135deg, var(--tt-primary), var(--tt-dark));
+  color: #fff; font-size: 1.02rem; font-weight: 600; letter-spacing: .01em;
+  box-shadow: 0 14px 28px -14px color-mix(in srgb, var(--tt-primary) 75%, transparent);
+  transition: transform .2s var(--tt-ease), box-shadow .2s var(--tt-ease);
+}
+.ft-principale:active { transform: scale(.98); }
+.ft-nota { font-size: .76rem; color: var(--tt-muted); margin: .8rem 0 0; }
+
+/* ── Coda di caricamento ───────────────────────────────────── */
+.ft-coda { list-style: none; margin: 1.2rem 0 0; padding: 0; text-align: left; display: grid; gap: .4rem; }
+.ft-coda-testa { font-size: .8rem; color: var(--tt-muted); padding: 0 .3rem .2rem; }
+.ft-coda-testa.ft-ok { display: flex; align-items: center; gap: .4rem; color: var(--tt-primary); font-weight: 600; }
+.ft-voce {
+  display: flex; align-items: center; gap: .8rem; padding: .55rem .8rem;
+  background: var(--tt-paper); border-radius: 12px; font-size: .8rem;
+}
+.ft-voce-nome { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-barra { flex: 0 0 38%; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--tt-primary) 14%, transparent); overflow: hidden; }
+.ft-barra i { display: block; height: 100%; background: var(--tt-primary); border-radius: 3px; transition: width .25s linear; }
+.ft-voce-esito { display: inline-flex; align-items: center; gap: .35rem; flex: 0 1 auto; color: var(--tt-primary); }
+.ft-errore { background: #fef2f2; }
+.ft-errore .ft-voce-esito { color: #b91c1c; font-size: .74rem; }
+.ft-voce-esito button { border: 0; background: transparent; color: inherit; padding: 4px; display: inline-flex; cursor: pointer; }
+
+/* ── Griglia ───────────────────────────────────────────────── */
+.ft-vuoto { text-align: center; color: var(--tt-muted); margin: 2.5rem 0 1rem; font-size: .92rem; }
+.ft-vuoto svg { color: var(--tt-mid); }
+.ft-griglia {
+  display: grid; gap: 5px; margin-top: 1.6rem;
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (min-width: 560px) { .ft-griglia { grid-template-columns: repeat(4, 1fr); gap: 7px; } }
+@media (min-width: 860px) { .ft-griglia { grid-template-columns: repeat(5, 1fr); gap: 8px; } }
+.ft-tessera {
+  position: relative; aspect-ratio: 1; padding: 0; border: 0; cursor: pointer; overflow: hidden;
+  background: color-mix(in srgb, var(--tt-primary) 8%, #fff); border-radius: 6px;
+}
+.ft-tessera img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s var(--tt-ease); }
+.ft-tessera:hover img { transform: scale(1.04); }
+.ft-altre { margin-top: 1.4rem; }
+
+/* ── Lightbox ──────────────────────────────────────────────── */
+.ft-luce { position: fixed; inset: 0; z-index: 100; background: rgba(14, 10, 9, .96); display: flex; flex-direction: column; animation: ft-dissolvi .2s ease both; }
+@keyframes ft-dissolvi { from { opacity: 0; } to { opacity: 1; } }
+.ft-luce-barra {
+  display: flex; align-items: center; gap: .4rem; color: #fff; font-size: .85rem;
+  padding: calc(env(safe-area-inset-top) + .6rem) calc(env(safe-area-inset-right) + .8rem) .6rem calc(env(safe-area-inset-left) + 1rem);
+}
+.ft-luce-barra span { flex: 1; opacity: .85; }
+.ft-icona { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .1); color: #fff; cursor: pointer; text-decoration: none; }
+.ft-icona:active { background: rgba(255, 255, 255, .22); }
+.ft-luce-scena { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; touch-action: pan-y; padding: 0 0 env(safe-area-inset-bottom); }
+.ft-luce-scena img { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity .25s ease; user-select: none; -webkit-user-drag: none; }
+.ft-luce-scena img.ft-pronta { opacity: 1; }
+.ft-luce-attesa { position: absolute !important; left: 50%; top: 50%; margin: -11px 0 0 -11px; }
+.ft-freccia {
+  position: absolute; top: 50%; margin-top: -24px; width: 48px; height: 48px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .12); color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer;
+}
+.ft-freccia:hover { background: rgba(255, 255, 255, .24); }
+.ft-sx { left: 1rem; } .ft-dx { right: 1rem; }
+/* Sul telefono si scorre col dito; le frecce servono col mouse. */
+@media (hover: hover) and (pointer: fine) { .ft-freccia { display: inline-flex; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-luce, .ft-tessera img, .ft-luce-scena img { animation: none; transition: none; }
+}

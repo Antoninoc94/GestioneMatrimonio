@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown, Armchair } from 'lucide-react';
+import { MapPin, Heart, Navigation, Copy, Check, ExternalLink, Gift, ChevronDown, Armchair, Camera } from 'lucide-react';
 import { formattaIban } from '../publicUrl';
 import { TEMI } from '../temiWedding';
 import { format, parseISO } from 'date-fns';
@@ -269,17 +269,23 @@ export default function Landing() {
           </div>
         )}
 
-        {/* Il giorno del matrimonio: chi apre la pagina dalla sala trova il suo tavolo */}
-        {config.tavolo_pubblico_abilitato === 1 && (
-          <div style={{ textAlign: 'center', padding: '1rem 0 1.5rem' }}>
-            <a href="/tavolo" style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
-              background: '#fff', color: tema.primary, border: `1.5px solid ${tema.primary}`,
-              padding: '0.75rem 2rem', borderRadius: '3rem', textDecoration: 'none',
-              fontWeight: 600, fontSize: '0.9375rem', letterSpacing: '0.03em',
-            }}>
-              <Armchair size={16} /> Trova il tuo tavolo
-            </a>
+        {/* Il giorno del matrimonio: chi apre la pagina dalla sala trova il suo tavolo
+            e, a festa in corso, può condividere le sue foto */}
+        {(config.tavolo_pubblico_abilitato === 1 || config.galleria_abilitata === 1) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.75rem', padding: '1rem 0 1.5rem' }}>
+            {[
+              config.tavolo_pubblico_abilitato === 1 && { href: '/tavolo', Icona: Armchair, testo: 'Trova il tuo tavolo' },
+              config.galleria_abilitata === 1 && { href: '/foto', Icona: Camera, testo: 'Le foto della festa' },
+            ].filter(Boolean).map(({ href, Icona, testo }) => (
+              <a key={href} href={href} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+                background: '#fff', color: tema.primary, border: `1.5px solid ${tema.primary}`,
+                padding: '0.75rem 2rem', borderRadius: '3rem', textDecoration: 'none',
+                fontWeight: 600, fontSize: '0.9375rem', letterSpacing: '0.03em',
+              }}>
+                <Icona size={16} /> {testo}
+              </a>
+            ))}
           </div>
         )}
 

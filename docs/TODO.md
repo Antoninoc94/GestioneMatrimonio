@@ -4,7 +4,7 @@ Questo file è la memoria condivisa del progetto: chi riprende il lavoro, da
 qualunque computer, parte da qui. **Va aggiornato a ogni lavoro finito**
 (cosa è stato fatto, cosa resta, decisioni prese) e committato su `main`.
 
-Ultimo aggiornamento: 2026-11-27 (sera): NAS pronta e montata, disco VM da svuotare, galleria da scrivere (vedi "Dove siamo arrivati").
+Ultimo aggiornamento: 2026-11-27 (sera): galleria foto scritta e provata in locale, da mettere in produzione (vedi "Galleria foto: messa in produzione").
 
 ## Come si lavora
 
@@ -35,7 +35,9 @@ Ultimo aggiornamento: 2026-11-27 (sera): NAS pronta e montata, disco VM da svuot
   }
   ```
 
-  Una futura pagina pubblica nuova (es. galleria foto) andrà aggiunta qui.
+  Per la **galleria foto** vanno aggiunti anche `foto$` e `api/galleria/`:
+  `...(?!wedding$|conferma$|tavolo$|foto$|assets/|...|api/tavolo/|api/galleria/)`.
+  Una futura pagina pubblica nuova andrà aggiunta qui.
 - La pagina `/tavolo` è spenta finché non si accende **"Ricerca attiva"** in
   Landing → sezione QR.
 
@@ -77,7 +79,7 @@ Ultimo aggiornamento: 2026-11-27 (sera): NAS pronta e montata, disco VM da svuot
 1. **Menu del ricevimento** — da fare **solo quando arriva il menu ufficiale
    dal ristorante**. Idea: lo scrivono gli sposi nell'app, gli invitati lo
    vedono nella pagina del tavolo e/o nella pagina Wedding.
-2. **Galleria foto degli invitati** — progettata, NAS in preparazione, codice non ancora scritto: vedi sotto "Dove siamo arrivati".
+2. **Galleria foto degli invitati** — scritta e provata in locale; da mettere in produzione: vedi "Galleria foto: messa in produzione".
 
 ## Progetto: galleria foto degli invitati
 
@@ -140,7 +142,7 @@ Ultimo aggiornamento: 2026-11-27 (sera): NAS pronta e montata, disco VM da svuot
 - Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist.
 
 ### Dove siamo arrivati (2026-11-27) — da riprendere da qui
-**Il codice della galleria non è ancora scritto**, ma la NAS è pronta e montata.
+**La galleria è scritta** (server, pagina `/foto`, pagina Galleria degli sposi, QR e interruttori in Landing → QR) e provata in locale con Playwright; la NAS è pronta e montata.
 
 > Il repository è **pubblico**: qui niente IP, nomi di pool o altri dettagli
 > della rete di casa. Chi riprende li chiede all'utente.
@@ -171,13 +173,24 @@ per colpa della build cache di Docker (44 GB, creata da `docker compose build
 --volumes` né `docker volume prune`: il database sta in un volume. Controllare
 con `df -h /` che lo spazio sia tornato libero.
 
-Dopo: scrivere la galleria (si può anche prima, provandola in locale con una
-cartella normale) e collegarla con `GALLERIA_DIR=/mnt/foto-matrimonio` nel
-`.env` accanto a `docker-compose.yml`.
+### Galleria foto: messa in produzione
+Provato in locale: caricamento da telefono (iPhone emulato), versioni grande/miniatura,
+rifiuto di file non-foto, lightbox con "indietro", nome ricordato, nascondi/elimina,
+ZIP, modalità NAS con e senza `.galleria-nas`. **Non provato dentro Docker** (qui non c'è).
+1. Sulla VM, nel `.env` accanto a `docker-compose.yml`: `GALLERIA_DIR=/mnt/foto-matrimonio`.
+2. `sudo bash update.sh` (ricostruisce l'immagine: nuova dipendenza `archiver`; se
+   `npm ci` si lamenta del lockfile, rigenerarlo in Linux — è stato aggiornato da Windows).
+3. Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist (sopra).
+4. In Landing → QR accendere "Galleria attiva", stampare il cartello, provare un
+   caricamento da telefono vero (HEIC su iPhone, foto scattata in verticale).
+5. Dopo il matrimonio: spegnere "Caricamenti aperti" e scaricare lo ZIP dalla pagina Galleria.
+
+### Decisioni sulla galleria prese in fase di scrittura
+- Il nome di chi carica **si ricorda sul telefono** (`localStorage`), scelta dell'utente.
+- Le miniature nella griglia sono quadrate (ritagliate), in ordine dal più recente.
+- Il pubblico scarica la versione grande (2048 px); l'originale solo gli sposi.
 
 ### Ancora da chiarire con l'utente
-- Il nome di chi carica va ricordato sul telefono (proposta: sì, non è un dato
-  riservato ed è comodo) o richiesto ogni volta?
 - Spazio: ~5 MB a foto con originale; 150 invitati × 20 foto ≈ 15 GB.
 
 ## Idee messe da parte (non richieste)

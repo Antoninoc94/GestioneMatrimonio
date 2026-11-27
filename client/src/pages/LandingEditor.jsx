@@ -50,7 +50,11 @@ export default function LandingEditor() {
   const qrWeddingRef = useRef();
   const qrConfermaRef = useRef();
   const qrTavoloRef = useRef();
+  const qrFotoRef = useRef();
   const [tavoloAttivo, setTavoloAttivo] = useState(false);
+  // Galleria foto: la pagina si vede / si possono aggiungere foto.
+  const [galleriaAttiva, setGalleriaAttiva] = useState(false);
+  const [galleriaCaricamenti, setGalleriaCaricamenti] = useState(true);
   // Biglietto di ringraziamento dopo che l'invitato ha trovato la sua sedia.
   const [grazieAttivo, setGrazieAttivo] = useState(true);
   const [grazie, setGrazie] = useState('');
@@ -100,8 +104,8 @@ export default function LandingEditor() {
   // Il cartello da mettere su un cavalletto all'ingresso della sala: A4
   // verticale, si può stampare ingrandito in A3. Solo testo e QR, niente
   // emoji né "→": helvetica e times non le hanno.
-  const cartelloTavolo = async url => {
-    const png = await pngQR(qrTavoloRef, 2048);
+  const cartello = async ({ url, ref, titolo, righe, file }) => {
+    const png = await pngQR(ref, 2048);
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const W = 210, cx = W / 2;
     doc.setDrawColor(225, 29, 72);
@@ -115,19 +119,37 @@ export default function LandingEditor() {
     if (sposi) doc.text(sposi, cx, 42, { align: 'center' });
     doc.setFont('times', 'normal');
     doc.setFontSize(40);
-    doc.text('Trova il tuo tavolo', cx, 68, { align: 'center' });
+    doc.text(titolo, cx, 68, { align: 'center' });
     doc.setDrawColor(225, 29, 72);
     doc.line(cx - 25, 78, cx + 25, 78);
     const lato = 120;
     doc.addImage(png, 'PNG', cx - lato / 2, 92, lato, lato);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(15);
-    doc.text('Inquadra il codice con la fotocamera del telefono,', cx, 230, { align: 'center' });
-    doc.text('scrivi il tuo nome e scopri dove siedi.', cx, 238, { align: 'center' });
+    righe.forEach((riga, i) => doc.text(riga, cx, 230 + i * 8, { align: 'center' }));
     doc.setFontSize(10);
     doc.setTextColor(107, 114, 128);
     doc.text(url.replace(/^https?:\/\//, ''), cx, 262, { align: 'center' });
-    doc.save('cartello-trova-il-tuo-tavolo.pdf');
+    doc.save(file);
+  };
+  const cartelloTavolo = url => cartello({
+    url, ref: qrTavoloRef, titolo: 'Trova il tuo tavolo', file: 'cartello-trova-il-tuo-tavolo.pdf',
+    righe: ['Inquadra il codice con la fotocamera del telefono,', 'scrivi il tuo nome e scopri dove siedi.'],
+  });
+  const cartelloFoto = url => cartello({
+    url, ref: qrFotoRef, titolo: 'Le foto della festa', file: 'cartello-foto-della-festa.pdf',
+    righe: ['Inquadra il codice con la fotocamera del telefono', 'e condividi i tuoi scatti con tutti noi.'],
+  });
+
+  const toggleGalleria = async chiave => {
+    const attuale = chiave === 'galleria_abilitata' ? galleriaAttiva : galleriaCaricamenti;
+    const set = chiave === 'galleria_abilitata' ? setGalleriaAttiva : setGalleriaCaricamenti;
+    set(!attuale);
+    try {
+      await api.put('/config', { [chiave]: !attuale });
+    } catch {
+      set(attuale);
+    }
   };
 
   const toggleTavolo = async () => {
@@ -172,6 +194,8 @@ export default function LandingEditor() {
       });
       setUrlPubblico(d.url_pubblico || '');
       setTavoloAttivo(d.tavolo_pubblico_abilitato === 1);
+      setGalleriaAttiva(d.galleria_abilitata === 1);
+      setGalleriaCaricamenti(d.galleria_caricamenti !== 0);
       setGrazieAttivo(d.tavolo_grazie_abilitato !== 0);
       setGrazie(d.tavolo_grazie || '');
       setSposi([d.nome_sposo1, d.nome_sposo2].filter(Boolean).join(' & '));
@@ -557,7 +581,8 @@ export default function LandingEditor() {
             { label: 'Pagina Wedding', path: '/wedding', ref: qrWeddingRef, file: 'qr-wedding' },
             { label: 'Conferma Presenza', path: '/conferma', ref: qrConfermaRef, file: 'qr-conferma' },
             { label: 'Trova il tuo tavolo', path: '/tavolo', ref: qrTavoloRef, file: 'qr-tavolo', tavolo: true },
-          ].map(({ label, path, ref, file, tavolo }) => {
+            { label: 'Foto della festa', path: '/foto', ref: qrFotoRef, file: 'qr-foto', foto: true },
+          ].map(({ label, path, ref, file, tavolo, foto }) => {
             const url = `${baseQR}${path}`;
             return (
               <div key={path} className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
@@ -579,6 +604,25 @@ export default function LandingEditor() {
                   </button>
                 </div>
                 <p className="text-[11px] text-gray-400 text-center -mt-1">Per il biglietto stampato usa l'SVG: resta nitido a qualsiasi dimensione.</p>
+                {foto && (
+                  <div className="w-full border-t border-gray-200 pt-3 space-y-2">
+                    <button type="button" className="btn-primary text-sm w-full justify-center" onClick={() => cartelloFoto(url)}>
+                      <FileText size={13} /> Cartello da stampare (PDF)
+                    </button>
+                    <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5 accent-rose-500" checked={galleriaAttiva} onChange={() => toggleGalleria('galleria_abilitata')} />
+                      <span>
+                        <strong>Galleria attiva</strong>: gli invitati vedono le foto e la pagina Wedding rimanda alla galleria.
+                        {!galleriaAttiva && ' Spenta, la pagina dice che sarà disponibile il giorno del matrimonio.'}
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5 accent-rose-500" checked={galleriaCaricamenti} onChange={() => toggleGalleria('galleria_caricamenti')} />
+                      <span><strong>Caricamenti aperti</strong>: si possono aggiungere foto. Chiudili a festa finita: la galleria resta da guardare.</span>
+                    </label>
+                    <p className="text-[11px] text-gray-400">Le foto si gestiscono (nascondi, elimina, scarica) da <strong>Galleria foto</strong> nel menu.</p>
+                  </div>
+                )}
                 {tavolo && (
                   <div className="w-full border-t border-gray-200 pt-3 space-y-2">
                     <button type="button" className="btn-primary text-sm w-full justify-center" onClick={() => cartelloTavolo(url)}>
