@@ -4,7 +4,7 @@ Questo file è la memoria condivisa del progetto: chi riprende il lavoro, da
 qualunque computer, parte da qui. **Va aggiornato a ogni lavoro finito**
 (cosa è stato fatto, cosa resta, decisioni prese) e committato su `main`.
 
-Ultimo aggiornamento: 2026-11-27 (sera): galleria foto scritta e provata in locale, da mettere in produzione (vedi "Galleria foto: messa in produzione").
+Ultimo aggiornamento: 2026-11-27 (sera): galleria foto **in produzione e funzionante** (nginx e NAS a posto); rifiniture fatte oggi tutte su `main`. Prossima volta: l'utente deve ancora lanciare `sudo bash update.sh` sulla VM per avere le ultime modifiche (vedi "Da verificare alla prossima sessione").
 
 ## Come si lavora
 
@@ -81,7 +81,7 @@ Ultimo aggiornamento: 2026-11-27 (sera): galleria foto scritta e provata in loca
 1. **Menu del ricevimento** — da fare **solo quando arriva il menu ufficiale
    dal ristorante**. Idea: lo scrivono gli sposi nell'app, gli invitati lo
    vedono nella pagina del tavolo e/o nella pagina Wedding.
-2. **Galleria foto degli invitati** — scritta e provata in locale; da mettere in produzione: vedi "Galleria foto: messa in produzione".
+2. **Galleria foto degli invitati** — fatta e in produzione; restano solo le verifiche in "Da verificare alla prossima sessione".
 
 ## Progetto: galleria foto degli invitati
 
@@ -175,7 +175,15 @@ per colpa della build cache di Docker (44 GB, creata da `docker compose build
 --volumes` né `docker volume prune`: il database sta in un volume. Controllare
 con `df -h /` che lo spazio sia tornato libero.
 
-### Galleria foto: messa in produzione
+### Da verificare alla prossima sessione
+Dopo `sudo bash update.sh` sulla VM (non ancora fatto al momento della chiusura), controllare dal vivo:
+- `/foto`: un solo pulsante "Aggiungi foto" (a galleria vuota quello sotto il testo, con foto quello fisso), nessuna icona nello stato vuoto, nome e cognome obbligatori, aggiornamento automatico tra due telefoni;
+- lightbox: foto verticali e orizzontali dentro lo schermo anche su Windows (corretto l'adattamento con `object-fit`, provato in locale su desktop e iPhone);
+- `/tavolo`: "Non sei tu?" azzera la scelta, la pianta non mostra più la sedia di prima;
+- Galleria degli sposi: filtro autori con numero di foto e "non in lista ospiti".
+Ancora da fare: provare dentro Docker (mai fatto), e decidere se stringere la regex nginx a `api/galleria/(info$|foto$|file/|carica$)`.
+
+### Galleria foto: messa in produzione (fatto)
 Provato in locale: caricamento da telefono (iPhone emulato), versioni grande/miniatura,
 rifiuto di file non-foto, lightbox con "indietro", nome ricordato, nascondi/elimina,
 ZIP, modalità NAS con e senza `.galleria-nas`. **Non provato dentro Docker** (qui non c'è).
