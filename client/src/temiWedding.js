@@ -10,3 +10,7 @@ export const TEMI = {
   // brillante (mid) sul bianco non si legge, quindi resta a ornamenti e icone.
   biancoro: { primary: '#9c7a1c', light: '#fdfaf3', border: '#e9d9ae', text: '#94731c', mid: '#c8a24a', dark: '#8b6914', bg: '#ffffff' },
 };
+
+// Biglietto di ringraziamento di "Trova il tuo tavolo", quando gli sposi non
+// ne scrivono uno loro. `{nome}` diventa il nome dell'invitato.
+export const GRAZIE_PREDEFINITO = 'Grazie di essere qui a festeggiare con noi questo giorno speciale. La tua presenza è il regalo più bello.';

@@ -23,8 +23,11 @@ const MAX_RISULTATI = 8;
 
 router.get('/info', (req, res) => {
   // La foto è quella della pagina Wedding, già pubblica in /uploads/landing.
-  const cfg = db.prepare('SELECT nome_sposo1, nome_sposo2, data_matrimonio, landing_tema, landing_foto FROM config LIMIT 1').get() || {};
-  res.json({ ...cfg, abilitata: abilitata() ? 1 : 0 });
+  const cfg = db.prepare(`SELECT nome_sposo1, nome_sposo2, data_matrimonio, landing_tema, landing_foto,
+    tavolo_grazie_abilitato, tavolo_grazie FROM config LIMIT 1`).get() || {};
+  const { tavolo_grazie_abilitato, tavolo_grazie, ...resto } = cfg;
+  // Il biglietto di ringraziamento: null se spento, '' = testo predefinito.
+  res.json({ ...resto, grazie: tavolo_grazie_abilitato === 0 ? null : tavolo_grazie || '', abilitata: abilitata() ? 1 : 0 });
 });
 
 // Ogni parola scritta deve essere l'inizio di una parola del nome o del

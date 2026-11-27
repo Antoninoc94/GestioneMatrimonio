@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Search, X, ChevronRight, ChevronLeft, ArrowRight, Map as MapIcon, List, Heart } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { TEMI } from '../temiWedding';
+import { TEMI, GRAZIE_PREDEFINITO } from '../temiWedding';
 import Sala from './trovaTavolo/Sala';
 import { piazza, ruotaSala, confini, inquadraPosto, adattaProporzioni, numeriTavoli } from './trovaTavolo/geometria';
 import './trovaTavolo/TrovaTavolo.css';
@@ -71,6 +71,10 @@ export default function TrovaTavolo() {
   // { id, nome, primo, tavolo: { id, nome }, posto }: solo in memoria.
   const [scelta, setScelta] = useState(null);
   const [cercaAltro, setCercaAltro] = useState(false);
+  // Il biglietto di ringraziamento esce una volta per ricerca, non a ogni
+  // apertura della sala.
+  const [grazieVisto, setGrazieVisto] = useState(false);
+  const segnaGrazieVisto = useCallback(() => setGrazieVisto(true), []);
   // La sala sta nell'URL: il tasto indietro del telefono la chiude invece di
   // uscire dalla pagina.
   const salaAperta = params.get('vista') === 'sala';
@@ -87,6 +91,7 @@ export default function TrovaTavolo() {
 
   const scegli = o => {
     setScelta(daRisultato(o));
+    setGrazieVisto(false);
     setCercaAltro(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -132,7 +137,8 @@ export default function TrovaTavolo() {
       </div>
 
       {salaAperta && info.abilitata === 1 && tavoli && (
-        <VistaSala tavoli={tavoli} scelta={mioTavolo ? scelta : null} tema={tema} onChiudi={chiudiSala} />
+        <VistaSala tavoli={tavoli} scelta={mioTavolo ? scelta : null} tema={tema} onChiudi={chiudiSala}
+          grazie={grazieVisto ? null : info.grazie} sposi={sposi} onGrazieVisto={segnaGrazieVisto} />
       )}
     </div>
   );
@@ -275,7 +281,22 @@ function useViewBox(target) {
   return vb;
 }
 
-function VistaSala({ tavoli, scelta, tema, onChiudi }) {
+// Il biglietto che esce quando lo zoom arriva sulla sedia.
+function Grazie({ testo, nome, sposi, onChiudi }) {
+  const conNome = (testo || GRAZIE_PREDEFINITO).includes('{nome}');
+  const corpo = (testo || GRAZIE_PREDEFINITO).replaceAll('{nome}', nome);
+  return (
+    <div className="tt-grazie" role="status">
+      <button className="tt-grazie-chiudi" onClick={onChiudi} aria-label="Chiudi"><X size={16} /></button>
+      <p className="tt-grazie-titolo">{conNome ? 'Grazie di cuore' : `Grazie, ${nome}`}</p>
+      <p className="tt-grazie-testo">{corpo}</p>
+      {sposi && <p className="tt-grazie-firma">{sposi}</p>}
+    </div>
+  );
+}
+
+// `grazie`: testo del biglietto ('' = predefinito), null se non va mostrato.
+function VistaSala({ tavoli, scelta, tema, onChiudi, grazie = null, sposi, onGrazieVisto }) {
   const verticale = useVerticale();
   const [forzaVerticale, setForzaVerticale] = useState(false);
   // 'sala', 'mio' (il proprio posto) o 'tavolo' (uno scelto dalla legenda, `fuoco`).
@@ -284,6 +305,9 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
   // La legenda: aperta da sé solo dove c'è spazio per tenerla di fianco.
   const [elenco, setElenco] = useState(() => window.matchMedia?.('(min-width: 1000px)').matches ?? false);
   const [aspetto, setAspetto] = useState(null);
+  // Il testo del biglietto mentre è aperto (null = chiuso): si tiene da parte
+  // perché, una volta visto, `grazie` torna null.
+  const [biglietto, setBiglietto] = useState(null);
   const palco = useRef(null);
   // In verticale con la rotazione bloccata, la sala si gira da sola.
   const girata = verticale && forzaVerticale;
@@ -326,6 +350,15 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
     const t = setTimeout(() => setVista('mio'), 900);
     return () => clearTimeout(t);
   }, [mioId, chiediRotazione, girata]);
+
+  // Il biglietto arriva dopo lo zoom sulla sedia (750 ms), non durante.
+  const daMostrare = grazie !== null && !!scelta && vista === 'mio';
+  useEffect(() => {
+    if (!daMostrare) return;
+    const testo = grazie;
+    const t = setTimeout(() => { setBiglietto(testo); onGrazieVisto?.(); }, 950);
+    return () => clearTimeout(t);
+  }, [daMostrare, grazie, onGrazieVisto]);
 
   const target = useMemo(() => {
     if (!aspetto) return null;
@@ -378,7 +411,8 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
       <div className="tt-vano">
         <div className="tt-palco" ref={palco}>
           {vb && <Sala tema={tema} tavoli={disposti} mioId={mioId} posto={scelta?.posto} viewBox={vb} numeri={numeri} evidenziaId={scelto?.id} />}
-          {mio && scelta.posto != null && !elenco && <div className="tt-legenda"><i /> Il tuo posto</div>}
+          {mio && scelta.posto != null && !elenco && biglietto === null && <div className="tt-legenda"><i /> Il tuo posto</div>}
+          {biglietto !== null && <Grazie testo={biglietto} nome={scelta?.primo || ''} sposi={sposi} onChiudi={() => setBiglietto(null)} />}
         </div>
         {elenco && (
           <aside className="tt-elenco" aria-label="Tavoli">

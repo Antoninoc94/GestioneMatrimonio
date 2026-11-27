@@ -3,6 +3,7 @@ import { Save, Image, Trash2, ExternalLink, Globe, QrCode, Download, Crop, Gift,
 import jsPDF from 'jspdf';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api';
+import { GRAZIE_PREDEFINITO } from '../temiWedding';
 import PhotoCropper from '../components/PhotoCropper';
 import { baseUrlPubblico, MESSAGGIO_WHATSAPP_DEFAULT, ibanValido, normalizzaIban } from '../publicUrl';
 
@@ -50,6 +51,10 @@ export default function LandingEditor() {
   const qrConfermaRef = useRef();
   const qrTavoloRef = useRef();
   const [tavoloAttivo, setTavoloAttivo] = useState(false);
+  // Biglietto di ringraziamento dopo che l'invitato ha trovato la sua sedia.
+  const [grazieAttivo, setGrazieAttivo] = useState(true);
+  const [grazie, setGrazie] = useState('');
+  const [grazieSalvato, setGrazieSalvato] = useState(null); // null | 'salvato' | 'errore'
   const [sposi, setSposi] = useState('');
 
   // Il QR è disegnato in SVG: l'SVG si scarica così com'è (vettoriale, nitido
@@ -135,6 +140,24 @@ export default function LandingEditor() {
     }
   };
 
+  const toggleGrazie = async () => {
+    const nuovo = !grazieAttivo;
+    setGrazieAttivo(nuovo);
+    try {
+      await api.put('/config', { tavolo_grazie_abilitato: nuovo });
+    } catch {
+      setGrazieAttivo(!nuovo);
+    }
+  };
+  const salvaGrazie = async () => {
+    try {
+      await api.put('/config', { tavolo_grazie: grazie });
+      setGrazieSalvato('salvato');
+    } catch {
+      setGrazieSalvato('errore');
+    }
+  };
+
   useEffect(() => {
     api.get('/config').then(r => {
       const d = r.data;
@@ -149,6 +172,8 @@ export default function LandingEditor() {
       });
       setUrlPubblico(d.url_pubblico || '');
       setTavoloAttivo(d.tavolo_pubblico_abilitato === 1);
+      setGrazieAttivo(d.tavolo_grazie_abilitato !== 0);
+      setGrazie(d.tavolo_grazie || '');
       setSposi([d.nome_sposo1, d.nome_sposo2].filter(Boolean).join(' & '));
       setMessaggioWa(d.messaggio_whatsapp || '');
       setFoto(d.landing_foto || null);
@@ -566,6 +591,21 @@ export default function LandingEditor() {
                         {!tavoloAttivo && ' Spenta, la pagina dice che sarà disponibile il giorno del matrimonio: accendila quando la disposizione è definitiva.'}
                       </span>
                     </label>
+                    <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5 accent-rose-500" checked={grazieAttivo} onChange={toggleGrazie} />
+                      <span><strong>Biglietto di ringraziamento</strong>: compare quando l'invitato trova la sua sedia.</span>
+                    </label>
+                    {grazieAttivo && (
+                      <div>
+                        <textarea className="input text-xs w-full" rows={4} maxLength={400} value={grazie}
+                          placeholder={GRAZIE_PREDEFINITO}
+                          onChange={e => { setGrazie(e.target.value); setGrazieSalvato(null); }} onBlur={salvaGrazie} />
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {grazieSalvato === 'salvato' ? '✓ Salvato. ' : grazieSalvato === 'errore' ? 'Non salvato, riprova. ' : ''}
+                          Vuoto = il testo d'esempio. Scrivi {'{nome}'} per il nome dell'invitato; la firma con i vostri nomi si aggiunge da sola.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

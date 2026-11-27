@@ -301,6 +301,14 @@ for (const col of ['regalo_titolo', 'regalo_messaggio', 'regalo_iban', 'regalo_i
 if (!configCols.find(c => c.name === 'tavolo_pubblico_abilitato')) {
   db.prepare('ALTER TABLE config ADD COLUMN tavolo_pubblico_abilitato INTEGER DEFAULT 0').run();
 }
+// Biglietto di ringraziamento che compare quando l'invitato trova la sua sedia.
+// Testo vuoto = quello predefinito della pagina; `{nome}` diventa il nome.
+if (!configCols.find(c => c.name === 'tavolo_grazie_abilitato')) {
+  db.prepare('ALTER TABLE config ADD COLUMN tavolo_grazie_abilitato INTEGER DEFAULT 1').run();
+}
+if (!configCols.find(c => c.name === 'tavolo_grazie')) {
+  db.prepare("ALTER TABLE config ADD COLUMN tavolo_grazie TEXT DEFAULT ''").run();
+}
 if (!configCols.find(c => c.name === 'invito_tema')) {
   db.prepare("ALTER TABLE config ADD COLUMN invito_tema TEXT DEFAULT 'classico'").run();
 }
