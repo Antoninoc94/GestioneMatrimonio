@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { RotateCw, LayoutGrid, MousePointerClick, Undo2, ZoomIn, ZoomOut, Maximize2, Magnet } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { RotateCw, LayoutGrid, MousePointerClick, Undo2, ZoomIn, ZoomOut, Maximize2, Magnet, X } from 'lucide-react';
 import TavoloDaVicino from './TavoloDaVicino';
 import { PIANTA_W, PIANTA_H, PASSO_GRIGLIA, misure, ingombro, sovrapposizioni, posizioneDefault, nomeOspite, tipoTavolo, formaTavolo, ellePosti, contornoElle, ruotabile, posti, limitaPosizione, posizioneTavolo } from './util';
 
@@ -313,6 +314,9 @@ function etichette(ospiti) {
     ini.get(iniziali(o)) === 1 ? iniziali(o) : brevi.get(breve(o)) === 1 ? breve(o) : o.posto != null ? o.posto + 1 : '?']));
 }
 
+// Nella finestra grande, accanto alla sedia: nome e iniziale del cognome.
+const nomeBreve = o => [o.nome, o.cognome && `${[...o.cognome.trim()][0]}.`].filter(Boolean).join(' ');
+
 function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
   const sedute = perSedia(t);
   const scelto = t.ospiti.find(o => o.id === selOspite);
@@ -320,11 +324,20 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
   const sigla = etichette(t.ospiti);
   // L'ultimo spostamento: { n, testo, ids, sedie, prima, primaScelti }.
   const [ultimo, setUltimo] = useState(null);
+  // Sul computer il pannello è stretto: la finestra grande mostra il tavolo
+  // ingrandito con i nomi accanto alle sedie.
+  const [grande, setGrande] = useState(false);
   useEffect(() => {
     if (!ultimo) return;
     const timer = setTimeout(() => setUltimo(null), 9000);
     return () => clearTimeout(timer);
   }, [ultimo]);
+  useEffect(() => {
+    if (!grande) return;
+    const esci = e => { if (e.key === 'Escape') { if (selOspite) setSelOspite(null); else setGrande(false); } };
+    window.addEventListener('keydown', esci);
+    return () => window.removeEventListener('keydown', esci);
+  }, [grande, selOspite, setSelOspite]);
 
   const siedi = i => {
     const occupante = sedute.get(i);
@@ -359,45 +372,46 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
     setUltimo(null);
   };
 
-  return (
+  const sedia = i => {
+    const o = sedute.get(i);
+    const suo = scelto && o?.id === scelto.id;
+    const nome = o ? nomeBreve(o) : null;
+    if (scelto && !suo) {
+      // Dove può andare: libera in verde, occupata con il segno dello scambio.
+      return o
+        ? { ...coloreSedia(o), testo: sigla.get(o.id), coloreTesto: '#ffffff', segno: '⇄', titolo: `Scambia con ${nomeOspite(o)}`, nome }
+        : { fill: '#dcfce7', stroke: '#16a34a', testo: i + 1, coloreTesto: '#15803d', titolo: `Posto ${i + 1} libero` };
+    }
+    return {
+      ...coloreSedia(o),
+      testo: o ? sigla.get(o.id) : i + 1,
+      coloreTesto: o ? '#ffffff' : '#9ca3af',
+      evidenzia: suo,
+      lampeggia: ultimo?.sedie.has(i) ? ultimo.n : null,
+      titolo: o ? `Posto ${i + 1}: ${nomeOspite(o)}` : `Posto ${i + 1} libero`,
+      nome,
+      ...(suo ? { fill: '#111827', stroke: '#111827' } : {}),
+    };
+  };
+
+  const banner = scelto && (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-900 text-white text-xs px-3 py-2 mb-2">
+      <span>Scegli la nuova sedia per <strong>{nomeOspite(scelto)}</strong></span>
+      <button className="text-gray-300 hover:text-white underline flex-shrink-0" onClick={() => setSelOspite(null)}>Annulla</button>
+    </div>
+  );
+  const messaggio = ultimo ? (
+    <div className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 text-green-900 text-xs px-3 py-2 mb-2">
+      <span className="flex-1">{ultimo.testo}</span>
+      <button className="font-semibold text-green-700 hover:text-green-900 underline flex-shrink-0" onClick={annulla}>Annulla</button>
+    </div>
+  ) : (
+    <p className="text-[11px] text-gray-500 text-center mb-2">
+      {scelto ? 'Verde = sedia libera · ⇄ = scambia di posto' : 'Tocca un ospite (o la sua sedia), poi la sedia dove deve sedersi.'}
+    </p>
+  );
+  const elenco = alta => (
     <>
-      {scelto && (
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-900 text-white text-xs px-3 py-2 mb-2">
-          <span>Scegli la nuova sedia per <strong>{nomeOspite(scelto)}</strong></span>
-          <button className="text-gray-300 hover:text-white underline flex-shrink-0" onClick={() => setSelOspite(null)}>Annulla</button>
-        </div>
-      )}
-      <TavoloDaVicino t={t} className="w-full max-w-[260px] mx-auto block my-1" onSedia={siedi}
-        coloreTavolo={{ fill: '#f9fafb', stroke: '#d1d5db' }}
-        sedia={i => {
-          const o = sedute.get(i);
-          const suo = scelto && o?.id === scelto.id;
-          if (scelto && !suo) {
-            // Dove può andare: libera in verde, occupata con il segno dello scambio.
-            return o
-              ? { ...coloreSedia(o), testo: sigla.get(o.id), coloreTesto: '#ffffff', segno: '⇄', titolo: `Scambia con ${nomeOspite(o)}` }
-              : { fill: '#dcfce7', stroke: '#16a34a', testo: i + 1, coloreTesto: '#15803d', titolo: `Posto ${i + 1} libero` };
-          }
-          return {
-            ...coloreSedia(o),
-            testo: o ? sigla.get(o.id) : i + 1,
-            coloreTesto: o ? '#ffffff' : '#9ca3af',
-            evidenzia: suo,
-            lampeggia: ultimo?.sedie.has(i) ? ultimo.n : null,
-            titolo: o ? `Posto ${i + 1}: ${nomeOspite(o)}` : `Posto ${i + 1} libero`,
-            ...(suo ? { fill: '#111827', stroke: '#111827' } : {}),
-          };
-        }} />
-      {ultimo ? (
-        <div className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 text-green-900 text-xs px-3 py-2 mb-2">
-          <span className="flex-1">{ultimo.testo}</span>
-          <button className="font-semibold text-green-700 hover:text-green-900 underline flex-shrink-0" onClick={annulla}>Annulla</button>
-        </div>
-      ) : (
-        <p className="text-[11px] text-gray-500 text-center mb-2">
-          {scelto ? 'Verde = sedia libera · ⇄ = scambia di posto' : 'Tocca un ospite (o la sua sedia), poi la sedia dove deve sedersi.'}
-        </p>
-      )}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <span className="text-[11px] text-gray-400">{t.posti_scelti ? 'Posti scelti da voi' : 'Posti automatici: famiglie vicine'}</span>
         {t.posti_scelti && (
@@ -407,11 +421,11 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
           </button>
         )}
       </div>
-      <ul className="text-sm space-y-0.5 max-h-72 overflow-y-auto">
+      <ul className={`text-sm space-y-0.5 overflow-y-auto ${alta ? 'flex-1 min-h-0' : 'max-h-72'}`}>
         {[...t.ospiti].sort((a, b) => (a.posto ?? 999) - (b.posto ?? 999)).map(o => (
           <li key={o.id}>
             <button onClick={() => setSelOspite(s => (s === o.id ? null : o.id))}
-              className={`w-full flex items-center gap-2 text-left rounded px-1.5 py-0.5 transition-colors duration-700 ${selOspite === o.id ? 'bg-gray-900 text-white' : ultimo?.ids.has(o.id) ? 'bg-green-100' : 'hover:bg-gray-50'}`}>
+              className={`w-full flex items-center gap-2 text-left rounded px-1.5 ${alta ? 'py-1' : 'py-0.5'} transition-colors duration-700 ${selOspite === o.id ? 'bg-gray-900 text-white' : ultimo?.ids.has(o.id) ? 'bg-green-100' : 'hover:bg-gray-50'}`}>
               <span className={`w-5 h-5 flex-shrink-0 rounded-full text-[10px] font-bold flex items-center justify-center ${o.posto == null ? 'bg-red-100 text-red-600' : o.tipo === 'bambino' ? 'bg-purple-400 text-white' : 'bg-rose-400 text-white'}`}>
                 {o.posto == null ? '!' : o.posto + 1}
               </span>
@@ -424,6 +438,47 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
       </ul>
       {senzaSedia.length > 0 && (
         <p className="text-[11px] text-red-500 mt-1.5">{senzaSedia.length === 1 ? '1 ospite è' : `${senzaSedia.length} ospiti sono`} senza sedia: il tavolo è pieno.</p>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <button className="hidden lg:flex w-full items-center justify-center gap-1.5 btn-secondary text-xs py-1.5 mb-2" onClick={() => setGrande(true)}>
+        <Maximize2 size={13} /> Apri in grande
+      </button>
+      {!grande && banner}
+      <TavoloDaVicino t={t} className="w-full max-w-[260px] mx-auto block my-1" onSedia={siedi}
+        coloreTavolo={{ fill: '#f9fafb', stroke: '#d1d5db' }} sedia={sedia} />
+      {!grande && messaggio}
+      {elenco(false)}
+      {/* Nel body: un antenato della pagina con un'animazione farebbe da
+          riferimento al `fixed` e la finestra finirebbe sotto la barra laterale. */}
+      {grande && createPortal(
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-6" onClick={() => setGrande(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[88vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}
+            role="dialog" aria-modal="true" aria-label={`Posti di ${t.nome}`}>
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+              <div className="mr-auto min-w-0">
+                <h2 className="font-bold text-gray-900 truncate">{t.nome}</h2>
+                <p className="text-xs text-gray-500">{t.ospiti.length}/{t.capienza} posti occupati</p>
+              </div>
+              <button className="btn-secondary px-2.5 py-1.5" onClick={() => setGrande(false)} aria-label="Chiudi"><X size={16} /></button>
+            </div>
+            <div className="flex-1 min-h-0 grid grid-cols-[1fr_320px]">
+              <div className="min-h-0 flex flex-col p-4">
+                {banner}
+                <TavoloDaVicino t={t} nomi className="flex-1 min-h-0 w-full" onSedia={siedi}
+                  coloreTavolo={{ fill: '#f9fafb', stroke: '#d1d5db' }} sedia={sedia} />
+              </div>
+              <div className="min-h-0 flex flex-col border-l border-gray-100 p-4">
+                {messaggio}
+                {elenco(true)}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </>
   );

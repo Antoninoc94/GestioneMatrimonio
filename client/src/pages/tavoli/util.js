@@ -213,10 +213,18 @@ export function areaNome(t) {
 
 // Le sedie in coordinate del tavolo già ruotato: i numeri dentro le sedie
 // devono restare dritti, quindi si ruotano i punti e non il gruppo.
+// `n` è la direzione in cui la sedia sta rispetto al tavolo (verso l'esterno),
+// ruotata anch'essa: dice dove scrivere un'etichetta accanto alla sedia.
 export function sedieRuotate(t) {
   const a = ((ruotabile(t) ? t.rotazione || 0 : 0) * Math.PI) / 180;
   const c = Math.cos(a), s = Math.sin(a);
-  return posti(t).map(p => ({ x: p.x * c - p.y * s, y: p.x * s + p.y * c }));
+  const ruota = (x, y) => [x * c - y * s, x * s + y * c];
+  return posti(t).map(p => {
+    const d = Math.hypot(p.x, p.y) || 1;
+    const [nx, ny] = p.n ?? (t.forma === 'rettangolare' ? [0, p.y < 0 ? -1 : 1] : [p.x / d, p.y / d]);
+    const [x, y] = ruota(p.x, p.y);
+    return { x, y, n: ruota(nx, ny) };
+  });
 }
 
 // Problemi da segnalare sopra le schede. Ogni avviso può avere un'azione

@@ -19,12 +19,14 @@ const R_SEDIA = 14;
 // disegnare la sedia i: { fill, stroke, testo, coloreTesto, evidenzia (pulsa),
 // lampeggia (un numero nuovo a ogni spostamento), segno (piccolo bollo), titolo }. Con `onSedia` le
 // sedie si toccano (gestione dei posti), altrimenti è solo da guardare.
-export default function TavoloDaVicino({ t, sedia, onSedia, coloreTavolo = { fill: '#ffffff', stroke: '#d1d5db' }, testo, fontFamily, coloreTesto, className, style }) {
+// Con `nomi` scrive `d.nome` fuori da ogni sedia, verso l'esterno: in alto e
+// in basso in verticale, così i nomi di sedie vicine non si accavallano.
+export default function TavoloDaVicino({ t, sedia, onSedia, coloreTavolo = { fill: '#ffffff', stroke: '#d1d5db' }, testo, fontFamily, coloreTesto, nomi = false, className, style }) {
   const sedie = sedieRuotate(t);
   const m = misure(t);
   const rot = ruotabile(t) ? t.rotazione || 0 : 0;
   // Margine per l'alone pulsante della sedia evidenziata.
-  const lato = Math.max(...sedie.map(p => Math.max(Math.abs(p.x), Math.abs(p.y))), m.w / 2, m.h / 2) + R_SEDIA + 12;
+  const lato = Math.max(...sedie.map(p => Math.max(Math.abs(p.x), Math.abs(p.y))), m.w / 2, m.h / 2) + R_SEDIA + 12 + (nomi ? 78 : 0);
   return (
     <svg viewBox={`${-lato} ${-lato} ${lato * 2} ${lato * 2}`} className={className} style={style} role="img" aria-label={`Tavolo ${t.nome}`}>
       <g transform={`rotate(${rot})`}>
@@ -58,6 +60,16 @@ export default function TavoloDaVicino({ t, sedia, onSedia, coloreTavolo = { fil
             {d.testo != null && (
               <text y="4.2" textAnchor="middle" fontSize={String(d.testo).length > 2 ? 9.5 : String(d.testo).length > 1 ? 11 : 12} fontWeight="700" fill={d.coloreTesto || '#374151'} pointerEvents="none">{d.testo}</text>
             )}
+            {nomi && d.nome && (() => {
+              const [nx, ny] = p.n;
+              const verticale = Math.abs(ny) > Math.abs(nx);
+              const off = R_SEDIA + 6;
+              return verticale
+                ? <text transform={`translate(${nx * off} ${ny * off}) rotate(-90)`} textAnchor={ny < 0 ? 'start' : 'end'} y="3.5"
+                    fontSize="11" fontWeight="600" fill="#374151" pointerEvents="none">{d.nome}</text>
+                : <text x={nx * off} y={ny * off + 3.5} textAnchor={nx > 0 ? 'start' : 'end'}
+                    fontSize="11" fontWeight="600" fill="#374151" pointerEvents="none">{d.nome}</text>;
+            })()}
             {d.segno && (
               <g transform={`translate(${R_SEDIA * 0.75} ${-R_SEDIA * 0.75})`} pointerEvents="none">
                 <circle r="7" fill="#ffffff" stroke="#111827" strokeWidth="1.2" />
