@@ -164,10 +164,12 @@ Sulla **VM del server**, fatto:
       risultano di `matrimonio` (UID 3002), non di root
 - [x] file di controllo `.galleria-nas` creato nella cartella
 
-**Problema aperto: il disco di sistema della VM è pieno al 100%** (`/` con 0
-byte liberi). Non riguarda le foto (stanno sulla NAS) ma Docker, il database e
-i log sì: da sistemare prima di tutto (`docker system df`, `du -xh / --max-depth=2`,
-immagini e log di Docker, `journalctl --vacuum-size`).
+**Disco di sistema della VM pieno (risolto, da verificare)**: `/` era al 100%
+per colpa della build cache di Docker (44 GB, creata da `docker compose build
+--no-cache` a ogni aggiornamento). Svuotata con `docker builder prune -a -f`;
+`update.sh` ora la pulisce da solo a fine aggiornamento. Mai `docker system prune
+--volumes` né `docker volume prune`: il database sta in un volume. Controllare
+con `df -h /` che lo spazio sia tornato libero.
 
 Dopo: scrivere la galleria (si può anche prima, provandola in locale con una
 cartella normale) e collegarla con `GALLERIA_DIR=/mnt/foto-matrimonio` nel

@@ -39,6 +39,13 @@ info "Riavvio container (zero-downtime)..."
 docker compose up -d --remove-orphans
 success "Container aggiornato e riavviato"
 
+# --no-cache lascia una build cache nuova a ogni aggiornamento (oltre 40 GB in
+# qualche mese, fino a riempire il disco). E' solo cache: immagini in uso, container
+# e volumi (il database) non vengono toccati. Mai "--volumes" qui.
+info "Pulizia della build cache Docker..."
+docker builder prune -a -f > /dev/null || true
+success "Build cache pulita"
+
 # Installazioni create prima dell'introduzione di backup.sh non hanno il cron:
 # lo aggiungiamo qui, cosi' arriva anche ai deploy gia' esistenti.
 if ! crontab -l 2>/dev/null | grep -qF "matrimonio-backup.log"; then
