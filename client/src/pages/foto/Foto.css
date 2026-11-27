@@ -124,8 +124,11 @@
 .ft-luce-barra span { flex: 1; opacity: .85; }
 .ft-icona { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .1); color: #fff; cursor: pointer; text-decoration: none; }
 .ft-icona:active { background: rgba(255, 255, 255, .22); }
-.ft-luce-scena { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; touch-action: pan-y; padding: 0 0 env(safe-area-inset-bottom); }
-.ft-luce-scena img { max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity .25s ease; user-select: none; -webkit-user-drag: none; }
+/* La foto occupa esattamente l'area libera e si adatta con object-fit: con
+   max-height in percentuale una foto verticale usciva dallo schermo, perché
+   l'altezza della cella non era definita. */
+.ft-luce-scena { position: relative; flex: 1; min-height: 0; touch-action: pan-y; }
+.ft-luce-scena img { position: absolute; inset: 0 0 env(safe-area-inset-bottom) 0; width: 100%; height: calc(100% - env(safe-area-inset-bottom)); object-fit: contain; opacity: 0; transition: opacity .25s ease; user-select: none; -webkit-user-drag: none; }
 .ft-luce-scena img.ft-pronta { opacity: 1; }
 .ft-luce-attesa { position: absolute !important; left: 50%; top: 50%; margin: -11px 0 0 -11px; }
 .ft-freccia {
