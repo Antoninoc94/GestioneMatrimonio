@@ -146,7 +146,12 @@ Ultimo aggiornamento: 2026-11-27.
   (l'app nel container gira come root, e NFS di norma trasforma root in
   `nobody`, che non può scrivere). Sulla VM: `nfs-common`, mount in
   `/etc/fstab` (es. su `/mnt/foto-matrimonio`), poi `GALLERIA_DIR` nel `.env`.
-  Da confermare: TrueNAS SCALE o CORE, IP della NAS e della VM. Spazio: ~5 MB a foto con
+  **Stato 2026-11-27**: TrueNAS SCALE; dataset creato,
+  `/mnt/HDDNAS/matrimonio-foto` (pool `HDDNAS`, quota 200 GiB, permessi Unix).
+  Il servizio NFS è già attivo (lo usa il dataset `Torrent`). Mancano:
+  proprietario `matrimonio` sul dataset, condivisione NFS verso l'IP della VM
+  con Mapall `matrimonio`, un'attività di snapshot giornaliera (backup delle
+  foto). Servono ancora l'IP della NAS e l'IP della VM per i comandi di mount. Spazio: ~5 MB a foto con
   originale; 150 invitati × 20 foto ≈ 15 GB.
 - Se il nome di chi carica va ricordato sul telefono (comodo) o richiesto ogni
   volta (come la pagina del tavolo, che non ricorda nulla).
