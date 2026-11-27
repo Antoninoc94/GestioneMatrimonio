@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Camera, X, ChevronLeft, ChevronRight, Download, Check, RotateCw, AlertCircle, ImagePlus } from 'lucide-react';
+import { Camera, X, ChevronLeft, ChevronRight, Download, Check, RotateCw, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { TEMI } from '../temiWedding';
@@ -264,7 +264,6 @@ export default function Foto() {
             {errore && !foto.length && <p className="ft-vuoto">{errore}</p>}
             {caricata && !errore && !foto.length && (
               <div className="ft-vuoto">
-                <ImagePlus size={30} />
                 <p>{puoCaricare ? 'Nessuno ha ancora condiviso una foto: aggiungi la prima!' : 'Non ci sono ancora foto.'}</p>
                 {puoCaricare && <button type="button" className="ft-principale ft-piccolo" onClick={() => apri('carica', '1')}><Camera size={18} /> Aggiungi foto</button>}
               </div>
