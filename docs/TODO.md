@@ -140,8 +140,13 @@ Ultimo aggiornamento: 2026-11-27.
 - Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist.
 
 ### Ancora da chiarire
-- La NAS: che sistema è (TrueNAS, OpenMediaVault, Synology…), se condivide in
-  NFS o SMB, e se la cartella per le foto esiste già. Spazio: ~5 MB a foto con
+- La NAS è **TrueNAS** (detto dall'utente il 2026-11-27). Piano: un dataset
+  dedicato (es. `matrimonio-foto`) condiviso in **NFS** solo verso l'IP della VM
+  del server, con **Mapall User** = un utente TrueNAS proprietario del dataset
+  (l'app nel container gira come root, e NFS di norma trasforma root in
+  `nobody`, che non può scrivere). Sulla VM: `nfs-common`, mount in
+  `/etc/fstab` (es. su `/mnt/foto-matrimonio`), poi `GALLERIA_DIR` nel `.env`.
+  Da confermare: TrueNAS SCALE o CORE, IP della NAS e della VM. Spazio: ~5 MB a foto con
   originale; 150 invitati × 20 foto ≈ 15 GB.
 - Se il nome di chi carica va ricordato sul telefono (comodo) o richiesto ogni
   volta (come la pagina del tavolo, che non ricorda nulla).
