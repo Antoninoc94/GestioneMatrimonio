@@ -83,3 +83,26 @@ export function inquadraPosto(t, posto, aspetto) {
 // Verso cui guarda la sedia: lo schienale sta dalla parte opposta al tavolo.
 // In gradi, per rotate() di SVG, in coordinate locali del tavolo.
 export const angoloSedia = p => (Math.atan2(p.x, -p.y) * 180) / Math.PI;
+
+// Numeri per la legenda della sala. Il numero viene dal nome quando c'è
+// ("Tavolo 3" → 3), così sul telefono e sul cartellino in sala coincidono;
+// gli altri tavoli prendono i primi numeri liberi, nell'ordine dei tavoli.
+// Il tavolo sposi non ha numero: ha un cuore. Map(id → numero, o null per gli sposi).
+export function numeriTavoli(tavoli) {
+  const numeri = new Map();
+  const usati = new Set();
+  for (const t of tavoli) {
+    if (t.tipo === 'sposi') { numeri.set(t.id, null); continue; }
+    const m = String(t.nome ?? '').match(/(\d+)\s*$/);
+    const n = m ? Number(m[1]) : null;
+    if (n && !usati.has(n)) { numeri.set(t.id, n); usati.add(n); }
+  }
+  let libero = 1;
+  for (const t of tavoli) {
+    if (numeri.has(t.id)) continue;
+    while (usati.has(libero)) libero++;
+    numeri.set(t.id, libero);
+    usati.add(libero);
+  }
+  return numeri;
+}

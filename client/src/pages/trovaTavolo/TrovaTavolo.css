@@ -205,7 +205,36 @@
   font-size: .78rem; font-weight: 600; color: var(--tt-muted); white-space: nowrap; transition: background .2s, color .2s;
 }
 .tt-interruttore button[aria-pressed="true"] { background: #fff; color: var(--tt-dark); box-shadow: 0 2px 8px -3px rgba(43, 37, 34, .3); }
-.tt-palco { position: relative; flex: 1; min-height: 0; }
+/* Sotto la barra: la sala e, accanto, la legenda dei tavoli. */
+.tt-vano { position: relative; flex: 1; min-height: 0; display: flex; }
+.tt-palco { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.tt-tondo-elenco.attivo { background: var(--tt-dark); color: #fff; }
+.tt-elenco {
+  position: absolute; z-index: 3; top: .6rem; right: calc(env(safe-area-inset-right) + .6rem); bottom: calc(env(safe-area-inset-bottom) + .6rem);
+  width: min(270px, 78vw); overflow-y: auto; overscroll-behavior: contain;
+  padding: .9rem .6rem .6rem; border-radius: 20px;
+  background: rgba(255, 255, 255, .94); box-shadow: 0 18px 40px -18px rgba(43, 37, 34, .45);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  animation: tt-entra .3s var(--tt-ease) both;
+}
+.tt-elenco-titolo { margin: 0 .5rem .5rem; font-size: .62rem; letter-spacing: .26em; text-transform: uppercase; color: var(--tt-muted); font-weight: 600; }
+.tt-elenco ul { list-style: none; margin: 0; padding: 0; }
+.tt-elenco button {
+  width: 100%; display: flex; align-items: center; gap: .7rem; padding: .5rem; border: 0; border-radius: 12px;
+  background: transparent; cursor: pointer; text-align: left; color: var(--tt-ink); font: 500 .88rem/1.25 var(--tt-sans);
+}
+.tt-elenco button:hover, .tt-elenco button.attivo { background: color-mix(in srgb, var(--tt-primary) 8%, transparent); }
+.tt-numero {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; font-size: .85rem; color: var(--tt-dark); background: #fff; border: 1.2px solid var(--tt-mid);
+}
+.tt-elenco button.mio .tt-numero { background: var(--tt-primary); border-color: var(--tt-dark); color: #fff; }
+.tt-elenco-nome { flex: 1; min-width: 0; }
+.tt-elenco small { flex-shrink: 0; font-size: .68rem; font-weight: 600; color: var(--tt-primary); }
+/* Dove c'è spazio la legenda sta di fianco alla sala invece di coprirla. */
+@media (min-width: 1000px) {
+  .tt-elenco { position: relative; inset: auto; width: 290px; flex-shrink: 0; margin: .8rem .8rem .8rem 0; animation: none; }
+}
 .tt-palco svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tt-legenda {
   position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 14px); transform: translateX(-50%);

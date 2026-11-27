@@ -56,7 +56,24 @@ function Sedia({ C, p, dritta, mia, delMio, attenuata }) {
   );
 }
 
-function Tavolo({ C, t, mio, posto, attenuato, grande, nomi }) {
+// Il numero della legenda al posto del nome: un tondo che si legge anche con
+// la sala intera su un telefono. Il tavolo sposi ha un cuore.
+const CUORE = 'M0 7 C-11 -1 -8 -11 0 -5 C8 -11 11 -1 0 7 Z';
+function Numero({ C, t, n, mio }) {
+  const area = areaNome(t);
+  const r = Math.max(13, Math.min(24, Math.min(area.w, area.h) / 2 - 2));
+  return (
+    <g transform={`translate(${area.x || 0} ${area.y || 0})`} pointerEvents="none">
+      <circle r={r} fill={mio ? C.primary : '#ffffff'} stroke={mio ? C.dark : C.mid} strokeWidth={mio ? 2 : 1.2} />
+      {n == null
+        ? <path d={CUORE} transform={`scale(${r / 17})`} fill={mio ? '#ffffff' : C.primary} />
+        : <text y={r * 0.36} textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize={r * (n > 99 ? 0.8 : 1.02)}
+            fill={mio ? '#ffffff' : C.dark}>{n}</text>}
+    </g>
+  );
+}
+
+function Tavolo({ C, t, mio, posto, attenuato, grande, nomi, numero }) {
   const m = misure(t);
   const rot = ruotabile(t) ? t.rotazione || 0 : 0;
   const sposi = t.tipo === 'sposi';
@@ -82,13 +99,17 @@ function Tavolo({ C, t, mio, posto, attenuato, grande, nomi }) {
         {/* l'orlo della tovaglia */}
         {forma(7, { fill: 'none', stroke: mio ? C.primary : C.bordo, strokeWidth: 0.8, opacity: mio ? 0.55 : 0.6, strokeDasharray: sposi ? '2 4' : undefined })}
       </g>
-      {nomi && <Nome t={t} colore={mio ? C.dark : '#3f3a36'} grande={grande} />}
+      {numero !== undefined
+        ? <Numero C={C} t={t} n={numero} mio={mio} />
+        : nomi && <Nome t={t} colore={mio ? C.dark : '#3f3a36'} grande={grande} />}
     </g>
   );
 }
 
 // `nomi={false}` nel tavolo da vicino: il nome è già scritto in grande sopra.
-export default function Sala({ tema, tavoli, mioId, posto, viewBox, pavimento = true, grande = false, nomi = true, className, style }) {
+// Con `numeri` (Map id → numero) i tavoli mostrano il numero della legenda;
+// `evidenziaId` è il tavolo scelto dalla legenda, che non si attenua.
+export default function Sala({ tema, tavoli, mioId, posto, viewBox, pavimento = true, grande = false, nomi = true, numeri, evidenziaId, className, style }) {
   const C = colori(tema);
   const vb = `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`;
   const conMio = tavoli.some(t => t.id === mioId);
@@ -112,7 +133,8 @@ export default function Sala({ tema, tavoli, mioId, posto, viewBox, pavimento = 
         </>
       )}
       {ordinati.map(t => (
-        <Tavolo key={t.id} C={C} t={t} mio={t.id === mioId} posto={posto} attenuato={conMio && t.id !== mioId} grande={grande} nomi={nomi} />
+        <Tavolo key={t.id} C={C} t={t} mio={t.id === mioId} posto={posto} attenuato={conMio && t.id !== mioId && t.id !== evidenziaId}
+          grande={grande} nomi={nomi} numero={numeri ? numeri.get(t.id) : undefined} />
       ))}
     </svg>
   );

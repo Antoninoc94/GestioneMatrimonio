@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Search, X, ChevronRight, ChevronLeft, ArrowRight, Map as MapIcon } from 'lucide-react';
+import { Search, X, ChevronRight, ChevronLeft, ArrowRight, Map as MapIcon, List, Heart } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { TEMI } from '../temiWedding';
 import Sala from './trovaTavolo/Sala';
-import { piazza, ruotaSala, confini, inquadraPosto, adattaProporzioni } from './trovaTavolo/geometria';
+import { piazza, ruotaSala, confini, inquadraPosto, adattaProporzioni, numeriTavoli } from './trovaTavolo/geometria';
 import './trovaTavolo/TrovaTavolo.css';
 
 // Pagina per gli invitati, raggiunta dal QR all'ingresso della sala. Tre passi:
@@ -278,7 +278,11 @@ function useViewBox(target) {
 function VistaSala({ tavoli, scelta, tema, onChiudi }) {
   const verticale = useVerticale();
   const [forzaVerticale, setForzaVerticale] = useState(false);
+  // 'sala', 'mio' (il proprio posto) o 'tavolo' (uno scelto dalla legenda, `fuoco`).
   const [vista, setVista] = useState('sala');
+  const [fuoco, setFuoco] = useState(null);
+  // La legenda: aperta da sé solo dove c'è spazio per tenerla di fianco.
+  const [elenco, setElenco] = useState(() => window.matchMedia?.('(min-width: 1000px)').matches ?? false);
   const [aspetto, setAspetto] = useState(null);
   const palco = useRef(null);
   // In verticale con la rotazione bloccata, la sala si gira da sola.
@@ -305,6 +309,15 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
   const disposti = useMemo(() => { const p = piazza(tavoli); return girata ? ruotaSala(p) : p; }, [tavoli, girata]);
   const mio = scelta ? disposti.find(t => t.id === scelta.tavolo.id) : null;
   const mioId = mio?.id;
+  const numeri = useMemo(() => numeriTavoli(tavoli), [tavoli]);
+  const legenda = useMemo(() => [...tavoli].sort((a, b) => (numeri.get(a.id) ?? 0) - (numeri.get(b.id) ?? 0)), [tavoli, numeri]);
+  const scelto = vista === 'tavolo' ? disposti.find(t => t.id === fuoco) : null;
+  const guarda = t => {
+    if (t.id === mioId) setVista('mio');
+    else { setFuoco(t.id); setVista('tavolo'); }
+    // Sul telefono la legenda copre la sala: si chiude per mostrare il tavolo.
+    if (!window.matchMedia?.('(min-width: 1000px)').matches) setElenco(false);
+  };
 
   // Si apre su tutta la sala, poi lo zoom va da sé sul proprio tavolo.
   useEffect(() => {
@@ -317,8 +330,9 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
   const target = useMemo(() => {
     if (!aspetto) return null;
     if (vista === 'mio' && mio) return inquadraPosto(mio, scelta.posto, aspetto);
+    if (scelto) return inquadraPosto(scelto, null, aspetto);
     return adattaProporzioni(confini(disposti), aspetto);
-  }, [aspetto, vista, mio, disposti, scelta]);
+  }, [aspetto, vista, mio, scelto, disposti, scelta]);
   const vb = useViewBox(target);
 
   if (chiediRotazione) {
@@ -346,8 +360,8 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
       <div className="tt-barra">
         <button className="tt-tondo" onClick={onChiudi} aria-label="Indietro"><ChevronLeft size={22} /></button>
         <div className="tt-barra-testo">
-          <small>{mio ? 'Il tuo tavolo' : 'La sala'}</small>
-          <strong>{mio ? mio.nome : 'Pianta dei tavoli'}</strong>
+          <small>{scelto ? 'Tavolo' : mio ? 'Il tuo tavolo' : 'La sala'}</small>
+          <strong>{scelto ? scelto.nome : mio ? mio.nome : 'Pianta dei tavoli'}</strong>
         </div>
         {mio && (
           <div className="tt-interruttore" role="group" aria-label="Inquadratura">
@@ -355,10 +369,38 @@ function VistaSala({ tavoli, scelta, tema, onChiudi }) {
             <button aria-pressed={vista === 'mio'} onClick={() => setVista('mio')}>Il mio posto</button>
           </div>
         )}
+        {!mio && scelto && (
+          <div className="tt-interruttore"><button onClick={() => setVista('sala')}>Sala</button></div>
+        )}
+        <button className={`tt-tondo tt-tondo-elenco${elenco ? ' attivo' : ''}`} onClick={() => setElenco(v => !v)}
+          aria-label="Elenco dei tavoli" aria-expanded={elenco}><List size={20} /></button>
       </div>
-      <div className="tt-palco" ref={palco}>
-        {vb && <Sala tema={tema} tavoli={disposti} mioId={mioId} posto={scelta?.posto} viewBox={vb} />}
-        {mio && scelta.posto != null && <div className="tt-legenda"><i /> Il tuo posto</div>}
+      <div className="tt-vano">
+        <div className="tt-palco" ref={palco}>
+          {vb && <Sala tema={tema} tavoli={disposti} mioId={mioId} posto={scelta?.posto} viewBox={vb} numeri={numeri} evidenziaId={scelto?.id} />}
+          {mio && scelta.posto != null && !elenco && <div className="tt-legenda"><i /> Il tuo posto</div>}
+        </div>
+        {elenco && (
+          <aside className="tt-elenco" aria-label="Tavoli">
+            <p className="tt-elenco-titolo">I tavoli</p>
+            <ul>
+              {legenda.map(t => {
+                const n = numeri.get(t.id);
+                const attivo = t.id === (scelto?.id ?? (vista === 'mio' ? mioId : null));
+                return (
+                  <li key={t.id}>
+                    <button onClick={() => guarda(t)} aria-current={attivo || undefined}
+                      className={`${t.id === mioId ? 'mio' : ''}${attivo ? ' attivo' : ''}`}>
+                      <span className="tt-numero">{n == null ? <Heart size={13} fill="currentColor" /> : n}</span>
+                      <span className="tt-elenco-nome">{t.nome}</span>
+                      {t.id === mioId && <small>il tuo</small>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </aside>
+        )}
       </div>
     </div>
   );
