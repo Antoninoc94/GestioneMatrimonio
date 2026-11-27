@@ -77,13 +77,74 @@ Ultimo aggiornamento: 2026-11-27.
 1. **Menu del ricevimento** — da fare **solo quando arriva il menu ufficiale
    dal ristorante**. Idea: lo scrivono gli sposi nell'app, gli invitati lo
    vedono nella pagina del tavolo e/o nella pagina Wedding.
-2. **Galleria foto degli invitati** — per ultima. Gli invitati caricano le foto
-   della giornata da un QR. Da decidere prima di cominciare:
-   - le foto compaiono subito o le approvano gli sposi una per una;
-   - chi la vede (tutti con il link, o solo dal QR in sala);
-   - spazio su disco del server e riduzione automatica delle foto;
-   - quando è aperta (solo durante/dopo il matrimonio, o anche prima).
-   - ricordarsi la whitelist di Nginx Proxy Manager (vedi sopra).
+2. **Galleria foto degli invitati** — in progettazione (2026-11-27), vedi sotto.
+
+## Progetto: galleria foto degli invitati
+
+### Decisioni dell'utente (2026-11-27)
+- Le foto **compaiono subito**; gli sposi possono nasconderle o eliminarle.
+- La vede **chiunque abbia il link o il QR** (pagina pubblica, niente codice).
+- Si conserva **l'originale** (per gli sposi) **più una versione leggera** per
+  la galleria.
+- **Solo foto**, niente video.
+
+### Come funziona
+- **Pagina pubblica `/foto`**, stessa grafica di "Trova il tuo tavolo" (tema e
+  foto della pagina Wedding): bottone grande "Carica le tue foto" (più foto
+  insieme dalla galleria del telefono o dalla fotocamera), avanzamento per
+  ogni foto, poi la galleria a mosaico con le più recenti in alto; toccando una
+  foto si apre a schermo intero, si scorre col dito e si scarica.
+- Nome di chi carica **facoltativo** ("Foto di Luca").
+- **Due interruttori** in Landing → QR: "Galleria attiva" (la pagina si vede)
+  e "Caricamenti aperti" (si possono aggiungere foto) — così dopo il matrimonio
+  si chiudono i caricamenti e la galleria resta da guardare.
+- **QR e cartello A4** per la sala, come per il tavolo; link dalla pagina
+  Wedding e dal biglietto/pagina di "Trova il tuo tavolo".
+- **Pagina "Galleria" per gli sposi** (nel menu): tutte le foto, nascondi /
+  mostra / elimina, filtro per autore, **scarica tutti gli originali in ZIP**.
+
+### Scelte tecniche
+- **Riduzione nel browser dell'invitato**, non sul server: il telefono crea la
+  versione grande (lato lungo ~2048 px, JPEG) e la miniatura (~480 px) e le
+  carica insieme all'originale. Evita librerie di immagini sul server (l'immagine
+  Docker è Alpine) e fa caricare meno dati col Wi-Fi della sala. Safari su
+  iPhone decodifica anche le HEIC, quindi le versioni leggere sono sempre JPEG.
+- **Privacy**: le versioni leggere, ricreate nel browser, **non hanno i dati
+  EXIF** (niente posizione GPS). Gli originali li scaricano solo gli sposi,
+  da route autenticata. Le foto nascoste non sono raggiungibili dal pubblico.
+- **Le foto stanno sulla NAS** (decisione dell'utente, 2026-11-27: NAS sulla
+  stessa rete, anch'essa virtualizzata). L'app non parla con la NAS: la
+  cartella condivisa viene montata sulla VM del server (NFS o SMB, in
+  `/etc/fstab`) e passata al container con un bind mount. In
+  `docker-compose.yml` il percorso viene da una variabile del `.env` accanto
+  (`GALLERIA_DIR`, come `APP_PORT`), così il file tracciato non si tocca; senza
+  variabile si usa un volume locale.
+- **NAS non raggiungibile**: se il mount salta, la cartella sulla VM resta vuota
+  e le foto finirebbero sul disco della VM senza che nessuno se ne accorga.
+  Per evitarlo l'app scrive solo se nella cartella c'è un file segnaposto
+  (`.galleria-nas`) creato una volta sulla NAS; altrimenti i caricamenti si
+  fermano con un messaggio chiaro e gli sposi vedono un avviso.
+- Dentro la cartella: `originali/`, `grandi/`, `mini/`. I file sono serviti da
+  route (`/api/galleria/...`) e **non** da una cartella statica, così una foto
+  nascosta resta davvero nascosta.
+- Controllo del tipo vero del file (non solo l'estensione), limite di peso per
+  foto (~25 MB) e limite di caricamenti per IP (largo: in sala molti invitati
+  condividono il Wi-Fi).
+- Tabella `galleria_foto` (file, dimensioni, autore, nascosta, data) e colonne
+  `config.galleria_abilitata` / `config.galleria_caricamenti`, aggiunte col
+  solito `ALTER TABLE` protetto in `db.js`.
+- ZIP degli originali generato in streaming (nuova dipendenza `archiver`), senza
+  tenerlo tutto in memoria.
+- Backup delle foto: li fa la NAS (snapshot/backup suoi); `backup.sh` resta
+  solo per il database.
+- Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist.
+
+### Ancora da chiarire
+- La NAS: che sistema è (TrueNAS, OpenMediaVault, Synology…), se condivide in
+  NFS o SMB, e se la cartella per le foto esiste già. Spazio: ~5 MB a foto con
+  originale; 150 invitati × 20 foto ≈ 15 GB.
+- Se il nome di chi carica va ricordato sul telefono (comodo) o richiesto ogni
+  volta (come la pagina del tavolo, che non ricorda nulla).
 
 ## Idee messe da parte (non richieste)
 - Trascinare una persona sulla sedia (drag & drop): rimandato, il tocco basta.
