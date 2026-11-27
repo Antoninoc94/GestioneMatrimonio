@@ -32,10 +32,11 @@ export function misure(t) {
     // Lunghezza utile: fuori 2S, dentro 2S-2T, entrambi 4S-2T.
     const T = ELLE_T;
     const config = t.tipo === 'sposi' ? 'esterno' : t.elle_posti;
+    // Dentro, l'angolo non si usa: vedi ELLE_ANGOLO.
     const necessaria = n * 40;
-    const daS = config === 'interno' ? (necessaria + 2 * T) / 2
+    const daS = config === 'interno' ? (necessaria + 2 * T + 2 * ELLE_ANGOLO) / 2
       : config === 'esterno' ? necessaria / 2
-      : (necessaria + 2 * T) / 4;
+      : (necessaria + 2 * T + 2 * ELLE_ANGOLO) / 4;
     const S = Math.min(320, Math.max(170, Math.ceil(daS)));
     return { w: S, h: S, S, T };
   }
@@ -279,6 +280,9 @@ export function calcolaAvvisi(tavoli, ospiti) {
 // verticale sta a sinistra e quello orizzontale in basso: l'angolo è in basso
 // a sinistra e "Ruota" lo porta negli altri tre.
 export const ELLE_T = 64;
+// Tratto dei lati interni lasciato libero vicino all'angolo: la profondità di
+// una sedia (distanza dal bordo più mezza sedia), con un po' d'aria.
+export const ELLE_ANGOLO = 28;
 
 // Contorno della L (senso orario, a partire da in alto a sinistra).
 export function contornoElle(S, T) {
@@ -294,9 +298,12 @@ export function elleLati(config, S, T) {
     { a: [-m, -m], b: [-m, m], n: [-1, 0] }, // lato sinistro, lungo
     { a: [-m, m], b: [m, m], n: [0, 1] },    // lato in basso, lungo
   ];
+  // Dentro, i due lati si incontrano ad angolo: le sedie vicine all'angolo
+  // finirebbero una addosso all'altra, quindi i lati partono un po' più in là.
+  const k = ELLE_ANGOLO;
   const interni = [
-    { a: [-m + T, -m], b: [-m + T, m - T], n: [1, 0] }, // destra del braccio verticale
-    { a: [-m + T, m - T], b: [m, m - T], n: [0, -1] },  // sopra il braccio orizzontale
+    { a: [-m + T, -m], b: [-m + T, m - T - k], n: [1, 0] }, // destra del braccio verticale
+    { a: [-m + T + k, m - T], b: [m, m - T], n: [0, -1] },  // sopra il braccio orizzontale
   ];
   const lati = config === 'interno' ? interni : config === 'esterno' ? esterni : [...esterni, ...interni];
   return lati.map(l => ({ ...l, len: Math.hypot(l.b[0] - l.a[0], l.b[1] - l.a[1]) }));
