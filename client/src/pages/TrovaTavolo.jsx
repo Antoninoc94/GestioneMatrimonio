@@ -240,7 +240,7 @@ function Esito({ scelta, tavolo, tema, onSala, onAltro }) {
         <>
           <Sala tema={tema} tavoli={[box.t]} mioId={box.t.id} posto={scelta.posto} viewBox={box.vb} pavimento={false} nomi={false} className="tt-vicino"
             style={{ aspectRatio: box.aspetto, maxWidth: Math.min(420, Math.round(250 * Math.sqrt(box.aspetto))) }} />
-          <p className="tt-didascalia"><i /> Il tuo posto è quello illuminato</p>
+          <p className="tt-didascalia"><i /> <span>Posto <strong>{scelta.posto + 1}</strong>, quello illuminato</span></p>
         </>
       ) : <div style={{ height: '1.5rem' }} />}
       {tavolo && <button className="tt-azione" onClick={onSala}>Vedi dove si trova in sala <ArrowRight size={18} /></button>}

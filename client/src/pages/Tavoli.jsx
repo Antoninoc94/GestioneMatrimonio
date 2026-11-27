@@ -176,8 +176,14 @@ export default function Tavoli() {
   const [exportingCatering, setExportingCatering] = useState(false);
 
   const exportSegnaposti = () => {
-    // Tutti i confermati con un tavolo, partner e figli compresi
-    const tutti = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato');
+    // La sedia vera (scelta o automatica) arriva con i tavoli, non con la lista ospiti.
+    const postoDi = new Map(tavoli.flatMap(t => t.ospiti.map(o => [o.id, o.posto])));
+    const ordineTavolo = new Map(tavoli.map((t, i) => [t.id, i]));
+    // Tutti i confermati con un tavolo, partner e figli compresi, in ordine di
+    // tavolo e di sedia: chi li dispone in sala li trova già in fila.
+    const tutti = ospiti.filter(o => o.tavolo_id && o.rsvp === 'confermato').sort((a, b) =>
+      (ordineTavolo.get(a.tavolo_id) ?? 1e9) - (ordineTavolo.get(b.tavolo_id) ?? 1e9)
+      || (postoDi.get(a.id) ?? 1e9) - (postoDi.get(b.id) ?? 1e9));
     if (tutti.length === 0) {
       const seduti = ospiti.filter(o => o.tavolo_id);
       if (seduti.length === 0) return alert('Nessun ospite ha ancora un tavolo.');
@@ -236,8 +242,10 @@ export default function Tavoli() {
         doc.setLineWidth(0.3);
         doc.line(cx + 12, cy + cardH / 2 + 8, cx + cardW - 12, cy + cardH / 2 + 8);
 
-        // Nome tavolo
-        const tavolo = tavoloMap[o.tavolo_id] || '';
+        // Nome tavolo e numero della sedia, come sulla pianta e sulla pagina
+        // "Trova il tuo tavolo" (si conta da 1)
+        const sedia = postoDi.get(o.id);
+        const tavolo = [tavoloMap[o.tavolo_id], sedia != null && `Posto ${sedia + 1}`].filter(Boolean).join('  ·  ');
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(107, 114, 128);

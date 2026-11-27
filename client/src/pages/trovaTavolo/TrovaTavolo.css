@@ -150,6 +150,7 @@
 .tt-vicino { width: 100%; max-width: 250px; aspect-ratio: 1; margin: .6rem auto 0; display: block; animation: tt-zoom .9s .15s var(--tt-ease) both; }
 .tt-didascalia { display: inline-flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--tt-muted); margin: .1rem 0 1.5rem; }
 .tt-didascalia i { width: 10px; height: 10px; border-radius: 3px; background: var(--tt-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tt-primary) 18%, transparent); }
+.tt-didascalia strong { color: var(--tt-dark); font-weight: 600; }
 
 .tt-azione {
   width: 100%; min-height: 56px; display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
