@@ -128,7 +128,7 @@
    max-height in percentuale una foto verticale usciva dallo schermo, perché
    l'altezza della cella non era definita. */
 .ft-luce-scena { position: relative; flex: 1; min-height: 0; touch-action: pan-y; }
-.ft-luce-scena img { position: absolute; inset: 0 0 env(safe-area-inset-bottom) 0; width: 100%; height: calc(100% - env(safe-area-inset-bottom)); object-fit: contain; opacity: 0; transition: opacity .25s ease; user-select: none; -webkit-user-drag: none; }
+.ft-luce-scena img { position: absolute; inset: 0 0 calc(env(safe-area-inset-bottom) + 12px) 0; width: 100%; height: calc(100% - env(safe-area-inset-bottom) - 12px); object-fit: contain; opacity: 0; transition: opacity .25s ease; user-select: none; -webkit-user-drag: none; }
 .ft-luce-scena img.ft-pronta { opacity: 1; }
 .ft-luce-attesa { position: absolute !important; left: 50%; top: 50%; margin: -11px 0 0 -11px; }
 .ft-freccia {
