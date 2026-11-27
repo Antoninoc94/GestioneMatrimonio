@@ -4,7 +4,7 @@ Questo file è la memoria condivisa del progetto: chi riprende il lavoro, da
 qualunque computer, parte da qui. **Va aggiornato a ogni lavoro finito**
 (cosa è stato fatto, cosa resta, decisioni prese) e committato su `main`.
 
-Ultimo aggiornamento: 2026-11-27.
+Ultimo aggiornamento: 2026-11-27 (sera): galleria in preparazione, vedi "Dove siamo arrivati".
 
 ## Come si lavora
 
@@ -77,7 +77,7 @@ Ultimo aggiornamento: 2026-11-27.
 1. **Menu del ricevimento** — da fare **solo quando arriva il menu ufficiale
    dal ristorante**. Idea: lo scrivono gli sposi nell'app, gli invitati lo
    vedono nella pagina del tavolo e/o nella pagina Wedding.
-2. **Galleria foto degli invitati** — in progettazione (2026-11-27), vedi sotto.
+2. **Galleria foto degli invitati** — progettata, NAS in preparazione, codice non ancora scritto: vedi sotto "Dove siamo arrivati".
 
 ## Progetto: galleria foto degli invitati
 
@@ -112,8 +112,8 @@ Ultimo aggiornamento: 2026-11-27.
 - **Privacy**: le versioni leggere, ricreate nel browser, **non hanno i dati
   EXIF** (niente posizione GPS). Gli originali li scaricano solo gli sposi,
   da route autenticata. Le foto nascoste non sono raggiungibili dal pubblico.
-- **Le foto stanno sulla NAS** (decisione dell'utente, 2026-11-27: NAS sulla
-  stessa rete, anch'essa virtualizzata). L'app non parla con la NAS: la
+- **Le foto stanno sulla NAS** (decisione dell'utente, 2026-11-27: TrueNAS
+  sulla stessa rete, anch'essa virtualizzata). L'app non parla con la NAS: la
   cartella condivisa viene montata sulla VM del server (NFS o SMB, in
   `/etc/fstab`) e passata al container con un bind mount. In
   `docker-compose.yml` il percorso viene da una variabile del `.env` accanto
@@ -139,22 +139,59 @@ Ultimo aggiornamento: 2026-11-27.
   solo per il database.
 - Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist.
 
-### Ancora da chiarire
-- La NAS è **TrueNAS** (detto dall'utente il 2026-11-27). Piano: un dataset
-  dedicato (es. `matrimonio-foto`) condiviso in **NFS** solo verso l'IP della VM
-  del server, con **Mapall User** = un utente TrueNAS proprietario del dataset
-  (l'app nel container gira come root, e NFS di norma trasforma root in
-  `nobody`, che non può scrivere). Sulla VM: `nfs-common`, mount in
-  `/etc/fstab` (es. su `/mnt/foto-matrimonio`), poi `GALLERIA_DIR` nel `.env`.
-  **Stato 2026-11-27**: TrueNAS SCALE; dataset creato,
-  `/mnt/HDDNAS/matrimonio-foto` (pool `HDDNAS`, quota 200 GiB, permessi Unix).
-  Il servizio NFS è già attivo (lo usa il dataset `Torrent`). Mancano:
-  proprietario `matrimonio` sul dataset, condivisione NFS verso l'IP della VM
-  con Mapall `matrimonio`, un'attività di snapshot giornaliera (backup delle
-  foto). Servono ancora l'IP della NAS e l'IP della VM per i comandi di mount. Spazio: ~5 MB a foto con
-  originale; 150 invitati × 20 foto ≈ 15 GB.
-- Se il nome di chi carica va ricordato sul telefono (comodo) o richiesto ogni
-  volta (come la pagina del tavolo, che non ricorda nulla).
+### Dove siamo arrivati (2026-11-27) — da riprendere da qui
+**Il codice della galleria non è ancora scritto.** Si sta preparando la NAS.
+
+> Il repository è **pubblico**: qui niente IP, nomi di pool o altri dettagli
+> della rete di casa. Chi riprende li chiede all'utente.
+
+NAS **TrueNAS SCALE**, fatto finora dall'utente:
+- [x] dataset dedicato `matrimonio-foto` (preset Generic, quota 200 GiB,
+      permessi Unix/POSIX)
+- [x] utente di servizio `matrimonio`: password disabilitata, **Utente SMB
+      disattivato**, nessun gruppo ausiliario (era finito in `builtin_users` e
+      da lì apriva le altre condivisioni della NAS), shell `nologin`
+- [ ] **Directory home** dell'utente: era impostata sul dataset delle foto con
+      permessi 777 → cambiarla in `/var/empty` (o togliere i permessi "Altro")
+- [ ] verificare che da Windows `\IP_NAS` con `matrimonio` l'accesso sia rifiutato
+- [ ] proprietario del dataset = `matrimonio` (Autorizzazioni → Modifica,
+      Applica utente/gruppo)
+- [ ] condivisione **NFS** del dataset, Host = solo l'IP della VM del server,
+      **Mapall User/Group = `matrimonio`**
+- [ ] attività di snapshot giornaliera sul dataset (è il backup delle foto)
+
+Poi, **sulla VM del server** (sostituire `IP_NAS` e `PERCORSO_DATASET`):
+
+```bash
+sudo apt install -y nfs-common
+showmount -e IP_NAS
+sudo mkdir -p /mnt/foto-matrimonio
+sudo mount -t nfs IP_NAS:PERCORSO_DATASET /mnt/foto-matrimonio
+sudo touch /mnt/foto-matrimonio/prova.txt && ls -ln /mnt/foto-matrimonio && sudo rm /mnt/foto-matrimonio/prova.txt
+```
+
+Atteso: `showmount` elenca il dataset con l'IP della VM; `ls -ln` mostra come
+proprietario l'UID di `matrimonio` (non 0); nessun "Permission denied".
+Se va, renderlo permanente:
+
+```bash
+echo 'IP_NAS:PERCORSO_DATASET /mnt/foto-matrimonio nfs _netdev,nofail,soft,timeo=150,retrans=2 0 0' | sudo tee -a /etc/fstab
+sudo umount /mnt/foto-matrimonio && sudo mount -a && df -h /mnt/foto-matrimonio
+sudo touch /mnt/foto-matrimonio/.galleria-nas
+```
+
+`nofail`: la VM parte anche a NAS spenta; `soft,timeo=150`: se la NAS sparisce
+la galleria dà errore invece di bloccare tutta l'app; `.galleria-nas`: il file
+di controllo senza il quale l'app non scrive foto.
+
+Dopo: scrivere la galleria (si può anche prima, provandola in locale con una
+cartella normale) e collegarla con `GALLERIA_DIR=/mnt/foto-matrimonio` nel
+`.env` accanto a `docker-compose.yml`.
+
+### Ancora da chiarire con l'utente
+- Il nome di chi carica va ricordato sul telefono (proposta: sì, non è un dato
+  riservato ed è comodo) o richiesto ogni volta?
+- Spazio: ~5 MB a foto con originale; 150 invitati × 20 foto ≈ 15 GB.
 
 ## Idee messe da parte (non richieste)
 - Trascinare una persona sulla sedia (drag & drop): rimandato, il tocco basta.
