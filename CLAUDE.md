@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Start here: project status and working rules
+
+**Read `docs/TODO.md` at the start of every session.** It is the shared memory of this project (done, to do, decisions, production-server notes), kept in git so it follows the user across computers — local Claude memory does not. Update it whenever a piece of work is finished or a decision is made, and commit it with that work.
+
+- **Work only on `main`**: commit and push straight to `main` after verifying (client build, oxlint, a Playwright run). Do not open feature branches; if a change is risky enough to try before production, ask first.
+- **Never lose work**: before finishing, check that no remote branch has commits missing from `main`.
+- The user writes in Italian: answer in Italian.
+
 ## Project
 
 GestioneMatrimonio — a self-hosted wedding planning app (Italian) for a couple to manage vendors, budget, guests, seating, timeline, gifts, travel, and a public RSVP/landing page for guests. Monorepo with an Express/SQLite server and a React/Vite client.
