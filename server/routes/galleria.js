@@ -30,8 +30,21 @@ const cfg = () => db.prepare('SELECT galleria_abilitata, galleria_caricamenti FR
 const visibile = () => cfg().galleria_abilitata === 1;
 const caricamentiAperti = () => visibile() && cfg().galleria_caricamenti === 1 && g.pronta();
 
-const pulisciAutore = v => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+// Nome e cognome di chi carica, obbligatori: servono agli sposi per ringraziare.
+// Due parole almeno, solo lettere (con apostrofo, trattino e punto: D'Angelo,
+// Anna-Maria, Jr.). Non si può sapere se è davvero il suo nome, ma si evita
+// "ciao", "a" o un numero. Scritto tutto minuscolo o tutto maiuscolo, si
+// sistemano le iniziali.
+const PAROLA_NOME = /^\p{L}[\p{L}'’.-]+$/u;
+const maiuscole = w => w.replace(/(^|[-'’])(\p{L})/gu, (m, sep, c) => sep + c.toUpperCase());
+function formattaNome(v) {
+  const parole = String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (parole.length < 2 || parole.join(' ').length > 60 || !parole.every(w => PAROLA_NOME.test(w))) return null;
+  return parole.map(w => (w === w.toLowerCase() || w === w.toUpperCase() ? maiuscole(w.toLowerCase()) : w)).join(' ');
+}
+const semplifica = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const CODICE = /^[a-f0-9]{24}$/;
+const contaVisibili = () => db.prepare('SELECT COUNT(*) AS n FROM galleria_foto WHERE nascosta = 0').get().n;
 
 // ── Pubblico ─────────────────────────────────────────────────────
 router.get('/info', (req, res) => {
@@ -50,7 +63,7 @@ router.get('/foto', (req, res) => {
     WHERE nascosta = 0 ${prima > 0 ? 'AND id < ?' : ''}
     ORDER BY id DESC LIMIT ?
   `).all(...(prima > 0 ? [prima] : []), PER_PAGINA + 1);
-  res.json({ foto: righe.slice(0, PER_PAGINA), altre: righe.length > PER_PAGINA });
+  res.json({ foto: righe.slice(0, PER_PAGINA), altre: righe.length > PER_PAGINA, totale: contaVisibili() });
 });
 
 function inviaFile(res, file, nomeScarica) {
@@ -105,6 +118,8 @@ router.post('/carica', (req, res, next) => {
       butta();
       return res.status(400).json({ error: 'Il file non è una foto valida.' });
     }
+    const autore = formattaNome(req.body.autore);
+    if (!autore) { butta(); return res.status(400).json({ error: 'Scrivi il tuo nome e cognome.' }); }
     const larghezza = parseInt(req.body.larghezza, 10);
     const altezza = parseInt(req.body.altezza, 10);
     if (!(larghezza > 0 && larghezza <= 20000 && altezza > 0 && altezza <= 20000)) {
@@ -123,7 +138,7 @@ router.post('/carica', (req, res, next) => {
       for (const [da, a] of destinazioni) { fs.renameSync(da, a); fatti.push(a); }
       const info = db.prepare(`INSERT INTO galleria_foto (codice, estensione, nome_file, autore, larghezza, altezza, peso)
         VALUES (?, ?, ?, ?, ?, ?, ?)`).run(codice, estensione, path.basename(String(f.originale.originalname || '')).slice(0, 120),
-        pulisciAutore(req.body.autore) || null, larghezza, altezza, f.originale.size);
+        autore, larghezza, altezza, f.originale.size);
       res.status(201).json({ id: Number(info.lastInsertRowid), codice });
     } catch (e) {
       // Un file spostato e uno no lascerebbe un mezzo caricamento: si disfa tutto.
@@ -183,8 +198,19 @@ admin.get('/foto', (req, res) => {
   const foto = db.prepare(`SELECT id, codice, estensione, nome_file, autore, larghezza, altezza, peso, nascosta, created_at
     FROM galleria_foto ORDER BY id DESC`).all();
   const gettone = jwt.sign({ galleria: 1 }, SEGRETO(), { expiresIn: '2h' });
+  // Chi ha caricato, e se il nome corrisponde a un invitato (in qualsiasi ordine):
+  // aiuta a capire chi ringraziare e chi ha scritto un nome inventato.
+  const invitati = new Set();
+  for (const o of db.prepare('SELECT nome, cognome FROM ospiti WHERE sposo IS NULL').all()) {
+    invitati.add(semplifica(`${o.nome} ${o.cognome}`));
+    invitati.add(semplifica(`${o.cognome} ${o.nome}`));
+  }
+  const conteggio = new Map();
+  for (const f of foto) if (f.autore) conteggio.set(f.autore, (conteggio.get(f.autore) || 0) + 1);
+  const autori = [...conteggio].map(([nome, n]) => ({ nome, foto: n, in_lista: invitati.has(semplifica(nome)) }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
   res.json({
-    foto, gettone,
+    foto, gettone, autori,
     stato: { pronta: g.pronta(), nas: g.NAS, abilitata: visibile(), caricamenti: cfg().galleria_caricamenti === 1 },
   });
 });

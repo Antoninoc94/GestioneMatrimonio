@@ -34,7 +34,8 @@ export default function Galleria() {
   const gettoneScaduto = () => { if (Date.now() - ultimoRicarico.current > 10000) carica(); };
 
   const foto = useMemo(() => dati?.foto || [], [dati]);
-  const autori = useMemo(() => [...new Set(foto.map(f => f.autore).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'it')), [foto]);
+  const autori = useMemo(() => dati?.autori || [], [dati]);
+  const inLista = useMemo(() => new Map(autori.map(a => [a.nome, a.in_lista])), [autori]);
   const mostrate = useMemo(() => foto.filter(f =>
     (filtro === 'tutte' || (filtro === 'nascoste') === (f.nascosta === 1)) &&
     (!autore || (autore === '__nessuno' ? !f.autore : f.autore === autore))), [foto, filtro, autore]);
@@ -134,7 +135,7 @@ export default function Galleria() {
             </select>
             <select className="input w-auto text-sm" value={autore} onChange={e => setAutore(e.target.value)}>
               <option value="">Tutti gli autori</option>
-              {autori.map(a => <option key={a} value={a}>{a}</option>)}
+              {autori.map(a => <option key={a.nome} value={a.nome}>{a.nome} ({a.foto}){a.in_lista ? '' : ' · non in lista ospiti'}</option>)}
               <option value="__nessuno">Senza nome</option>
             </select>
             <span className="text-xs text-gray-400 ml-auto">Tocca una foto per aprirla, o il cerchio per selezionarne più d'una.</span>
@@ -179,7 +180,9 @@ export default function Galleria() {
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={e => e.target === e.currentTarget && setAperta(null)}>
           <div className="flex flex-wrap items-center gap-2 p-3 text-white text-sm">
             <span className="flex-1 min-w-40">
-              {corrente.autore ? `Foto di ${corrente.autore}` : 'Senza nome'} · {quando(corrente.created_at)} · {peso(corrente.peso || 0)}
+              {corrente.autore ? `Foto di ${corrente.autore}` : 'Senza nome'}
+              {corrente.autore && !inLista.get(corrente.autore) && <em className="not-italic text-amber-300"> (non in lista ospiti)</em>}
+              {' · '}{quando(corrente.created_at)} · {peso(corrente.peso || 0)}
               {corrente.nascosta === 1 && ' · nascosta'}
             </span>
             <button className="btn-secondary text-sm inline-flex items-center gap-1.5 whitespace-nowrap" disabled={occupato} onClick={() => esegui([corrente.id], corrente.nascosta ? 'mostra' : 'nascondi')}>

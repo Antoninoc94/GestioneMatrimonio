@@ -187,7 +187,9 @@ ZIP, modalità NAS con e senza `.galleria-nas`. **Non provato dentro Docker** (q
 
 ### Decisioni sulla galleria prese in fase di scrittura
 - Il nome di chi carica **si ricorda sul telefono** (`localStorage`), scelta dell'utente.
-- Le miniature nella griglia sono quadrate (ritagliate), in ordine dal più recente.
+- La galleria è la pagina principale: foto a righe che mantengono la proporzione, dal più recente; il caricamento è un pannello aperto da un pulsante fisso (scelta dell'utente: meglio una sola pagina e un solo QR che due pagine).
+- **Nome e cognome obbligatori** (sposi: serve per ringraziare). Non si può verificare che siano veri; nella pagina Galleria degli sposi ogni autore mostra quante foto ha caricato e se il nome è nella lista ospiti.
+- La pagina si aggiorna ogni 30 secondi e quando si torna sulla scheda.
 - Il pubblico scarica la versione grande (2048 px); l'originale solo gli sposi.
 
 ### Ancora da chiarire con l'utente

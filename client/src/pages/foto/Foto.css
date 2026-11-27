@@ -1,16 +1,89 @@
 /* Galleria foto per gli invitati (/foto). Si appoggia a .tt (variabili, copertina,
-   carta, campo di testo) e aggiunge griglia, coda di caricamento e lightbox. */
+   carta, campo di testo) e aggiunge la griglia a righe, il pulsante fisso, il
+   pannello di caricamento e il lightbox. */
 
 .ft-colonna {
   position: relative; z-index: 2;
-  width: 100%; max-width: 1040px; margin: -4.5rem auto 0;
-  padding: 0 1rem calc(env(safe-area-inset-bottom) + 2.5rem);
+  width: 100%; max-width: 1100px; margin: -2.2rem auto 0;
+  padding: 0 .6rem calc(env(safe-area-inset-bottom) + 6.5rem);
 }
-.ft-carta { max-width: 560px; margin: 0 auto; text-align: center; }
+@media (min-width: 700px) { .ft-colonna { padding-left: 1.2rem; padding-right: 1.2rem; } }
+.ft-carta { max-width: 560px; margin: 2.4rem auto 0; text-align: center; }
 
-.ft-etichetta { display: block; text-align: left; font-size: .78rem; font-weight: 600; color: var(--tt-muted); margin: 1.2rem 0 .4rem .3rem; }
-.ft-etichetta span { font-weight: 400; }
-.ft-nome { padding-left: 18px !important; }
+/* ── Intestazione della galleria ───────────────────────────── */
+.ft-testa { text-align: center; padding: 3.2rem 1rem 1.3rem; }
+.ft-titolo { font-family: var(--tt-serif); font-weight: 400; font-size: clamp(1.5rem, 5vw, 2rem); margin: 0; color: var(--tt-ink); }
+.ft-conteggio { margin: .35rem 0 0; font-size: .8rem; color: var(--tt-muted); letter-spacing: .04em; }
+
+/* ── Griglia a righe: ogni foto tiene la sua proporzione ───── */
+/* Righe alte quanto --riga: ogni foto prende larghezza in proporzione alla sua
+   forma e la riga si riempie da bordo a bordo, come nelle gallerie dei telefoni.
+   Il riempitivo in coda evita che l'ultima riga si allarghi a dismisura. */
+.ft-griglia { --riga: 150px; display: flex; flex-wrap: wrap; gap: 4px; }
+@media (min-width: 560px) { .ft-griglia { --riga: 190px; gap: 6px; } }
+@media (min-width: 900px) { .ft-griglia { --riga: 230px; gap: 8px; } }
+.ft-griglia::after { content: ""; flex-grow: 999999; }
+.ft-tessera {
+  position: relative; display: block; padding: 0; border: 0; cursor: pointer; overflow: hidden;
+  background: color-mix(in srgb, var(--tt-primary) 9%, #fff); border-radius: 4px;
+}
+@media (min-width: 560px) { .ft-tessera { border-radius: 8px; } }
+.ft-tessera i { display: block; width: 100%; }
+.ft-tessera img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .45s var(--tt-ease), filter .3s ease;
+}
+.ft-tessera:hover img { transform: scale(1.035); filter: brightness(1.04); }
+.ft-tessera:focus-visible { outline: 3px solid var(--tt-primary); outline-offset: 2px; }
+.ft-altre { margin: 1.6rem auto 0; max-width: 360px; }
+
+.ft-vuoto { text-align: center; color: var(--tt-muted); margin: 1.5rem 0 1rem; font-size: .95rem; }
+.ft-vuoto svg { color: var(--tt-mid); }
+.ft-vuoto p { margin: .6rem 0 1.1rem; }
+
+/* ── Pulsante fisso ────────────────────────────────────────── */
+.ft-fab {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom) + 1.1rem);
+  display: inline-flex; align-items: center; gap: .6rem; padding: .95rem 1.6rem;
+  border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  background: linear-gradient(135deg, var(--tt-primary), var(--tt-dark)); color: #fff;
+  font: 600 .98rem var(--tt-sans); letter-spacing: .01em;
+  box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--tt-dark) 85%, transparent), 0 4px 12px rgba(0, 0, 0, .18);
+  animation: ft-sali .5s var(--tt-ease) both;
+}
+.ft-fab:active { transform: translateX(-50%) scale(.97); }
+.ft-fab-attivo { background: #fff; color: var(--tt-primary); box-shadow: 0 16px 34px -14px rgba(0, 0, 0, .35), 0 0 0 1.5px var(--tt-primary); }
+.ft-fab-giro { position: static !important; margin: 0 !important; }
+@keyframes ft-sali { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+
+/* ── Pannello di caricamento ───────────────────────────────── */
+.ft-velo {
+  position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(20, 12, 10, .55); backdrop-filter: blur(3px); animation: ft-dissolvi .2s ease both;
+}
+.ft-pannello {
+  position: relative; width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  background: #fff; border-radius: 28px 28px 0 0; text-align: center;
+  padding: 2.4rem 1.4rem calc(env(safe-area-inset-bottom) + 1.6rem);
+  animation: ft-pannello .35s var(--tt-ease) both;
+}
+@keyframes ft-pannello { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (min-width: 700px) {
+  .ft-velo { align-items: center; }
+  .ft-pannello { border-radius: 28px; padding: 2.6rem 2.2rem 2rem; }
+}
+.ft-pannello-chiudi {
+  position: absolute; top: .9rem; right: .9rem; width: 40px; height: 40px; border: 0; border-radius: 50%;
+  background: var(--tt-paper); color: var(--tt-muted); display: grid; place-items: center; cursor: pointer;
+}
+
+.ft-due { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; text-align: left; margin-top: .4rem; }
+.ft-due label { display: block; min-width: 0; }
+.ft-etichetta { display: block; font-size: .76rem; font-weight: 600; color: var(--tt-muted); margin: 0 0 .35rem .3rem; }
+.ft-campo-testo { padding-left: 18px !important; width: 100%; }
+.ft-nota { font-size: .76rem; color: var(--tt-muted); margin: .7rem 0 0; }
+.ft-nota-errore { color: #b91c1c; font-weight: 500; }
 
 .ft-principale {
   display: flex; align-items: center; justify-content: center; gap: .6rem;
@@ -19,10 +92,12 @@
   background: linear-gradient(135deg, var(--tt-primary), var(--tt-dark));
   color: #fff; font-size: 1.02rem; font-weight: 600; letter-spacing: .01em;
   box-shadow: 0 14px 28px -14px color-mix(in srgb, var(--tt-primary) 75%, transparent);
-  transition: transform .2s var(--tt-ease), box-shadow .2s var(--tt-ease);
+  transition: transform .2s var(--tt-ease), box-shadow .2s var(--tt-ease), opacity .2s;
 }
-.ft-principale:active { transform: scale(.98); }
-.ft-nota { font-size: .76rem; color: var(--tt-muted); margin: .8rem 0 0; }
+.ft-principale:active:not(:disabled) { transform: scale(.98); }
+.ft-principale:disabled { opacity: .4; box-shadow: none; cursor: not-allowed; }
+.ft-piccolo { width: auto; margin: 0 auto; padding: .85rem 1.6rem; font-size: .95rem; }
+.ft-vedi { margin-top: 1.1rem; }
 
 /* ── Coda di caricamento ───────────────────────────────────── */
 .ft-coda { list-style: none; margin: 1.2rem 0 0; padding: 0; text-align: left; display: grid; gap: .4rem; }
@@ -39,23 +114,6 @@
 .ft-errore { background: #fef2f2; }
 .ft-errore .ft-voce-esito { color: #b91c1c; font-size: .74rem; }
 .ft-voce-esito button { border: 0; background: transparent; color: inherit; padding: 4px; display: inline-flex; cursor: pointer; }
-
-/* ── Griglia ───────────────────────────────────────────────── */
-.ft-vuoto { text-align: center; color: var(--tt-muted); margin: 2.5rem 0 1rem; font-size: .92rem; }
-.ft-vuoto svg { color: var(--tt-mid); }
-.ft-griglia {
-  display: grid; gap: 5px; margin-top: 1.6rem;
-  grid-template-columns: repeat(3, 1fr);
-}
-@media (min-width: 560px) { .ft-griglia { grid-template-columns: repeat(4, 1fr); gap: 7px; } }
-@media (min-width: 860px) { .ft-griglia { grid-template-columns: repeat(5, 1fr); gap: 8px; } }
-.ft-tessera {
-  position: relative; aspect-ratio: 1; padding: 0; border: 0; cursor: pointer; overflow: hidden;
-  background: color-mix(in srgb, var(--tt-primary) 8%, #fff); border-radius: 6px;
-}
-.ft-tessera img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s var(--tt-ease); }
-.ft-tessera:hover img { transform: scale(1.04); }
-.ft-altre { margin-top: 1.4rem; }
 
 /* ── Lightbox ──────────────────────────────────────────────── */
 .ft-luce { position: fixed; inset: 0; z-index: 100; background: rgba(14, 10, 9, .96); display: flex; flex-direction: column; animation: ft-dissolvi .2s ease both; }
@@ -81,5 +139,5 @@
 @media (hover: hover) and (pointer: fine) { .ft-freccia { display: inline-flex; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ft-luce, .ft-tessera img, .ft-luce-scena img { animation: none; transition: none; }
+  .ft-luce, .ft-velo, .ft-pannello, .ft-fab, .ft-tessera img, .ft-luce-scena img { animation: none; transition: none; }
 }
