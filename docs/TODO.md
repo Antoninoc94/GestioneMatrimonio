@@ -183,6 +183,16 @@ La VM è già aggiornata (l'utente ha lanciato `update.sh`). Controllare dal viv
 - Galleria degli sposi: filtro autori con numero di foto e "non in lista ospiti".
 Ancora da fare: provare dentro Docker (mai fatto), e decidere se stringere la regex nginx a `api/galleria/(info$|foto$|file/|carica$)`.
 
+### Prossimo lavoro: rendere la galleria `/foto` più elegante
+Richiesta dell'utente (2026-11-27): la galleria funziona, ma le foto sono "semplici
+rettangoli/quadrati uno affianco all'altro"; deve essere elegante e bella da vedere.
+Da fare insieme alla prossima sessione. Idee, nessuna ancora scelta né scritta:
+- foto come stampe con cornice bianca e ombra morbida, appena inclinate;
+- nome di chi l'ha scattata sotto la foto, nel carattere corsivo del tema;
+- ultima foto arrivata in grande, poi le altre;
+- comparsa graduale delle foto mentre si scorre.
+Codice da toccare: `Foto.jsx` (blocco `ft-griglia`) e `pages/foto/Foto.css`.
+
 ### Galleria foto: messa in produzione (fatto)
 Provato in locale: caricamento da telefono (iPhone emulato), versioni grande/miniatura,
 rifiuto di file non-foto, lightbox con "indietro", nome ricordato, nascondi/elimina,
