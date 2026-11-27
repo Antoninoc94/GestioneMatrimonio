@@ -16,7 +16,8 @@ export function TestoTavolo({ t, testo = t.nome, fill = '#374151', max = 26, fon
 const R_SEDIA = 14;
 
 // Un tavolo solo, ingrandito, con le sedie numerate. `sedia(i)` dice come
-// disegnare la sedia i: { fill, stroke, testo, evidenzia }. Con `onSedia` le
+// disegnare la sedia i: { fill, stroke, testo, coloreTesto, evidenzia (pulsa),
+// lampeggia (un numero nuovo a ogni spostamento), segno (piccolo bollo), titolo }. Con `onSedia` le
 // sedie si toccano (gestione dei posti), altrimenti è solo da guardare.
 export default function TavoloDaVicino({ t, sedia, onSedia, coloreTavolo = { fill: '#ffffff', stroke: '#d1d5db' }, testo, fontFamily, coloreTesto, className, style }) {
   const sedie = sedieRuotate(t);
@@ -37,17 +38,31 @@ export default function TavoloDaVicino({ t, sedia, onSedia, coloreTavolo = { fil
       {sedie.map((p, i) => {
         const d = sedia(i);
         return (
-          <g key={i} transform={`translate(${p.x} ${p.y})`}
+          // `lampeggia` cambia a ogni spostamento: la chiave nuova fa ripartire l'animazione.
+          <g key={`${i}-${d.lampeggia ?? ''}`} transform={`translate(${p.x} ${p.y})`}
             onClick={onSedia ? () => onSedia(i) : undefined}
             style={onSedia ? { cursor: 'pointer' } : undefined}>
+            {d.titolo && <title>{d.titolo}</title>}
             {d.evidenzia && (
               <circle r={R_SEDIA + 7} fill="none" stroke={d.stroke} strokeWidth="3">
                 <animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.6s" repeatCount="indefinite" />
               </circle>
             )}
-            <circle r={R_SEDIA} fill={d.fill} stroke={d.stroke} strokeWidth={d.evidenzia ? 3 : 1.5} />
+            {d.lampeggia != null && (
+              <circle r={R_SEDIA + 4} fill="#22c55e" opacity="0">
+                <animate attributeName="opacity" values="0;0.55;0;0.55;0" dur="1.4s" repeatCount="1" />
+                <animate attributeName="r" values={`${R_SEDIA};${R_SEDIA + 10};${R_SEDIA + 4}`} dur="1.4s" repeatCount="1" />
+              </circle>
+            )}
+            <circle r={R_SEDIA} fill={d.fill} stroke={d.stroke} strokeWidth={d.evidenzia || d.lampeggia != null ? 3 : 1.5} />
             {d.testo != null && (
-              <text y="4.5" textAnchor="middle" fontSize="12" fontWeight="700" fill={d.coloreTesto || '#374151'} pointerEvents="none">{d.testo}</text>
+              <text y="4.2" textAnchor="middle" fontSize={String(d.testo).length > 2 ? 9.5 : String(d.testo).length > 1 ? 11 : 12} fontWeight="700" fill={d.coloreTesto || '#374151'} pointerEvents="none">{d.testo}</text>
+            )}
+            {d.segno && (
+              <g transform={`translate(${R_SEDIA * 0.75} ${-R_SEDIA * 0.75})`} pointerEvents="none">
+                <circle r="7" fill="#ffffff" stroke="#111827" strokeWidth="1.2" />
+                <text y="3" textAnchor="middle" fontSize="9" fontWeight="700" fill="#111827">{d.segno}</text>
+              </g>
             )}
           </g>
         );

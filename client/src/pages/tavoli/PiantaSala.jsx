@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RotateCw, LayoutGrid, MousePointerClick, Undo2, ZoomIn, ZoomOut, Maximize2, Magnet } from 'lucide-react';
 import TavoloDaVicino from './TavoloDaVicino';
 import { PIANTA_W, PIANTA_H, PASSO_GRIGLIA, misure, ingombro, sovrapposizioni, posizioneDefault, nomeOspite, tipoTavolo, formaTavolo, ellePosti, contornoElle, ruotabile, posti, limitaPosizione, posizioneTavolo } from './util';
@@ -286,7 +286,7 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo, salvaP
             {sel.ospiti.length === 0 ? (
               <p className="text-xs text-gray-400">Nessun ospite seduto.</p>
             ) : (
-              <Posti t={sel} selOspite={selOspite} setSelOspite={setSelOspite} salvaPosti={salvaPosti} />
+              <Posti key={sel.id} t={sel} selOspite={selOspite} setSelOspite={setSelOspite} salvaPosti={salvaPosti} />
             )}
           </>
         )}
@@ -298,10 +298,33 @@ export default function PiantaSala({ tavoli, salvaPosizioni, salvaTavolo, salvaP
 // Chi siede dove. Si tocca un ospite e poi la sedia: se è occupata i due si
 // scambiano. Al primo cambio tutto il tavolo viene salvato com'è, così le
 // altre sedie non si spostano più da sole quando arriva un ospite nuovo.
+// Ogni passaggio si vede: iniziali sulle sedie, sedie libere in verde e
+// occupate con ⇄ mentre si sceglie, poi le sedie toccate lampeggiano e un
+// messaggio dice cosa è cambiato, con Annulla.
+const iniziali = o => [o.nome, o.cognome].filter(Boolean).map(s => [...s.trim()][0] || '').join('').toUpperCase().slice(0, 2);
+// Sulla sedia: le iniziali; in una famiglia si ripetono (Mario e Maria Rossi
+// sono entrambi "MR"), allora l'inizio del nome, e se si ripete anche quello
+// il numero della sedia. Map(id ospite → etichetta).
+function etichette(ospiti) {
+  const conta = f => { const m = new Map(); for (const o of ospiti) m.set(f(o), (m.get(f(o)) || 0) + 1); return m; };
+  const breve = o => [...(o.nome || '').trim()].slice(0, 3).join('');
+  const ini = conta(iniziali), brevi = conta(breve);
+  return new Map(ospiti.map(o => [o.id,
+    ini.get(iniziali(o)) === 1 ? iniziali(o) : brevi.get(breve(o)) === 1 ? breve(o) : o.posto != null ? o.posto + 1 : '?']));
+}
+
 function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
   const sedute = perSedia(t);
   const scelto = t.ospiti.find(o => o.id === selOspite);
   const senzaSedia = t.ospiti.filter(o => o.posto == null);
+  const sigla = etichette(t.ospiti);
+  // L'ultimo spostamento: { n, testo, ids, sedie, prima, primaScelti }.
+  const [ultimo, setUltimo] = useState(null);
+  useEffect(() => {
+    if (!ultimo) return;
+    const timer = setTimeout(() => setUltimo(null), 9000);
+    return () => clearTimeout(timer);
+  }, [ultimo]);
 
   const siedi = i => {
     const occupante = sedute.get(i);
@@ -310,31 +333,76 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
       return;
     }
     if (occupante?.id === scelto.id) { setSelOspite(null); return; }
+    const da = scelto.posto;
+    const prima = t.ospiti.map(o => ({ id: o.id, posto: o.posto ?? null }));
     const nuovi = t.ospiti.map(o => ({
       id: o.id,
-      posto: o.id === scelto.id ? i : o.id === occupante?.id ? scelto.posto ?? null : o.posto ?? null,
+      posto: o.id === scelto.id ? i : o.id === occupante?.id ? da ?? null : o.posto ?? null,
     }));
+    const dove = p => (p == null ? 'senza sedia' : `posto ${p + 1}`);
+    setUltimo({
+      n: (ultimo?.n || 0) + 1,
+      testo: <><strong>{nomeOspite(scelto)}</strong>: {dove(da)} → posto {i + 1}
+        {occupante && <> · scambiato con <strong>{nomeOspite(occupante)}</strong> (ora {dove(da)})</>}</>,
+      ids: new Set([scelto.id, occupante?.id].filter(Boolean)),
+      sedie: new Set([i, da].filter(p => p != null)),
+      prima,
+      primaScelti: t.posti_scelti,
+    });
     salvaPosti(t.id, nuovi);
     setSelOspite(null);
   };
 
+  const annulla = () => {
+    // Se prima erano automatici si torna agli automatici, non a una copia fissa.
+    salvaPosti(t.id, ultimo.primaScelti ? ultimo.prima : null);
+    setUltimo(null);
+  };
+
   return (
     <>
+      {scelto && (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-900 text-white text-xs px-3 py-2 mb-2">
+          <span>Scegli la nuova sedia per <strong>{nomeOspite(scelto)}</strong></span>
+          <button className="text-gray-300 hover:text-white underline flex-shrink-0" onClick={() => setSelOspite(null)}>Annulla</button>
+        </div>
+      )}
       <TavoloDaVicino t={t} className="w-full max-w-[260px] mx-auto block my-1" onSedia={siedi}
         coloreTavolo={{ fill: '#f9fafb', stroke: '#d1d5db' }}
         sedia={i => {
           const o = sedute.get(i);
           const suo = scelto && o?.id === scelto.id;
-          return { ...coloreSedia(o), testo: i + 1, coloreTesto: o ? '#ffffff' : '#9ca3af', evidenzia: suo, ...(suo ? { stroke: '#111827' } : {}) };
+          if (scelto && !suo) {
+            // Dove può andare: libera in verde, occupata con il segno dello scambio.
+            return o
+              ? { ...coloreSedia(o), testo: sigla.get(o.id), coloreTesto: '#ffffff', segno: '⇄', titolo: `Scambia con ${nomeOspite(o)}` }
+              : { fill: '#dcfce7', stroke: '#16a34a', testo: i + 1, coloreTesto: '#15803d', titolo: `Posto ${i + 1} libero` };
+          }
+          return {
+            ...coloreSedia(o),
+            testo: o ? sigla.get(o.id) : i + 1,
+            coloreTesto: o ? '#ffffff' : '#9ca3af',
+            evidenzia: suo,
+            lampeggia: ultimo?.sedie.has(i) ? ultimo.n : null,
+            titolo: o ? `Posto ${i + 1}: ${nomeOspite(o)}` : `Posto ${i + 1} libero`,
+            ...(suo ? { fill: '#111827', stroke: '#111827' } : {}),
+          };
         }} />
-      <p className="text-[11px] text-gray-500 text-center mb-2">
-        {scelto ? <>Ora tocca la sedia per <strong>{nomeOspite(scelto)}</strong></> : 'Tocca un ospite (o la sua sedia), poi la sedia dove siede.'}
-      </p>
+      {ultimo ? (
+        <div className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 text-green-900 text-xs px-3 py-2 mb-2">
+          <span className="flex-1">{ultimo.testo}</span>
+          <button className="font-semibold text-green-700 hover:text-green-900 underline flex-shrink-0" onClick={annulla}>Annulla</button>
+        </div>
+      ) : (
+        <p className="text-[11px] text-gray-500 text-center mb-2">
+          {scelto ? 'Verde = sedia libera · ⇄ = scambia di posto' : 'Tocca un ospite (o la sua sedia), poi la sedia dove deve sedersi.'}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <span className="text-[11px] text-gray-400">{t.posti_scelti ? 'Posti scelti da voi' : 'Posti automatici: famiglie vicine'}</span>
         {t.posti_scelti && (
           <button className="text-[11px] text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1"
-            onClick={() => { if (confirm('Tornare ai posti automatici per questo tavolo?')) salvaPosti(t.id, null); }}>
+            onClick={() => { if (confirm('Tornare ai posti automatici per questo tavolo?')) { salvaPosti(t.id, null); setUltimo(null); } }}>
             <Undo2 size={11} /> Automatici
           </button>
         )}
@@ -343,11 +411,11 @@ function Posti({ t, selOspite, setSelOspite, salvaPosti }) {
         {[...t.ospiti].sort((a, b) => (a.posto ?? 999) - (b.posto ?? 999)).map(o => (
           <li key={o.id}>
             <button onClick={() => setSelOspite(s => (s === o.id ? null : o.id))}
-              className={`w-full flex items-center gap-2 text-left rounded px-1.5 py-0.5 ${selOspite === o.id ? 'bg-rose-50 ring-1 ring-rose-300' : 'hover:bg-gray-50'}`}>
+              className={`w-full flex items-center gap-2 text-left rounded px-1.5 py-0.5 transition-colors duration-700 ${selOspite === o.id ? 'bg-gray-900 text-white' : ultimo?.ids.has(o.id) ? 'bg-green-100' : 'hover:bg-gray-50'}`}>
               <span className={`w-5 h-5 flex-shrink-0 rounded-full text-[10px] font-bold flex items-center justify-center ${o.posto == null ? 'bg-red-100 text-red-600' : o.tipo === 'bambino' ? 'bg-purple-400 text-white' : 'bg-rose-400 text-white'}`}>
                 {o.posto == null ? '!' : o.posto + 1}
               </span>
-              <span className={`truncate ${o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs' : 'text-gray-800'}`}>
+              <span className={`truncate ${selOspite === o.id ? '' : o.rsvp === 'declinato' ? 'line-through text-red-400' : o.parent_id ? 'text-gray-500 text-xs' : 'text-gray-800'}`}>
                 {o.sposo ? '💍 ' : ''}{nomeOspite(o)}{o.tipo === 'bambino' ? ' 👶' : ''}
               </span>
             </button>
