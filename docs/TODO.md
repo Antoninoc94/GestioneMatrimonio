@@ -49,7 +49,9 @@ Ultimo aggiornamento: 2026-11-27 (sera): galleria foto scritta e provata in loca
   Grafica curata soprattutto per il telefono; in verticale chiede di ruotarlo
   ("Ho la rotazione bloccata" gira la sala). Il tasto indietro chiude la sala.
 - La pagina **non ricorda nulla** tra una visita e l'altra (scelta esplicita:
-  chi cerca dal telefono di un altro non deve lasciarci il suo nome).
+  chi cerca dal telefono di un altro non deve lasciarci il suo nome). Anche
+  "Non sei tu?" azzera la scelta del tutto (prima la teneva da parte: la pianta
+  mostrava ancora la sedia di un'altra persona e c'era "Torna al tuo posto").
 - QR e cartello A4 da stampare in Landing → QR.
 - Sedie vere (`ospiti.posto`): automatiche (famiglie vicine, sposi al centro)
   finché gli sposi non ne spostano una; da lì il tavolo resta come l'hanno messo.

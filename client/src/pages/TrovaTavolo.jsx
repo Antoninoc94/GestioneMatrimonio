@@ -70,7 +70,6 @@ export default function TrovaTavolo() {
   const [tavoli, setTavoli] = useState(null);
   // { id, nome, primo, tavolo: { id, nome }, posto }: solo in memoria.
   const [scelta, setScelta] = useState(null);
-  const [cercaAltro, setCercaAltro] = useState(false);
   // Il biglietto di ringraziamento esce una volta per ricerca, non a ogni
   // apertura della sala.
   const [grazieVisto, setGrazieVisto] = useState(false);
@@ -92,7 +91,14 @@ export default function TrovaTavolo() {
   const scegli = o => {
     setScelta(daRisultato(o));
     setGrazieVisto(false);
-    setCercaAltro(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  // "Non sei tu?" cancella del tutto la scelta, non la mette da parte: altrimenti
+  // la pianta continuava a mostrare la sedia illuminata di un'altra persona, e
+  // chi sceglie dal telefono di un altro gli lasciava il proprio posto.
+  const nonSeiTu = () => {
+    setScelta(null);
+    setGrazieVisto(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const apriSala = () => { apertaDaQui.current = true; setParams({ vista: 'sala' }); };
@@ -111,7 +117,7 @@ export default function TrovaTavolo() {
   const sposi = [info.nome_sposo1, info.nome_sposo2].filter(Boolean).join(' & ');
   const data = info.data_matrimonio ? format(parseISO(info.data_matrimonio), 'd MMMM yyyy', { locale: it }) : '';
   const mioTavolo = tavoli?.find(t => t.id === scelta?.tavolo.id);
-  const mostraEsito = scelta && !cercaAltro;
+  const mostraEsito = !!scelta;
 
   return (
     <div className="tt" style={vars}>
@@ -125,9 +131,9 @@ export default function TrovaTavolo() {
               <p className="tt-sottotitolo" style={{ marginBottom: 0 }}>Qui troverai il tuo tavolo e il tuo posto in sala, appena sarà tutto pronto.</p>
             </div>
           ) : mostraEsito ? (
-            <Esito scelta={scelta} tavolo={mioTavolo} tema={tema} onSala={apriSala} onAltro={() => setCercaAltro(true)} />
+            <Esito scelta={scelta} tavolo={mioTavolo} tema={tema} onSala={apriSala} onAltro={nonSeiTu} />
           ) : (
-            <Ricerca onScegli={scegli} onAnnulla={scelta ? () => setCercaAltro(false) : null} />
+            <Ricerca onScegli={scegli} />
           )}
         </div>
         {info.abilitata === 1 && !mostraEsito && tavoli?.length > 0 && (
@@ -162,7 +168,7 @@ function Copertina({ sposi, data, foto, compatta }) {
   );
 }
 
-function Ricerca({ onScegli, onAnnulla }) {
+function Ricerca({ onScegli }) {
   const [q, setQ] = useState('');
   const [esito, setEsito] = useState(null);
   const [cercando, setCercando] = useState(false);
@@ -221,7 +227,6 @@ function Ricerca({ onScegli, onAnnulla }) {
         )}
         {esito?.altri && <p className="tt-nota">Ci sono altri nomi simili: aggiungi il cognome.</p>}
       </div>
-      {onAnnulla && <div style={{ textAlign: 'center' }}><button className="tt-link" onClick={onAnnulla}><ChevronLeft size={16} /> Torna al tuo posto</button></div>}
     </>
   );
 }
