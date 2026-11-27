@@ -265,7 +265,7 @@ export default function Foto() {
             {caricata && !errore && !foto.length && (
               <div className="ft-vuoto">
                 <p>{puoCaricare ? 'Nessuno ha ancora condiviso una foto: aggiungi la prima!' : 'Non ci sono ancora foto.'}</p>
-                {puoCaricare && <button type="button" className="ft-principale ft-piccolo" onClick={() => apri('carica', '1')}><Camera size={18} /> Aggiungi foto</button>}
+                {puoCaricare && !attive.length && <button type="button" className="ft-principale ft-piccolo" onClick={() => apri('carica', '1')}><Camera size={18} /> Aggiungi foto</button>}
               </div>
             )}
             {foto.length > 0 && (
@@ -293,8 +293,9 @@ export default function Foto() {
         {sposi && <div className="tt-piede"><p>{sposi}</p></div>}
       </div>
 
-      {/* Pulsante fisso: sempre a portata di pollice. Durante un caricamento diventa l'avanzamento. */}
-      {abilitata && puoCaricare && tuttoChiuso && (
+      {/* Pulsante fisso: sempre a portata di pollice. Durante un caricamento diventa l'avanzamento.
+          A galleria vuota non c'è: ci pensa il pulsante sotto il testo, per non averne due. */}
+      {abilitata && puoCaricare && tuttoChiuso && (foto.length > 0 || attive.length > 0) && (
         <button type="button" className={`ft-fab${attive.length ? ' ft-fab-attivo' : ''}`} onClick={() => apri('carica', '1')}>
           {attive.length
             ? <><span className="tt-attesa ft-fab-giro" aria-hidden="true" /> Carico {attive.length === 1 ? '1 foto' : `${attive.length} foto`}…</>
