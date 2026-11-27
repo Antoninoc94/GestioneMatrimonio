@@ -4,7 +4,7 @@ Questo file è la memoria condivisa del progetto: chi riprende il lavoro, da
 qualunque computer, parte da qui. **Va aggiornato a ogni lavoro finito**
 (cosa è stato fatto, cosa resta, decisioni prese) e committato su `main`.
 
-Ultimo aggiornamento: 2026-11-27 (sera): galleria foto **in produzione e funzionante** (nginx e NAS a posto); rifiniture fatte oggi tutte su `main`. Prossima volta: l'utente deve ancora lanciare `sudo bash update.sh` sulla VM per avere le ultime modifiche (vedi "Da verificare alla prossima sessione").
+Ultimo aggiornamento: 2026-11-27 (sera): galleria foto **in produzione e funzionante** (nginx e NAS a posto); rifiniture fatte oggi tutte su `main`. La VM è aggiornata con tutte le modifiche di oggi (`update.sh` già lanciato dall'utente).
 
 ## Come si lavora
 
@@ -176,7 +176,7 @@ per colpa della build cache di Docker (44 GB, creata da `docker compose build
 con `df -h /` che lo spazio sia tornato libero.
 
 ### Da verificare alla prossima sessione
-Dopo `sudo bash update.sh` sulla VM (non ancora fatto al momento della chiusura), controllare dal vivo:
+La VM è già aggiornata (l'utente ha lanciato `update.sh`). Controllare dal vivo che tutto sia a posto:
 - `/foto`: un solo pulsante "Aggiungi foto" (a galleria vuota quello sotto il testo, con foto quello fisso), nessuna icona nello stato vuoto, nome e cognome obbligatori, aggiornamento automatico tra due telefoni;
 - lightbox: foto verticali e orizzontali dentro lo schermo anche su Windows (corretto l'adattamento con `object-fit`, provato in locale su desktop e iPhone);
 - `/tavolo`: "Non sei tu?" azzera la scelta, la pianta non mostra più la sedia di prima;
