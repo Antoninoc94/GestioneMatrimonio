@@ -4,7 +4,7 @@ Questo file è la memoria condivisa del progetto: chi riprende il lavoro, da
 qualunque computer, parte da qui. **Va aggiornato a ogni lavoro finito**
 (cosa è stato fatto, cosa resta, decisioni prese) e committato su `main`.
 
-Ultimo aggiornamento: 2026-11-27 (sera): galleria in preparazione, vedi "Dove siamo arrivati".
+Ultimo aggiornamento: 2026-11-27 (sera): NAS pronta e montata, disco VM da svuotare, galleria da scrivere (vedi "Dove siamo arrivati").
 
 ## Come si lavora
 
@@ -140,49 +140,34 @@ Ultimo aggiornamento: 2026-11-27 (sera): galleria in preparazione, vedi "Dove si
 - Nginx Proxy Manager: aggiungere `foto$` e `api/galleria/` alla whitelist.
 
 ### Dove siamo arrivati (2026-11-27) — da riprendere da qui
-**Il codice della galleria non è ancora scritto.** Si sta preparando la NAS.
+**Il codice della galleria non è ancora scritto**, ma la NAS è pronta e montata.
 
 > Il repository è **pubblico**: qui niente IP, nomi di pool o altri dettagli
 > della rete di casa. Chi riprende li chiede all'utente.
 
-NAS **TrueNAS SCALE**, fatto finora dall'utente:
-- [x] dataset dedicato `matrimonio-foto` (preset Generic, quota 200 GiB,
-      permessi Unix/POSIX)
-- [x] utente di servizio `matrimonio`: password disabilitata, **Utente SMB
-      disattivato**, nessun gruppo ausiliario (era finito in `builtin_users` e
-      da lì apriva le altre condivisioni della NAS), shell `nologin`
-- [ ] **Directory home** dell'utente: era impostata sul dataset delle foto con
-      permessi 777 → cambiarla in `/var/empty` (o togliere i permessi "Altro")
-- [ ] verificare che da Windows `\IP_NAS` con `matrimonio` l'accesso sia rifiutato
-- [ ] proprietario del dataset = `matrimonio` (Autorizzazioni → Modifica,
-      Applica utente/gruppo)
-- [ ] condivisione **NFS** del dataset, Host = solo l'IP della VM del server,
-      **Mapall User/Group = `matrimonio`**
-- [ ] attività di snapshot giornaliera sul dataset (è il backup delle foto)
+NAS **TrueNAS SCALE**, fatto:
+- [x] dataset dedicato `matrimonio-foto` (quota 200 GiB, proprietario e gruppo
+      `matrimonio`, permessi "Altro" a zero)
+- [x] utente di servizio `matrimonio`: password disabilitata, non è utente SMB
+      (nessun accesso SMB), nessun gruppo ausiliario, shell `nologin`. La home
+      resta sul dataset: va bene, perché "Altro" non ha permessi. Non metterla
+      in `/var/empty`: TrueNAS ne cambierebbe i permessi di sistema.
+- [x] condivisione **NFS** del dataset, solo per l'IP della VM del server,
+      Mapall User/Group = `matrimonio`; servizio NFS acceso e con avvio
+      automatico
+- [x] snapshot giornaliero (00:00, conservato 2 settimane): è il backup delle foto
+- [x] accesso SMB di `matrimonio` dato per verificato (autenticazione Samba: No)
 
-Poi, **sulla VM del server** (sostituire `IP_NAS` e `PERCORSO_DATASET`):
+Sulla **VM del server**, fatto:
+- [x] cartella montata in `/mnt/foto-matrimonio` via NFS, permanente in
+      `/etc/fstab` (`_netdev,nofail,soft,timeo=150,retrans=2`); i file creati
+      risultano di `matrimonio` (UID 3002), non di root
+- [x] file di controllo `.galleria-nas` creato nella cartella
 
-```bash
-sudo apt install -y nfs-common
-showmount -e IP_NAS
-sudo mkdir -p /mnt/foto-matrimonio
-sudo mount -t nfs IP_NAS:PERCORSO_DATASET /mnt/foto-matrimonio
-sudo touch /mnt/foto-matrimonio/prova.txt && ls -ln /mnt/foto-matrimonio && sudo rm /mnt/foto-matrimonio/prova.txt
-```
-
-Atteso: `showmount` elenca il dataset con l'IP della VM; `ls -ln` mostra come
-proprietario l'UID di `matrimonio` (non 0); nessun "Permission denied".
-Se va, renderlo permanente:
-
-```bash
-echo 'IP_NAS:PERCORSO_DATASET /mnt/foto-matrimonio nfs _netdev,nofail,soft,timeo=150,retrans=2 0 0' | sudo tee -a /etc/fstab
-sudo umount /mnt/foto-matrimonio && sudo mount -a && df -h /mnt/foto-matrimonio
-sudo touch /mnt/foto-matrimonio/.galleria-nas
-```
-
-`nofail`: la VM parte anche a NAS spenta; `soft,timeo=150`: se la NAS sparisce
-la galleria dà errore invece di bloccare tutta l'app; `.galleria-nas`: il file
-di controllo senza il quale l'app non scrive foto.
+**Problema aperto: il disco di sistema della VM è pieno al 100%** (`/` con 0
+byte liberi). Non riguarda le foto (stanno sulla NAS) ma Docker, il database e
+i log sì: da sistemare prima di tutto (`docker system df`, `du -xh / --max-depth=2`,
+immagini e log di Docker, `journalctl --vacuum-size`).
 
 Dopo: scrivere la galleria (si può anche prima, provandola in locale con una
 cartella normale) e collegarla con `GALLERIA_DIR=/mnt/foto-matrimonio` nel
